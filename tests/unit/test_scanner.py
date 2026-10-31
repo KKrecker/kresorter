@@ -1,5 +1,6 @@
 """Scanner: wires policy + walker + heuristics + hashing into a report. Read-only."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,7 @@ import pytest
 from fakes import FakeOpenFiles, make_policy
 from safeclean.core import hashing
 from safeclean.core.heuristics import JunkCategory, JunkClassifier, load_rules
-from safeclean.core.models import Skipped, SkipReason
+from safeclean.core.models import FileEntry, Skipped, SkipReason
 from safeclean.core.policy import BlockReason
 from safeclean.core.scanner import DuplicateGroup, ScanContext, scan
 
@@ -54,6 +55,11 @@ def test_report_counts_files_junk_and_skips(tmp_path: Path) -> None:
     )
 
 
+def entry(path: Path) -> FileEntry:
+    info = path.lstat()
+    return FileEntry(path=path, size=info.st_size, mtime_ns=info.st_mtime_ns)
+
+
 def test_identical_files_form_a_duplicate_group(tmp_path: Path) -> None:
     root = tmp_path / "root"
     a = write(root / "a.bin", b"same bytes")
@@ -63,9 +69,41 @@ def test_identical_files_form_a_duplicate_group(tmp_path: Path) -> None:
     report = scan([root], context(tmp_path))
 
     assert report.duplicates == (
-        DuplicateGroup(digest=hashing.hash_file(a), size=10, paths=(a, b)),
+        DuplicateGroup(digest=hashing.hash_file(a), entries=(entry(a), entry(b))),
     )
-    assert report.duplicates[0].wasted_bytes == 10
+    group = report.duplicates[0]
+    assert group.paths == (a, b)
+    assert group.size == 10
+    assert group.wasted_bytes == 10
+
+
+def test_duplicate_entries_carry_the_scanned_metadata(tmp_path: Path) -> None:
+    # Size and mtime_ns as scanned: what a quarantine Candidate and its twin are checked against.
+    root = tmp_path / "root"
+    a = write(root / "a.bin", b"same bytes")
+    b = write(root / "b.bin", b"same bytes")
+    os.utime(a, ns=(1, 1_000_000_000_000_000_000))
+    os.utime(b, ns=(1, 1_200_000_000_000_000_000))
+
+    (group,) = scan([root], context(tmp_path)).duplicates
+
+    assert [(e.path, e.size, e.mtime_ns) for e in group.entries] == [
+        (a, 10, 1_000_000_000_000_000_000),
+        (b, 10, 1_200_000_000_000_000_000),
+    ]
+
+
+def test_a_duplicate_group_needs_two_copies(tmp_path: Path) -> None:
+    one = FileEntry(path=tmp_path / "a.bin", size=10, mtime_ns=1)
+    with pytest.raises(ValueError, match="at least two"):
+        DuplicateGroup(digest="d", entries=(one,))
+
+
+def test_a_duplicate_group_has_one_size(tmp_path: Path) -> None:
+    a = FileEntry(path=tmp_path / "a.bin", size=10, mtime_ns=1)
+    b = FileEntry(path=tmp_path / "b.bin", size=11, mtime_ns=1)
+    with pytest.raises(ValueError, match="size"):
+        DuplicateGroup(digest="d", entries=(a, b))
 
 
 def test_duplicates_can_be_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -18,9 +18,11 @@ from pathlib import Path
 
 import pytest
 
+from fakes import FakeOpenFiles, make_policy
 from safeclean.analysis.duplicates import DuplicateDecision, KeepReason, decide
 from safeclean.core.heuristics import JunkClassifier, load_rules
 from safeclean.core.models import FileEntry
+from safeclean.core.scanner import ScanContext, scan
 from safeclean.quarantine.preflight import Candidate
 
 DIGEST = "ab" * 32
@@ -200,3 +202,28 @@ def test_copies_of_different_sizes_are_not_a_group(home: Path, zones: tuple[Path
 def test_the_same_path_twice_is_not_a_group(home: Path, zones: tuple[Path, ...]) -> None:
     with pytest.raises(ValueError, match="twice"):
         run([copy(home / "a.bin"), copy(home / "a.bin", T0 + 1)], zones)
+
+
+# --- fed by a real scan ------------------------------------------------------------------------
+
+
+def test_a_scanned_group_feeds_the_decision(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    for name in ("keep/a.bin", "Downloads/a.bin"):
+        (root / name).parent.mkdir(parents=True)
+        (root / name).write_bytes(b"same bytes")
+    context = ScanContext(
+        policy=make_policy(tmp_path),
+        open_files=FakeOpenFiles(),
+        classifier=CLASSIFIER,
+        open_files_checked=True,
+    )
+    (group,) = scan([root], context).duplicates
+
+    decision = decide(
+        group.digest, group.entries, classifier=CLASSIFIER, safe_zones=[root / "Downloads"]
+    )
+
+    assert decision.keep.path == root / "keep" / "a.bin"
+    assert [c.entry.path for c in decision.remove] == [root / "Downloads" / "a.bin"]
+    assert decision.remove[0].twin in group.entries
