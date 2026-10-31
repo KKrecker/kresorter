@@ -161,9 +161,7 @@ def test_legacy_item_without_atime_keeps_the_vault_atime(
     assert (zone / "a.bin").lstat().st_mtime_ns == MTIME_NS
 
 
-def test_missing_parent_directories_are_recreated(
-    service: QuarantineService, zone: Path
-) -> None:
+def test_missing_parent_directories_are_recreated(service: QuarantineService, zone: Path) -> None:
     item = quarantined(service, zone / "deep" / "er" / "a.bin")
     (zone / "deep").replace(zone / "moved-away")  # the whole parent chain is gone
 
@@ -298,9 +296,7 @@ def test_failed_move_keeps_the_item_quarantined_and_others_proceed(
     result = make_service(conn, policy, move).restore([first, second])
 
     assert result.state is OperationState.FAILED
-    assert [(r.item_id, r.reason) for r in result.refused] == [
-        (first, RestoreRefusal.MOVE_FAILED)
-    ]
+    assert [(r.item_id, r.reason) for r in result.refused] == [(first, RestoreRefusal.MOVE_FAILED)]
     assert "I/O error" in result.refused[0].detail
     assert [r.item_id for r in result.restored] == [second]
     assert item_state(conn, first) == "quarantined"
