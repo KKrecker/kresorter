@@ -119,3 +119,14 @@
 23. **The digest of a Run value covers the value and its flag** (name, type and data of each,
     every field length-prefixed, a missing flag included), so a changed flag counts as a
     changed entry.
+
+## Addendum (step 4, commit 6): the `winreg` adapter
+
+24. **`WinRegistry` opens every key read-only in the 64-bit view**
+    (`KEY_READ | KEY_WOW64_64KEY`), so `WOW6432Node` paths are read where they are written and
+    nothing is redirected behind our back. A missing key reads as `None`; any other failure,
+    opening or enumerating, is a `RegistryError` with the reason; the key is always closed.
+25. **Only `ERROR_NO_MORE_ITEMS` (259) ends an enumeration.** Any other error while enumerating
+    (for example `ERROR_MORE_DATA`) is a failure of the whole key, never a silently shorter list.
+26. `winreg` is imported on first use, like `msvcrt` (0009), and tested with a stand-in module.
+    Choosing the registry per platform belongs to the `safeclean autostart list` commit.
