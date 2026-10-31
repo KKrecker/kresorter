@@ -275,3 +275,15 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     every item carries `state from the file` (item 40). launchd directories do not overlay each
     other: one that cannot be listed is a skip with its reason, the others are still read. The
     digest covers the file bytes; launchd items are read-only in step 4 (item 9).
+
+## Addendum (step 4, commit 10): `safeclean autostart list`
+
+53. **One listing per platform, from its readers, joined in order**: Linux XDG autostart, then
+    systemd user units; Windows Run keys, startup folders, services, then scheduled tasks;
+    macOS launchd. An `AutostartContext` names everything read from the live system (platform,
+    environment, home, root, a registry factory), so the whole listing runs on temporary trees
+    and a fake registry in tests.
+54. **The registry is created on Windows only, once per listing**, by a factory (`WinRegistry`
+    on a live system); Linux and macOS never touch it. `--include-machine` changes nothing on
+    Linux and macOS, where no machine scope needs consent, and is accepted silently. The
+    caller detects the platform: `autostart.listing` does not depend on the CLI.
