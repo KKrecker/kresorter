@@ -42,7 +42,10 @@ _V1: Migration = (
     "CREATE INDEX items_by_state ON items (state)",
 )
 
-MIGRATIONS: tuple[Migration, ...] = (_V1,)
+# v2: atime at quarantine time, so restore can put it back (decision 0004, item 6).
+_V2: Migration = ("ALTER TABLE items ADD COLUMN atime_ns INTEGER",)
+
+MIGRATIONS: tuple[Migration, ...] = (_V1, _V2)
 SCHEMA_VERSION = len(MIGRATIONS)
 
 

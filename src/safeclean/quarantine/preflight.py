@@ -44,6 +44,7 @@ class RefusalReason(StrEnum):
     TWIN_CHANGED = "twin_changed"  # the copy that stays is no longer the scanned one
     TWIN_SAME_FILE = "twin_same_file"  # hard link: moving frees nothing
     CROSS_DEVICE = "cross_device"  # not on the vault's device; checked by the service
+    DUPLICATE_CANDIDATE = "duplicate_candidate"  # same path twice in one batch; by the service
 
 
 @dataclass(frozen=True)
