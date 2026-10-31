@@ -45,6 +45,39 @@ Scanner core and `safeclean scan` (read-only report).
 - **Quarantine works on files**, not directories; a cross-device file is refused
   (`CROSS_DEVICE`), never copied.
 
+### Step 3: done
+- `analysis.duplicates`: which copy of a duplicate group stays (not junk -> outside safe zones
+  -> oldest -> shallowest -> path), every other copy a `Candidate` twinned with the keeper; a
+  group never loses all copies.
+- `analysis.size_age`: large (>= 500 MiB) and old (>= 730 days by `mtime`) files.
+- `analysis.score`: levels `SAFE` / `LIKELY_SAFE` / `REVIEW` with pinned evidence and
+  user-facing reasons; large/old never raise a level; only `SAFE`/`LIKELY_SAFE` are proposed.
+- `analysis.report`: one read-only pass that merges all evidence into one finding per file;
+  a kept copy is never proposed, even when it is junk; absolute paths everywhere.
+- CLI: `safeclean analyze [paths] [--json] [--large MIB] [--older-than DAYS]` (read-only) and
+  `safeclean quarantine add --from-analysis [paths] --level {safe,likely_safe} [--yes]` (plan
+  without `--yes`, every file re-checked by preflight at move time).
+- Decision 0010 (with the 6b addendum). 512 tests, 100 % line and branch coverage.
+
+### Accepted limitations carried into step 4
+- Everything from step 2 still holds; in particular the **open-file check is Linux-only**, so
+  `quarantine add --from-analysis` exits with 3 on macOS and Windows, plan included (0010,
+  item 18).
+- **The plan and `--yes` are two analyses.** Nothing is stored between runs, so the `--yes` run
+  re-scans and may differ from the plan shown before (a file appeared, changed or vanished).
+  Safety does not depend on it: preflight re-checks every file, and the output lists exactly
+  what moved. A stored, signed plan would be a separate decision.
+- **Every run re-reads and re-hashes** the roots; there is no hash cache, and the whole report
+  (`ScanReport.entries`) is held in memory. Fine for home directories, slow for very large
+  trees.
+- **Duplicates are exact** (same content hash); no near-duplicates (resized photos, re-encoded
+  media). Hard links are left to preflight (`TWIN_SAME_FILE`).
+- **Age is `mtime` only**; `atime` is unreliable and never used, so "old" means "unmodified",
+  not "unused".
+- **Junk rules are static data** (`core/junk_rules.toml`, 14 rules); no user-defined rules yet.
+- **`REVIEW` is never moved in bulk**; large/old files go to the quarantine only when named by
+  hand (`safeclean quarantine add PATH`).
+
 ## Target package layout
 
 ```
@@ -52,7 +85,7 @@ src/safeclean/
 ├── core/         # step 1: models, policy, walker, hashing, heuristics, open_files, scanner
 ├── quarantine/   # step 2: move with metadata, restore (used by deletions AND organizer moves)
 ├── storage/      # step 2: SQLite index and operations journal
-├── analysis/     # step 3
+├── analysis/     # step 3: duplicates, size_age, score, report
 ├── autostart/    # step 4
 ├── organize/     # step 5
 ├── llm/          # step 6
