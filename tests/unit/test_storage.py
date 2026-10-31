@@ -132,6 +132,19 @@ def test_migrations_apply_in_order_from_current_version(tmp_path: Path) -> None:
 # --- transactions ------------------------------------------------------------------------------
 
 
+def _fail_inside_transaction(conn: sqlite3.Connection, error: BaseException) -> None:
+    with transaction(conn):
+        add_operation(conn)
+        raise error
+
+
+def _nest_transactions(conn: sqlite3.Connection) -> None:
+    with transaction(conn):
+        add_operation(conn)
+        with transaction(conn):
+            pass  # pragma: no cover - never reached
+
+
 def test_transaction_commits_and_is_visible_to_other_connections(
     conn: sqlite3.Connection, tmp_path: Path
 ) -> None:
@@ -147,19 +160,16 @@ def test_transaction_commits_and_is_visible_to_other_connections(
 def test_transaction_rolls_back_on_any_exception(
     conn: sqlite3.Connection, error: BaseException
 ) -> None:
-    with pytest.raises(type(error)), transaction(conn):
-        add_operation(conn)
-        raise error
+    with pytest.raises(type(error)):
+        _fail_inside_transaction(conn, error)
 
     assert count(conn, "operations") == 0
     assert not conn.in_transaction
 
 
 def test_nested_transaction_is_rejected_and_outer_rolled_back(conn: sqlite3.Connection) -> None:
-    with pytest.raises(StorageError, match="nested"), transaction(conn):
-        add_operation(conn)
-        with transaction(conn):
-            pass  # pragma: no cover - never reached
+    with pytest.raises(StorageError, match="nested"):
+        _nest_transactions(conn)
 
     assert count(conn, "operations") == 0
 
