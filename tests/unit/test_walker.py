@@ -12,7 +12,6 @@ from typing import Any
 import pytest
 from fakes import FakeOpenFiles
 
-from safeclean.core import walker
 from safeclean.core.models import FileEntry, Skipped, SkipReason
 from safeclean.core.policy import BlockReason, PathPolicy
 from safeclean.core.walker import walk
@@ -162,7 +161,7 @@ def failing_scandir(
             raise error
         return real(path)
 
-    monkeypatch.setattr(walker.os, "scandir", fake)
+    monkeypatch.setattr(os, "scandir", fake)
     return fake
 
 
@@ -216,7 +215,8 @@ class FakeEntry:
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
         if self._stat_error:
             raise FileNotFoundError(2, "gone")
-        return os.stat_result((0o100644, 0, 0, 1, 0, 0, 7, 0, 42, 0))
+        # st_size=7, st_mtime=42.0 (float fields follow the 10 integer ones)
+        return os.stat_result((0o100644, 0, 0, 1, 0, 0, 7, 0, 42, 0, 0.0, 42.0, 0.0))
 
 
 def fake_listing(monkeypatch: pytest.MonkeyPatch, root: Path, entries: list[FakeEntry]) -> None:
@@ -227,7 +227,7 @@ def fake_listing(monkeypatch: pytest.MonkeyPatch, root: Path, entries: list[Fake
         def __exit__(self, *exc: object) -> None:
             return None
 
-    monkeypatch.setattr(walker.os, "scandir", lambda path: Listing())
+    monkeypatch.setattr(os, "scandir", lambda path: Listing())
 
 
 def test_windows_junction_is_treated_as_link(
@@ -251,7 +251,8 @@ def test_file_vanishing_during_walk_is_reported(
 
     events = run(tmp_path, [root])
 
+    # Sorted by name: "b" < "gone.txt".
     assert events == [
-        Skipped(path=root / "gone.txt", reason=SkipReason.NOT_FOUND),
         FileEntry(path=root / "b", size=7, mtime=42.0),
+        Skipped(path=root / "gone.txt", reason=SkipReason.NOT_FOUND),
     ]

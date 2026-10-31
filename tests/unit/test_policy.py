@@ -63,7 +63,9 @@ ALLOWED = Verdict(allowed=True, reason=None)
         pytest.param(r"C:\ProgramData\Vendor\cfg.ini", blocked(BlockReason.SYSTEM), id="pdata"),
         pytest.param(r"C:\pagefile.sys", blocked(BlockReason.SYSTEM), id="pagefile"),
         pytest.param(r"C:\$Recycle.Bin\S-1\x", blocked(BlockReason.SYSTEM), id="recycle-bin"),
-        pytest.param(r"C:\Users\Bob\Documents\a.txt", blocked(BlockReason.PROFILE), id="other-user"),
+        pytest.param(
+            r"C:\Users\Bob\Documents\a.txt", blocked(BlockReason.PROFILE), id="other-user"
+        ),
         pytest.param(r"C:\Users\Public\a.txt", blocked(BlockReason.PROFILE), id="public"),
         pytest.param(r"C:\Users\Alice\NTUSER.DAT", blocked(BlockReason.PROFILE), id="ntuser"),
         pytest.param(r"C:\Users\Alice\ntuser.dat.LOG1", blocked(BlockReason.PROFILE), id="ntlog"),
