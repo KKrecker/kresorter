@@ -130,3 +130,27 @@
     (for example `ERROR_MORE_DATA`) is a failure of the whole key, never a silently shorter list.
 26. `winreg` is imported on first use, like `msvcrt` (0009), and tested with a stand-in module.
     Choosing the registry per platform belongs to the `safeclean autostart list` commit.
+
+## Addendum (step 4, commit 7): startup folders
+
+27. **Where startup folders are read.** The user's
+    (`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`) always; the common one
+    (`%ProgramData%\...\Programs\StartUp`) only with `--include-machine`, because its state
+    lives in `HKLM` (item 5). A variable that is unset or not absolute means no folder. Order:
+    the user folder, then the common one; by file name, ignoring case, within a folder.
+28. **One item per file; the command is the file itself**, as Explorer opens it. `desktop.ini`
+    is the folder's own settings and is not an entry. A sub-folder, a file larger than
+    `MAX_ENTRY_BYTES` or one that cannot be read is skipped with a reason. A folder that does
+    not exist is empty; one that exists but cannot be listed is a skip with the reason.
+29. **Shortcut (`.lnk`) targets are not resolved in step 4.** The Shell Link format is binary;
+    parsing it is a commit of its own with its own risk analysis (a size limit, strict
+    validation of every structure, no guessing on malformed data).
+30. **The state is the file's flag in `Explorer\StartupApproved\StartupFolder`** of the same
+    hive (`HKCU` for the user folder, `HKLM` for the common one), matched by file name
+    ignoring case, with the rules of item 21 (`registry.approved_state()`, shared with Run):
+    an unknown flag skips the file (item 12); a flag key that cannot be read makes the state
+    of the whole folder unknown (one skip for the key, no items). Flags are read only for a
+    folder that has files.
+31. **The digest covers the file bytes and its flag** (length-prefixed, a missing flag
+    included), so a changed file or a changed flag counts as a changed entry. Startup folder
+    items are read-only in step 4 (item 9): `disableable` is false.

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from typing import Protocol
 
+from safeclean.autostart.entries import BrokenEntryError
 from safeclean.autostart.models import entry_digest
 
 RegData = str | bytes | int | list[str] | None
@@ -78,3 +79,26 @@ def _encode(value: RegValue) -> bytes:
 
 def _field(raw: bytes) -> bytes:
     return len(raw).to_bytes(4, "big") + raw
+
+
+_ENABLED = frozenset({0x02, 0x06})
+_DISABLED = frozenset({0x03, 0x07})
+
+
+def approved_state(flag: RegValue | None) -> bool:
+    """The state an ``Explorer\\StartupApproved`` flag gives, as the Task Manager reads it.
+
+    No flag is enabled, ``0x02``/``0x06`` enabled, ``0x03``/``0x07`` disabled; anything else is
+    an unknown state, a ``BrokenEntryError`` (0011, items 12 and 21).
+    """
+    if flag is None:
+        return True
+    if flag.kind != ValueKind.REG_BINARY or not isinstance(flag.data, bytes):
+        raise BrokenEntryError("StartupApproved value is not binary")
+    if not flag.data:
+        raise BrokenEntryError("unknown StartupApproved state (empty)")
+    if flag.data[0] in _ENABLED:
+        return True
+    if flag.data[0] in _DISABLED:
+        return False
+    raise BrokenEntryError(f"unknown StartupApproved state 0x{flag.data[0]:02x}")

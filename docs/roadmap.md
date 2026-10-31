@@ -86,6 +86,13 @@ Linux:
 - `<target>.requires/` is not read;
 - units enabled for all users (`/etc/systemd/user`) are not read.
 
+Deferred on Windows (decision 0011, item 29): shortcut (`.lnk`) targets in startup folders are
+not resolved; the item's command is the shortcut file itself.
+
+Remaining commits: 8 services (the `Registry` protocol gains sub-keys), 9 scheduled tasks and
+macOS LaunchAgents, 10 `safeclean autostart list`, 11 journal schema v3, 12 `autostart
+disable/enable`.
+
 ## Target package layout
 
 ```

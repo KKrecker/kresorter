@@ -27,6 +27,7 @@ from safeclean.autostart.registry import (
     RegistryError,
     RegValue,
     ValueKind,
+    approved_state,
     kind_name,
     value_digest,
 )
@@ -40,8 +41,6 @@ APPROVED_32 = APPROVED + "32"
 DEFAULT_NAME = "(Default)"
 
 _STRING_KINDS = (ValueKind.REG_SZ, ValueKind.REG_EXPAND_SZ)
-_ENABLED = frozenset({0x02, 0x06})
-_DISABLED = frozenset({0x03, 0x07})
 _SCOPES = {Hive.HKCU: Scope.USER, Hive.HKLM: Scope.SYSTEM}
 _VIEW_32 = "32-bit view"
 
@@ -113,7 +112,7 @@ def _item(
     if source is Source.RUN_ONCE_KEY:
         enabled, notes = True, (*view.notes, "runs once at the next logon")
     else:
-        enabled = _state(flag)
+        enabled = approved_state(flag)
         disabled = () if enabled else (rf"disabled in {view.hive}\{view.approved}",)
         notes = (*view.notes, *disabled)
     return AutostartItem(
@@ -126,17 +125,3 @@ def _item(
         digest=value_digest(value, flag),
         notes=notes,
     )
-
-
-def _state(flag: RegValue | None) -> bool:
-    if flag is None:
-        return True
-    if flag.kind != ValueKind.REG_BINARY or not isinstance(flag.data, bytes):
-        raise BrokenEntryError("StartupApproved value is not binary")
-    if not flag.data:
-        raise BrokenEntryError("unknown StartupApproved state (empty)")
-    if flag.data[0] in _ENABLED:
-        return True
-    if flag.data[0] in _DISABLED:
-        return False
-    raise BrokenEntryError(f"unknown StartupApproved state 0x{flag.data[0]:02x}")
