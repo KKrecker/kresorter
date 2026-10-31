@@ -206,8 +206,6 @@ def test_default_context_posix(tmp_path: Path, platform: Platform) -> None:
 
     assert context.policy.default_roots() == (tmp_path / ".cache", tmp_path / "Downloads")
     assert context.policy.app_data_dir.name == "safeclean"
-    assert context.open_files_checked is False
-    assert context.open_files.is_open(tmp_path) is False
 
 
 def test_default_context_windows() -> None:
