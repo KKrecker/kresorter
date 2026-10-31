@@ -128,9 +128,7 @@ def test_a_hidden_stub_without_a_system_entry_is_skipped(user: Path, system: Pat
 
     assert read(user, system) == AutostartListing(
         items=(),
-        skipped=(
-            AutostartSkipped(Source.XDG_AUTOSTART, str(stub), "Hidden=true hides no entry"),
-        ),
+        skipped=(AutostartSkipped(Source.XDG_AUTOSTART, str(stub), "Hidden=true hides no entry"),),
     )
 
 
