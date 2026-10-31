@@ -287,3 +287,12 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     on a live system); Linux and macOS never touch it. `--include-machine` changes nothing on
     Linux and macOS, where no machine scope needs consent, and is accepted silently. The
     caller detects the platform: `autostart.listing` does not depend on the CLI.
+55. **`safeclean autostart list [--json] [--include-machine]` reports only**: it creates,
+    changes and deletes nothing (not even the data directory), builds no scan context and
+    always exits with 0 once it has listed; `safeclean autostart` without an action is a
+    usage error (2). The text groups entries by source in reader order, each with its state
+    and scope, `command`, `location`, `shadows` if any and every note, then the skips. On
+    Windows without `--include-machine` a note says what was not read. JSON has `platform`,
+    `include_machine`, every item field and the skips.
+56. **`disableable` is not shown** until `autostart disable` exists (commit 12): the report
+    does not promise an action it cannot take yet.

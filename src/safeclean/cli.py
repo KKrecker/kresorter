@@ -1,4 +1,4 @@
-"""Console interface. ``scan`` and ``analyze`` report and change nothing; ``quarantine`` acts."""
+"""Console interface. ``scan``, ``analyze`` and ``autostart list`` report; ``quarantine`` acts."""
 
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, TextIO
 
-from safeclean import cli_analyze, cli_quarantine
+from safeclean import cli_analyze, cli_autostart, cli_quarantine
+from safeclean.autostart.listing import AutostartContext, default_autostart_context
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.open_files import checker_for_platform
 from safeclean.core.policy import PathPolicy
@@ -72,6 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan_cmd.add_argument("--no-hash", action="store_true", help="skip duplicate detection")
     cli_analyze.add_parser(commands)
     cli_quarantine.add_parser(commands)
+    cli_autostart.add_parser(commands)
     return parser
 
 
@@ -81,9 +83,16 @@ def main(
     out: TextIO | None = None,
     err: TextIO | None = None,
     context_factory: Callable[[], ScanContext] | None = None,
+    autostart_context: Callable[[], AutostartContext] | None = None,
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "autostart":  # needs no scan context
+        if autostart_context is None:
+            listing_context = default_autostart_context(detect_platform())
+        else:
+            listing_context = autostart_context()
+        return cli_autostart.run(args, listing_context, out or sys.stdout)
     cli_quarantine.check_usage(parser, args)
     context = (context_factory or default_context)()
     if args.command == "analyze":

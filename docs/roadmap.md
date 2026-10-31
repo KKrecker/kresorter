@@ -98,8 +98,7 @@ delays are not taken into account and `TaskCache` is not compared with the XML; 
 state comes from the file only (`/var/db/com.apple.xpc.launchd/` overrides are root-only and not
 read), `LimitLoadToSessionType` is ignored, `/System/Library` is not read.
 
-Remaining commits: 10 `safeclean autostart list`, 11 journal schema v3, 12 `autostart
-disable/enable`.
+Remaining commits: 11 journal schema v3, 12 `autostart disable/enable`.
 
 ## Target package layout
 
