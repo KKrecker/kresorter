@@ -60,6 +60,7 @@ class ScanReport:
     roots: tuple[Path, ...]
     files_scanned: int
     bytes_scanned: int
+    entries: tuple[FileEntry, ...]  # every scanned file, for analysis
     junk: tuple[JunkFinding, ...]
     duplicates: tuple[DuplicateGroup, ...]
     skipped: tuple[Skipped, ...]
@@ -81,6 +82,7 @@ def scan(
         roots=tuple(roots),
         files_scanned=len(entries),
         bytes_scanned=sum(e.size for e in entries),
+        entries=tuple(entries),
         junk=tuple(_junk(entries, context.classifier)),
         duplicates=duplicates,
         skipped=tuple(skipped),
