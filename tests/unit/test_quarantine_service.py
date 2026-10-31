@@ -24,6 +24,7 @@ from safeclean.quarantine.service import (
     OperationState,
     QuarantineError,
     QuarantineService,
+    RecoveryReport,
 )
 from safeclean.quarantine.vault import Vault
 from safeclean.storage.db import connect
@@ -338,6 +339,70 @@ def test_interrupt_mid_batch_rolls_back_then_propagates(
     assert rows(conn, "SELECT state FROM operations") == [("rolled_back",)]
 
 
+def interrupted_after(call: int) -> Move:
+    """``Path.replace`` whose ``call``-th rename completes, then an interrupt arrives."""
+    calls = 0
+
+    def move(source: Path, target: Path) -> object:
+        nonlocal calls
+        calls += 1
+        source.replace(target)
+        if calls == call:
+            raise KeyboardInterrupt
+        return None
+
+    return move
+
+
+def test_interrupt_right_after_a_completed_rename_still_rolls_it_back(
+    conn: sqlite3.Connection, policy: PathPolicy, data_dir: Path, zone: Path
+) -> None:
+    # The rename happened but the service never learned it: the disk, not memory, decides.
+    a = scanned(write(zone / "a.bin", b"aaa"))
+    service = make_service(conn, policy, move=interrupted_after(1))
+
+    with pytest.raises(KeyboardInterrupt):
+        service.quarantine([Candidate(entry=a)])
+
+    assert a.path.read_bytes() == b"aaa"
+    assert not any(p.is_file() for p in (data_dir / "quarantine").rglob("*"))
+    assert rows(conn, "SELECT state FROM items") == [("rolled_back",)]
+    assert rows(conn, "SELECT state FROM operations") == [("rolled_back",)]
+
+
+def test_interrupt_during_rollback_is_reconciled_from_disk_by_recover(
+    conn: sqlite3.Connection, policy: PathPolicy, zone: Path
+) -> None:
+    # Move 1 (a) succeeds, move 2 (b) fails, move 3 puts a back and is then interrupted:
+    # a is home again but the journal still says quarantined, and the operation is pending.
+    a = scanned(write(zone / "a.bin", b"aaa"))
+    b = scanned(write(zone / "b.bin", b"bbb"))
+    calls = 0
+
+    def move(source: Path, target: Path) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError(5, "I/O error")
+        source.replace(target)
+        if calls == 3:
+            raise KeyboardInterrupt
+        return None
+
+    service = make_service(conn, policy, move=move)
+    with pytest.raises(KeyboardInterrupt):
+        service.quarantine([Candidate(entry=a), Candidate(entry=b)])
+    assert rows(conn, "SELECT state FROM operations") == [("pending",)]
+
+    report = service.recover()
+
+    assert set(report.rolled_back) == {a.path, b.path}
+    assert report.lost == ()
+    assert rows(conn, "SELECT state FROM items ORDER BY id") == [("rolled_back",), ("rolled_back",)]
+    assert rows(conn, "SELECT state FROM operations") == [("rolled_back",)]
+    assert a.path.read_bytes() == b"aaa"
+
+
 def test_rollback_never_overwrites_a_new_file_at_the_original_path(
     conn: sqlite3.Connection, policy: PathPolicy, zone: Path
 ) -> None:
@@ -515,3 +580,33 @@ def test_after_recover_new_operations_are_allowed(
     service.recover()
     a = scanned(write(zone / "a.bin"))
     assert service.quarantine([Candidate(entry=a)]).state is OperationState.DONE
+
+
+def test_recover_leaves_an_intact_item_of_an_interrupted_rollback_quarantined(
+    service: QuarantineService, conn: sqlite3.Connection, zone: Path
+) -> None:
+    # Interrupted before its move back: still in the vault, still ours, nothing to report.
+    a = scanned(write(zone / "a.bin"))
+    service.quarantine([Candidate(entry=a)])
+    conn.execute("UPDATE operations SET state = 'pending'")
+
+    report = service.recover()
+
+    assert report == RecoveryReport()
+    assert rows(conn, "SELECT state FROM items") == [("quarantined",)]
+    assert rows(conn, "SELECT state FROM operations") == [("done",)]
+
+
+def test_recover_reports_a_tampered_item_of_an_interrupted_rollback_as_lost(
+    service: QuarantineService, conn: sqlite3.Connection, zone: Path
+) -> None:
+    a = scanned(write(zone / "a.bin"))
+    result = service.quarantine([Candidate(entry=a)])
+    conn.execute("UPDATE operations SET state = 'pending'")
+    result.moved[0].vault_path.write_bytes(b"something else")
+
+    report = service.recover()
+
+    assert report.lost == (a.path,)
+    assert len(report.warnings) == 1
+    assert rows(conn, "SELECT state FROM items") == [("lost",)]
