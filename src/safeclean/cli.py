@@ -82,7 +82,9 @@ def main(
     err: TextIO | None = None,
     context_factory: Callable[[], ScanContext] | None = None,
 ) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    cli_quarantine.check_usage(parser, args)
     context = (context_factory or default_context)()
     if args.command == "analyze":
         return cli_analyze.run(args, context, out or sys.stdout)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -60,10 +61,12 @@ def add_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) ->
     )
 
 
-def run(args: argparse.Namespace, context: ScanContext, out: TextIO) -> int:
-    roots = [Path(p) for p in args.paths or context.policy.default_roots()]
+def analyze_paths(
+    paths: Sequence[str], context: ScanContext, thresholds: Thresholds
+) -> tuple[ScanReport, AnalysisReport]:
+    """Scan ``paths`` (default: the safe zones) and rate what was found. Read-only."""
+    roots = [Path(p) for p in paths or context.policy.default_roots()]
     scanned = scan(roots, context, hash_duplicates=True)
-    thresholds = Thresholds(large_bytes=args.large * MIB, old_after_days=args.older_than)
     analysis = analyze(
         scanned,
         classifier=context.classifier,
@@ -71,6 +74,12 @@ def run(args: argparse.Namespace, context: ScanContext, out: TextIO) -> int:
         now_ns=time.time_ns(),
         thresholds=thresholds,
     )
+    return scanned, analysis
+
+
+def run(args: argparse.Namespace, context: ScanContext, out: TextIO) -> int:
+    thresholds = Thresholds(large_bytes=args.large * MIB, old_after_days=args.older_than)
+    scanned, analysis = analyze_paths(args.paths, context, thresholds)
     render = render_json if args.json else render_text
     out.write(render(scanned, analysis, thresholds, context.open_files_checked))
     return 0
@@ -79,7 +88,7 @@ def run(args: argparse.Namespace, context: ScanContext, out: TextIO) -> int:
 # --- rendering ---------------------------------------------------------------------------------
 
 
-def _finding_lines(finding: Finding) -> list[str]:
+def finding_lines(finding: Finding) -> list[str]:
     kept = "" if finding.keeps is None else "  (kept copy, not proposed)"
     lines = [f"  {finding.entry.path}  {format_size(finding.entry.size)}{kept}"]
     lines += [f"    {r.evidence}: {r.detail}" for r in finding.reasons]
@@ -93,7 +102,7 @@ def _level_lines(analysis: AnalysisReport) -> list[str]:
         lines.append(f"{_TITLES[total.level]}: {files}")
         for finding in analysis.findings:
             if finding.level is total.level:
-                lines += _finding_lines(finding)
+                lines += finding_lines(finding)
         lines.append("")
     return lines
 

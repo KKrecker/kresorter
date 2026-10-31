@@ -46,3 +46,22 @@
 13. **`REVIEW` findings list all their reasons**, so the user sees why a file is in the report
     even when nothing is proposed.
 14. **Bulk quarantine from an analysis** shows the plan and acts only with `--yes`.
+
+## Addendum (commit 6b): `quarantine add --from-analysis`
+
+15. **`--level` is the least safe level to take**, and it includes the stricter ones:
+    `safe` takes `SAFE`; `likely_safe` takes `SAFE` and `LIKELY_SAFE`. `review` is not a
+    choice, so `REVIEW` findings are never moved in bulk; kept duplicate copies never are
+    either (`Finding.proposed`).
+16. **The analysis runs inside the quarantine command**: after the data directory check, the
+    single-instance lock and `recover()`, with the default thresholds (they only decide
+    `REVIEW`, which is never moved). Without `--yes` the plan is shown and the exit code is 1,
+    as for `purge`.
+17. **The analysis is not trusted at move time.** Every candidate goes through preflight like a
+    hand-picked file: a file opened, changed or replaced since the analysis is refused and the
+    rest move (exit 1). Preflight stays the last word.
+18. **No reliable open-file check means no bulk add, not even the plan** (exit 3, as for every
+    quarantine command). Showing the plan with a warning would be a separate decision.
+19. **Usage combinations argparse cannot express** (`--level`/`--yes` without
+    `--from-analysis`, `--from-analysis` without `--level`, neither paths nor
+    `--from-analysis`) are usage errors with exit 2.
