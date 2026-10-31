@@ -43,6 +43,7 @@ class RefusalReason(StrEnum):
     TWIN_MISSING = "twin_missing"  # the copy that stays is gone or unreadable
     TWIN_CHANGED = "twin_changed"  # the copy that stays is no longer the scanned one
     TWIN_SAME_FILE = "twin_same_file"  # hard link: moving frees nothing
+    CROSS_DEVICE = "cross_device"  # not on the vault's device; checked by the service
 
 
 @dataclass(frozen=True)

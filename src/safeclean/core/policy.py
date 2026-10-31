@@ -55,10 +55,10 @@ class _ProfileRules:
 APP_NAME = "safeclean"
 
 
-def _xdg_data_home(home: PurePosixPath, env: Mapping[str, str]) -> PurePosixPath:
+def _xdg_data_home(default: PurePosixPath, env: Mapping[str, str]) -> PurePosixPath:
     """``$XDG_DATA_HOME`` if absolute (the spec says to ignore relative values), else default."""
     value = PurePosixPath(env.get("XDG_DATA_HOME") or ".")
-    return value if value.is_absolute() else home / ".local" / "share"
+    return value if value.is_absolute() else default
 
 
 def _is_under(parts: Parts, prefix: Parts) -> bool:
@@ -112,12 +112,15 @@ class PathPolicy:
             ("Program Files", "Program Files (x86)"),
         )
         system = paths(("SystemRoot", "ProgramData"), ("Windows", "ProgramData"))
+        default_local = home / "AppData" / "Local"
         local = env.get("LOCALAPPDATA")
-        local_root = PureWindowsPath(local) if local else home / "AppData" / "Local"
+        local_root = PureWindowsPath(local) if local else default_local
         return cls(
             flavor=PureWindowsPath,
             case_sensitive=False,
-            prefix_rules=[(p, BlockReason.PROGRAM_FILES) for p in program_files]
+            # The default data dir stays blocked when LOCALAPPDATA points elsewhere.
+            prefix_rules=[(default_local / APP_NAME, BlockReason.APP_DATA)]
+            + [(p, BlockReason.PROGRAM_FILES) for p in program_files]
             + [(p, BlockReason.SYSTEM) for p in system],
             root_entry_names=(
                 "pagefile.sys",
@@ -151,15 +154,19 @@ class PathPolicy:
         if platform == "darwin":
             system = (*common, "/System", "/Library", "/private", "/cores")
             program_files = ("/Applications", "/opt")
-            data_root = home / "Library" / "Application Support"
+            default_data_root = home / "Library" / "Application Support"
+            data_root = default_data_root
         else:
             system = (*common, "/boot", "/lib", "/lib32", "/lib64", "/proc", "/sys", "/run")
             program_files = ("/opt", "/snap")
-            data_root = _xdg_data_home(home, env or {})
+            default_data_root = home / ".local" / "share"
+            data_root = _xdg_data_home(default_data_root, env or {})
         return cls(
             flavor=PurePosixPath,
             case_sensitive=platform == "linux",
-            prefix_rules=[(PurePosixPath(p), BlockReason.SYSTEM) for p in system]
+            # The default data dir stays blocked when XDG_DATA_HOME points elsewhere.
+            prefix_rules=[(default_data_root / APP_NAME, BlockReason.APP_DATA)]
+            + [(PurePosixPath(p), BlockReason.SYSTEM) for p in system]
             + [(PurePosixPath(p), BlockReason.PROGRAM_FILES) for p in program_files],
             root_entry_names=(),
             profile=(home.parent, home, [PurePosixPath(".ssh"), PurePosixPath(".gnupg")], []),

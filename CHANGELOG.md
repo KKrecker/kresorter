@@ -17,6 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `core.open_files` package: `reliable` flag on the checker protocol; Linux backend `ProcFdChecker` (`/proc/*/fd`, matches by `st_dev`/`st_ino`, fails closed); `checker_for_platform()` gives other OSes an unreliable placeholder (decision 0005).
 - `BlockReason.APP_DATA`: safeclean's data directory (`$XDG_DATA_HOME/safeclean` or `~/.local/share/safeclean`, `~/Library/Application Support/safeclean`, `%LOCALAPPDATA%\safeclean`) is blacklisted, so the vault and journal never appear in a scan, even when a parent is scanned explicitly; exposed as `PathPolicy.app_data_dir` (decision 0004).
 - `quarantine.preflight`: per-item re-validation right before acting (policy -> disk -> duplicate twin -> open files last); 11 refusal reasons incl. parent swapped for a link and hard-linked twin; refuses an unreliable open-file checker.
+- `quarantine.vault` and `quarantine.service`: private vault (0700) in the data directory, journal-before-move, same-device `Path.replace` only (`CROSS_DEVICE` refused), atomic batch with rollback that never overwrites, `recover()` that trusts only an exact vault copy (decision 0006). Default data directories stay blocked under custom `XDG_DATA_HOME`/`LOCALAPPDATA`.
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Changed
