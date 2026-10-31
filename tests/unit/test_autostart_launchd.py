@@ -25,6 +25,7 @@ from safeclean.autostart.models import (
 )
 
 Dirs = tuple[Path, Path, Path]
+Content = dict[str, object] | list[object] | bytes  # a property list to write, or raw bytes
 
 INVALID = "not a valid property list"
 FROM_FILE = "state from the file"  # launchd's own overrides are not read (0011, item 40)
@@ -35,7 +36,7 @@ AGENT: dict[str, object] = {
 }
 
 
-def plist(directory: Path, name: str, content: object = AGENT, *, binary: bool = False) -> Path:
+def plist(directory: Path, name: str, content: Content = AGENT, *, binary: bool = False) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / name
     form = plistlib.FMT_BINARY if binary else plistlib.FMT_XML
@@ -199,7 +200,7 @@ def test_program_is_the_executable_and_program_arguments_the_argv(
         (xml_plist("<key>A</key><integer>zz</integer>"), INVALID),
     ],
 )
-def test_an_agent_that_does_not_parse_is_skipped(dirs: Dirs, content: object, detail: str) -> None:
+def test_an_agent_that_does_not_parse_is_skipped(dirs: Dirs, content: Content, detail: str) -> None:
     path = plist(dirs[0], "a.plist", content)
 
     assert read(dirs) == skip(path, detail)
