@@ -1,4 +1,4 @@
-"""Console interface. ``safeclean scan`` reports and changes nothing; ``quarantine`` acts."""
+"""Console interface. ``scan`` and ``analyze`` report and change nothing; ``quarantine`` acts."""
 
 from __future__ import annotations
 
@@ -11,13 +11,12 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, TextIO
 
-from safeclean import cli_quarantine
+from safeclean import cli_analyze, cli_quarantine
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
-from safeclean.core.models import Skipped
 from safeclean.core.open_files import checker_for_platform
 from safeclean.core.policy import PathPolicy
 from safeclean.core.scanner import JunkFinding, ScanContext, ScanReport, scan
-from safeclean.text import count, format_size
+from safeclean.text import OPEN_FILES_NOTE, count, format_size, skip_json, skip_line
 
 __all__ = [
     "build_parser",
@@ -71,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan_cmd.add_argument("paths", nargs="*", help="directories to scan (default: safe zones)")
     scan_cmd.add_argument("--json", action="store_true", help="machine-readable output")
     scan_cmd.add_argument("--no-hash", action="store_true", help="skip duplicate detection")
+    cli_analyze.add_parser(commands)
     cli_quarantine.add_parser(commands)
     return parser
 
@@ -84,6 +84,8 @@ def main(
 ) -> int:
     args = build_parser().parse_args(argv)
     context = (context_factory or default_context)()
+    if args.command == "analyze":
+        return cli_analyze.run(args, context, out or sys.stdout)
     if args.command == "quarantine":
         return cli_quarantine.run(args, context, out or sys.stdout, err or sys.stderr)
     roots = [Path(p) for p in args.paths or context.policy.default_roots()]
@@ -94,12 +96,6 @@ def main(
 
 
 # --- rendering -----------------------------------------------------------------------------------
-
-
-def _skip_line(item: Skipped) -> str:
-    label = f"{item.reason} ({item.block_reason})" if item.block_reason else str(item.reason)
-    detail = f" ({item.detail})" if item.detail else ""
-    return f"  {label}: {item.path}{detail}"
 
 
 def _junk_lines(junk: Sequence[JunkFinding]) -> list[str]:
@@ -133,13 +129,10 @@ def render_text(report: ScanReport, open_files_checked: bool) -> str:
         f"Scanned: {count(report.files_scanned, 'file')}, {format_size(report.bytes_scanned)}",
     ]
     if not open_files_checked:
-        lines.append(
-            "Note: open-file check is not available yet; "
-            "files will be re-checked before any action."
-        )
+        lines.append(OPEN_FILES_NOTE)
     lines += ["", *_junk_lines(report.junk), "", *_duplicate_lines(report), ""]
     lines.append(f"Skipped: {len(report.skipped)}")
-    lines += [_skip_line(item) for item in report.skipped]
+    lines += [skip_line(item) for item in report.skipped]
     return "\n".join(lines) + "\n"
 
 
@@ -162,14 +155,6 @@ def render_json(report: ScanReport, open_files_checked: bool) -> str:
             {"digest": g.digest, "size": g.size, "paths": [str(p) for p in g.paths]}
             for g in report.duplicates
         ],
-        "skipped": [
-            {
-                "path": str(s.path),
-                "reason": str(s.reason),
-                "block_reason": str(s.block_reason) if s.block_reason else None,
-                "detail": s.detail,
-            }
-            for s in report.skipped
-        ],
+        "skipped": [skip_json(s) for s in report.skipped],
     }
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
