@@ -13,6 +13,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `core.hashing`: streaming BLAKE2b; duplicate candidates via size groups -> prefix hash -> full hash; files changed since scan or during hashing reported as `changed`.
 - `core.heuristics` + `core/junk_rules.toml`: junk rules as data (14 default rules: caches, temp, thumbnails, crash dumps, OS metadata) with strict validation.
 - `FileEntry.mtime_ns` (int) replaces float `mtime`: exact change detection.
+- `storage`: SQLite journal (WAL, foreign keys, synchronous=FULL, busy_timeout), all-or-nothing versioned migrations, `BEGIN IMMEDIATE` transactions with rollback on any exception; schema v1 (`operations`, `items`, STRICT + CHECK).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Changed
