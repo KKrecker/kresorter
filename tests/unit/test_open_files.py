@@ -12,8 +12,8 @@ import pytest
 
 from safeclean.core.open_files import (
     NoOpenFileCheck,
-    OpenFileCheckError,
     OpenFileChecker,
+    OpenFileCheckError,
     ProcFdChecker,
     checker_for_platform,
 )
@@ -126,7 +126,7 @@ def test_missing_proc_fails_closed(tmp_path: Path, target: Path) -> None:
 
 
 def test_missing_target_fails_closed(proc: Path, tmp_path: Path) -> None:
-    with pytest.raises(OpenFileCheckError, match="missing.bin"):
+    with pytest.raises(OpenFileCheckError, match=r"missing\.bin"):
         ProcFdChecker(proc_root=proc).is_open(tmp_path / "missing.bin")
 
 
