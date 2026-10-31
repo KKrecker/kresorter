@@ -46,8 +46,12 @@ class Registry(Protocol):
     def values(self, hive: Hive, key: str) -> Sequence[RegValue] | None: ...
 
 
+_KIND_NAMES = {kind.value: kind.name for kind in ValueKind}
+
+
 def kind_name(kind: int) -> str:
-    return ValueKind(kind).name if kind in ValueKind else f"type {kind}"
+    """``REG_*`` name of a type number; one the registry reports but we do not know by number."""
+    return _KIND_NAMES.get(kind, f"type {kind}")
 
 
 def value_digest(*values: RegValue | None) -> str:
