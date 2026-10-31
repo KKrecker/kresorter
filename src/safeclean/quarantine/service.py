@@ -215,13 +215,7 @@ class QuarantineService:
         delete: Delete = delete_from_vault,
     ) -> None:
         self._preflight = Preflight(policy, open_files)
-        data_dir = Path(policy.app_data_dir)
-        for root in policy.default_roots():
-            if data_dir.is_relative_to(root):
-                raise QuarantineError(f"data directory {data_dir} is inside scan zone {root}")
-        match = classifier.classify(data_dir / "quarantine" / "0" / "0")
-        if match is not None:
-            raise QuarantineError(f"data directory {data_dir} matches junk rule {match.rule_id}")
+        data_dir = check_data_dir(policy, classifier)
         self._conn = conn
         self._move = move
         self._delete = delete
@@ -625,6 +619,21 @@ class QuarantineService:
                 "UPDATE operations SET state = ?, finished_at_ns = ?, error = ? WHERE id = ?",
                 (state, time.time_ns(), error, operation_id),
             )
+
+
+def check_data_dir(policy: PathPolicy, classifier: JunkClassifier) -> Path:
+    """The data directory (journal and vault) must never be something a scan would offer.
+
+    Callers run it before creating anything there (decision 0009).
+    """
+    data_dir = Path(policy.app_data_dir)
+    for root in policy.default_roots():
+        if data_dir.is_relative_to(root):
+            raise QuarantineError(f"data directory {data_dir} is inside scan zone {root}")
+    match = classifier.classify(data_dir / "quarantine" / "0" / "0")
+    if match is not None:
+        raise QuarantineError(f"data directory {data_dir} matches junk rule {match.rule_id}")
+    return data_dir
 
 
 # Per operation kind: the items column linking to it, the item state when the operation

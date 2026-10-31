@@ -1,4 +1,4 @@
-"""Console interface. Step 1: ``safeclean scan`` produces a report and changes nothing."""
+"""Console interface. ``safeclean scan`` reports and changes nothing; ``quarantine`` acts."""
 
 from __future__ import annotations
 
@@ -11,14 +11,25 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, TextIO
 
+from safeclean import cli_quarantine
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.models import Skipped
-from safeclean.core.open_files import NoOpenFileCheck
+from safeclean.core.open_files import checker_for_platform
 from safeclean.core.policy import PathPolicy
 from safeclean.core.scanner import JunkFinding, ScanContext, ScanReport, scan
+from safeclean.text import count, format_size
+
+__all__ = [
+    "build_parser",
+    "default_context",
+    "detect_platform",
+    "format_size",
+    "main",
+    "render_json",
+    "render_text",
+]
 
 _PLATFORMS: dict[str, Platform] = {"win32": "windows", "linux": "linux", "darwin": "darwin"}
-_UNITS = ("B", "KiB", "MiB", "GiB", "TiB")
 
 
 def detect_platform(sys_platform: str = sys.platform) -> Platform:
@@ -44,11 +55,12 @@ def default_context(
             platform=posix,
             env=os.environ if env is None else env,
         )
+    open_files = checker_for_platform(current)
     return ScanContext(
         policy=policy,
-        open_files=NoOpenFileCheck(),
+        open_files=open_files,
         classifier=JunkClassifier(default_rules(), platform=current),
-        open_files_checked=False,
+        open_files_checked=open_files.reliable,
     )
 
 
@@ -59,6 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan_cmd.add_argument("paths", nargs="*", help="directories to scan (default: safe zones)")
     scan_cmd.add_argument("--json", action="store_true", help="machine-readable output")
     scan_cmd.add_argument("--no-hash", action="store_true", help="skip duplicate detection")
+    cli_quarantine.add_parser(commands)
     return parser
 
 
@@ -66,10 +79,13 @@ def main(
     argv: Sequence[str] | None = None,
     *,
     out: TextIO | None = None,
+    err: TextIO | None = None,
     context_factory: Callable[[], ScanContext] | None = None,
 ) -> int:
     args = build_parser().parse_args(argv)
     context = (context_factory or default_context)()
+    if args.command == "quarantine":
+        return cli_quarantine.run(args, context, out or sys.stdout, err or sys.stderr)
     roots = [Path(p) for p in args.paths or context.policy.default_roots()]
     report = scan(roots, context, hash_duplicates=not args.no_hash)
     render = render_json if args.json else render_text
@@ -80,19 +96,6 @@ def main(
 # --- rendering -----------------------------------------------------------------------------------
 
 
-def format_size(size: int) -> str:
-    value = float(size)
-    index = 0
-    while value >= 1024 and index < len(_UNITS) - 1:
-        value /= 1024
-        index += 1
-    return f"{size} B" if index == 0 else f"{value:.1f} {_UNITS[index]}"
-
-
-def _count(n: int, noun: str) -> str:
-    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
-
-
 def _skip_line(item: Skipped) -> str:
     label = f"{item.reason} ({item.block_reason})" if item.block_reason else str(item.reason)
     detail = f" ({item.detail})" if item.detail else ""
@@ -101,13 +104,13 @@ def _skip_line(item: Skipped) -> str:
 
 def _junk_lines(junk: Sequence[JunkFinding]) -> list[str]:
     total = sum(f.entry.size for f in junk)
-    lines = [f"Junk candidates: {_count(len(junk), 'file')}, {format_size(total)}"]
+    lines = [f"Junk candidates: {count(len(junk), 'file')}, {format_size(total)}"]
     by_category: dict[str, list[JunkFinding]] = defaultdict(list)
     for finding in junk:
         by_category[finding.match.category].append(finding)
     for category, items in by_category.items():
         size = format_size(sum(f.entry.size for f in items))
-        lines.append(f"  {category}: {_count(len(items), 'file')}, {size}")
+        lines.append(f"  {category}: {count(len(items), 'file')}, {size}")
         lines += [
             f"    {f.entry.path}  [{f.match.rule_id}]  {format_size(f.entry.size)}" for f in items
         ]
@@ -127,7 +130,7 @@ def render_text(report: ScanReport, open_files_checked: bool) -> str:
     lines = [
         "safeclean scan - report only, nothing was changed",
         f"Roots: {', '.join(str(r) for r in report.roots)}",
-        f"Scanned: {_count(report.files_scanned, 'file')}, {format_size(report.bytes_scanned)}",
+        f"Scanned: {count(report.files_scanned, 'file')}, {format_size(report.bytes_scanned)}",
     ]
     if not open_files_checked:
         lines.append(
