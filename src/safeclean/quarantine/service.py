@@ -20,8 +20,13 @@ overwrites. A file created at the original path in between would be replaced. Th
 library offers no no-replace rename (``renameat2(RENAME_NOREPLACE)``); the window is accepted
 and kept as short as possible: the check runs immediately before the move.
 
+``plan_purge()`` reads the journal only and returns a plan to confirm; ``purge()`` accepts that
+exact plan once, from the service that issued it, and deletes vault copies through
+``purge.delete_from_vault``, the only deletion point (decision 0008). A changed vault copy is
+never deleted; the original path is never touched.
+
 ``recover()`` reconciles what a crash left behind (``pending`` quarantine items, and quarantined
-items of a ``pending`` restore); until it has run, new operations are refused. A vault copy that
+items of a ``pending`` restore or purge); until it has run, new operations are refused. A vault copy that
 no longer matches the journaled size/``mtime_ns`` is not ours to restore or purge: it becomes
 ``lost`` and is reported loudly.
 """
@@ -29,6 +34,7 @@ no longer matches the journaled size/``mtime_ns`` is not ours to restore or purg
 from __future__ import annotations
 
 import os
+import secrets
 import sqlite3
 import stat
 import time
@@ -41,14 +47,20 @@ from safeclean.core.heuristics import JunkClassifier
 from safeclean.core.open_files import OpenFileChecker
 from safeclean.core.policy import PathPolicy
 from safeclean.quarantine.preflight import Candidate, Cleared, Preflight, RefusalReason, Refused
+from safeclean.quarantine.purge import delete_from_vault
 from safeclean.quarantine.vault import Vault
 from safeclean.storage.transactions import transaction
 
 Move = Callable[[Path, Path], object]
+Delete = Callable[[Path, Path], object]  # (vault root, slot)
 
 
 class QuarantineError(Exception):
     """The quarantine cannot run safely (vault location, unrecovered journal)."""
+
+
+class PurgeError(QuarantineError):
+    """The purge plan was not issued by this service, was altered, or was already used."""
 
 
 class OperationState(StrEnum):
@@ -64,6 +76,7 @@ class ItemState(StrEnum):
     RESTORED = "restored"
     ROLLED_BACK = "rolled_back"
     LOST = "lost"
+    PURGED = "purged"
 
 
 class RestoreRefusal(StrEnum):
@@ -75,6 +88,15 @@ class RestoreRefusal(StrEnum):
     CONFLICT = "conflict"  # something occupies the original path: never overwritten
     PARENT_SWAPPED = "parent_swapped"  # a directory on the original path is now a link
     MOVE_FAILED = "move_failed"  # OS error; the item stays quarantined
+
+
+class PurgeRefusal(StrEnum):
+    UNKNOWN_ITEM = "unknown_item"
+    DUPLICATE_ITEM = "duplicate_item"
+    NOT_QUARANTINED = "not_quarantined"
+    VAULT_MISSING = "vault_missing"  # item becomes lost
+    VAULT_CHANGED = "vault_changed"  # item becomes lost; the copy is NOT deleted
+    DELETE_FAILED = "delete_failed"  # OS error; the item stays quarantined
 
 
 @dataclass(frozen=True)
@@ -115,10 +137,50 @@ class RestoreResult:
 
 
 @dataclass(frozen=True)
+class PlannedPurge:
+    item_id: int
+    original: Path
+    size: int
+
+
+@dataclass(frozen=True)
+class PurgeRefused:
+    item_id: int
+    reason: PurgeRefusal
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class PurgePlan:
+    """What the user confirms. Accepted once, unchanged, by the service that issued it."""
+
+    token: str
+    items: tuple[PlannedPurge, ...]
+    refused: tuple[PurgeRefused, ...]
+
+    @property
+    def total_bytes(self) -> int:
+        return sum(item.size for item in self.items)
+
+
+@dataclass(frozen=True)
+class PurgeResult:
+    operation_id: int | None  # None: nothing left to purge, nothing journaled
+    state: OperationState | None
+    purged: tuple[PlannedPurge, ...]
+    refused: tuple[PurgeRefused, ...]
+
+    @property
+    def freed_bytes(self) -> int:
+        return sum(item.size for item in self.purged)
+
+
+@dataclass(frozen=True)
 class RecoveryReport:
     quarantined: tuple[Path, ...] = ()
     rolled_back: tuple[Path, ...] = ()
     restored: tuple[Path, ...] = ()
+    purged: tuple[Path, ...] = ()
     lost: tuple[Path, ...] = ()
     warnings: tuple[str, ...] = ()  # one per lost item; must be shown to the user
 
@@ -136,6 +198,10 @@ class _Journaled:
     atime_ns: int | None
 
 
+# (item id, reason value, detail): a refusal common to restore and purge.
+_Rejected = tuple[int, str, str]
+
+
 class QuarantineService:
     def __init__(
         self,
@@ -146,6 +212,7 @@ class QuarantineService:
         classifier: JunkClassifier,
         move: Move = Path.replace,
         vault: Vault | None = None,
+        delete: Delete = delete_from_vault,
     ) -> None:
         self._preflight = Preflight(policy, open_files)
         data_dir = Path(policy.app_data_dir)
@@ -157,14 +224,15 @@ class QuarantineService:
             raise QuarantineError(f"data directory {data_dir} matches junk rule {match.rule_id}")
         self._conn = conn
         self._move = move
+        self._delete = delete
+        self._plans: dict[str, PurgePlan] = {}
         self._vault = vault or Vault(data_dir)
         self._vault.ensure()
 
     # --- quarantine ----------------------------------------------------------------------------
 
     def quarantine(self, candidates: Sequence[Candidate]) -> QuarantineResult:
-        if self._has_pending():
-            raise QuarantineError("the journal has unfinished operations; run recover() first")
+        self._require_no_pending()
         cleared, refused = self._check(candidates)
         if not cleared:
             return QuarantineResult(None, None, (), refused)
@@ -269,12 +337,11 @@ class QuarantineService:
     # --- restore -------------------------------------------------------------------------------
 
     def restore(self, item_ids: Sequence[int]) -> RestoreResult:
-        if self._has_pending():
-            raise QuarantineError("the journal has unfinished operations; run recover() first")
+        self._require_no_pending()
         accepted, refused = self._select_for_restore(item_ids)
         if not accepted:
             return RestoreResult(None, None, (), tuple(refused))
-        operation_id = self._journal_restore(accepted)
+        operation_id = self._journal_side_operation("restore", "restore_operation_id", accepted)
         restored: list[Restored] = []
         for item in accepted:
             refusal = self._restore_one(item)
@@ -282,12 +349,7 @@ class QuarantineService:
                 restored.append(Restored(item.item_id, item.original))
             else:
                 refused.append(refusal)
-        if len(restored) == len(accepted):
-            state = OperationState.DONE
-        elif restored:
-            state = OperationState.FAILED
-        else:
-            state = OperationState.ROLLED_BACK
+        state = _outcome(len(restored), len(accepted))
         error = None if state is OperationState.DONE else "some items were not restored"
         self._finish(operation_id, state, error)
         return RestoreResult(operation_id, state, tuple(restored), tuple(refused))
@@ -295,13 +357,17 @@ class QuarantineService:
     def _select_for_restore(
         self, item_ids: Sequence[int]
     ) -> tuple[list[_Journaled], list[RestoreRefused]]:
+        accepted, refused = self._select(item_ids)
+        return accepted, [RestoreRefused(i, RestoreRefusal(r), d) for i, r, d in refused]
+
+    def _select(self, item_ids: Sequence[int]) -> tuple[list[_Journaled], list[_Rejected]]:
         """Refusals that do not depend on the disk, before anything is journaled."""
         accepted: list[_Journaled] = []
-        refused: list[RestoreRefused] = []
+        refused: list[_Rejected] = []
         seen: set[int] = set()
         for item_id in item_ids:
             if item_id in seen:
-                refused.append(RestoreRefused(item_id, RestoreRefusal.DUPLICATE_ITEM))
+                refused.append((item_id, "duplicate_item", ""))
                 continue
             seen.add(item_id)
             row = self._conn.execute(
@@ -310,9 +376,9 @@ class QuarantineService:
                 (item_id,),
             ).fetchone()
             if row is None:
-                refused.append(RestoreRefused(item_id, RestoreRefusal.UNKNOWN_ITEM))
+                refused.append((item_id, "unknown_item", ""))
             elif row[0] != ItemState.QUARANTINED:
-                refused.append(RestoreRefused(item_id, RestoreRefusal.NOT_QUARANTINED, row[0]))
+                refused.append((item_id, "not_quarantined", row[0]))
             else:
                 _, original, slot, size, mtime_ns, mode, atime_ns = row
                 accepted.append(
@@ -320,15 +386,16 @@ class QuarantineService:
                 )
         return accepted, refused
 
-    def _journal_restore(self, items: list[_Journaled]) -> int:
+    def _journal_side_operation(self, kind: str, column: str, items: list[_Journaled]) -> int:
+        """Journal a restore or purge as pending and link its items, before touching the disk."""
         with transaction(self._conn):
             operation_id = _insert(
                 self._conn,
-                "INSERT INTO operations (kind, state, created_at_ns) VALUES ('restore', ?, ?)",
-                (OperationState.PENDING, time.time_ns()),
+                "INSERT INTO operations (kind, state, created_at_ns) VALUES (?, ?, ?)",
+                (kind, OperationState.PENDING, time.time_ns()),
             )
             self._conn.executemany(
-                "UPDATE items SET restore_operation_id = ? WHERE id = ?",
+                f"UPDATE items SET {column} = ? WHERE id = ?",
                 [(operation_id, item.item_id) for item in items],
             )
         return operation_id
@@ -356,6 +423,58 @@ class QuarantineService:
         except OSError as error:
             return RestoreRefused(item.item_id, RestoreRefusal.MOVE_FAILED, str(error))
         self._set_item(item.item_id, ItemState.RESTORED)
+        return None
+
+    # --- purge ---------------------------------------------------------------------------------
+
+    def plan_purge(self, item_ids: Sequence[int]) -> PurgePlan:
+        """Read-only: what ``purge`` would delete, for the user to confirm."""
+        self._require_no_pending()
+        accepted, refused = self._select_for_purge(item_ids)
+        planned = tuple(PlannedPurge(i.item_id, i.original, i.size) for i in accepted)
+        plan = PurgePlan(secrets.token_hex(16), planned, tuple(refused))
+        self._plans[plan.token] = plan
+        return plan
+
+    def purge(self, plan: PurgePlan) -> PurgeResult:
+        if self._plans.pop(plan.token, None) != plan:  # one use; a tampered plan burns it too
+            raise PurgeError("unknown, altered or already used purge plan; plan again")
+        self._require_no_pending()
+        accepted, refused = self._select_for_purge([item.item_id for item in plan.items])
+        refused = [*plan.refused, *refused]
+        if not accepted:
+            return PurgeResult(None, None, (), tuple(refused))
+        operation_id = self._journal_side_operation("purge", "purge_operation_id", accepted)
+        purged: list[PlannedPurge] = []
+        for item in accepted:
+            refusal = self._purge_one(item)
+            if refusal is None:
+                purged.append(PlannedPurge(item.item_id, item.original, item.size))
+            else:
+                refused.append(refusal)
+        state = _outcome(len(purged), len(accepted))
+        error = None if state is OperationState.DONE else "some items were not purged"
+        self._finish(operation_id, state, error)
+        return PurgeResult(operation_id, state, tuple(purged), tuple(refused))
+
+    def _select_for_purge(
+        self, item_ids: Sequence[int]
+    ) -> tuple[list[_Journaled], list[PurgeRefused]]:
+        accepted, refused = self._select(item_ids)
+        return accepted, [PurgeRefused(i, PurgeRefusal(r), d) for i, r, d in refused]
+
+    def _purge_one(self, item: _Journaled) -> PurgeRefused | None:
+        copy = _probe(item.slot, item.size, item.mtime_ns)
+        if copy is not _Copy.MATCHES:
+            self._set_item(item.item_id, ItemState.LOST)
+            missing = copy is _Copy.MISSING
+            reason = PurgeRefusal.VAULT_MISSING if missing else PurgeRefusal.VAULT_CHANGED
+            return PurgeRefused(item.item_id, reason, str(item.slot))
+        try:
+            self._delete(self._vault.root, item.slot)
+        except OSError as error:
+            return PurgeRefused(item.item_id, PurgeRefusal.DELETE_FAILED, str(error))
+        self._set_item(item.item_id, ItemState.PURGED)
         return None
 
     # --- recover -------------------------------------------------------------------------------
@@ -407,11 +526,33 @@ class QuarantineService:
                 )
             self._set_item(item_id, state)
             found[state].append(original)
+        purging = self._conn.execute(
+            "SELECT items.id, original_path, vault_path, size, mtime_ns FROM items"
+            " JOIN operations ON items.purge_operation_id = operations.id"
+            " WHERE operations.state = ? AND items.state = ? ORDER BY items.id",
+            (OperationState.PENDING, ItemState.QUARANTINED),
+        ).fetchall()
+        for item_id, original_text, vault_text, size, mtime_ns in purging:
+            original, slot = Path(original_text), Path(vault_text)
+            copy = _probe(slot, size, mtime_ns)
+            if copy is _Copy.MATCHES:
+                state = ItemState.QUARANTINED  # the delete never happened
+            elif copy is _Copy.MISSING:
+                state = ItemState.PURGED  # deleted, journal update lost
+            else:
+                state = ItemState.LOST
+                warnings.append(
+                    f"LOST: the vault copy of {original} changed during a purge ({slot});"
+                    " it was not deleted"
+                )
+            self._set_item(item_id, state)
+            found[state].append(original)
         self._close_pending_operations()
         return RecoveryReport(
             quarantined=tuple(found[ItemState.QUARANTINED]),
             rolled_back=tuple(found[ItemState.ROLLED_BACK]),
             restored=tuple(found[ItemState.RESTORED]),
+            purged=tuple(found[ItemState.PURGED]),
             lost=tuple(found[ItemState.LOST]),
             warnings=tuple(warnings),
         )
@@ -437,6 +578,10 @@ class QuarantineService:
 
     # --- journal helpers -----------------------------------------------------------------------
 
+    def _require_no_pending(self) -> None:
+        if self._has_pending():
+            raise QuarantineError("the journal has unfinished operations; run recover() first")
+
     def _has_pending(self) -> bool:
         row = self._conn.execute(
             "SELECT EXISTS (SELECT 1 FROM operations WHERE state = ?)", (OperationState.PENDING,)
@@ -460,7 +605,14 @@ class QuarantineService:
 _OPERATION_ITEMS: dict[str, tuple[str, ItemState, ItemState]] = {
     "quarantine": ("operation_id", ItemState.QUARANTINED, ItemState.ROLLED_BACK),
     "restore": ("restore_operation_id", ItemState.RESTORED, ItemState.QUARANTINED),
+    "purge": ("purge_operation_id", ItemState.PURGED, ItemState.QUARANTINED),
 }
+
+
+def _outcome(succeeded: int, attempted: int) -> OperationState:
+    if succeeded == attempted:
+        return OperationState.DONE
+    return OperationState.FAILED if succeeded else OperationState.ROLLED_BACK
 
 
 class _Copy(Enum):

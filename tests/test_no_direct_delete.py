@@ -17,24 +17,27 @@ FORBIDDEN_METHODS = frozenset({"unlink", "rmdir", "rmtree", "removedirs"})
 # Names forbidden only on these modules (``list.remove`` is fine).
 FORBIDDEN_MODULE_ATTRS = {"os": frozenset({"remove", "unlink", "rmdir", "removedirs"})}
 # The only file allowed to delete: final purge of verified vault copies.
+# ``from os import remove`` and friends hide the module from the attribute check.
+FORBIDDEN_FROM_IMPORTS = {**FORBIDDEN_MODULE_ATTRS, "shutil": frozenset({"rmtree"})}
 ALLOWED_TO_DELETE = frozenset({"src/safeclean/quarantine/purge.py"})
 
 
 def find_direct_deletes(source: str) -> list[int]:
-    """Return line numbers of direct deletion calls in ``source``."""
+    """Return line numbers of direct deletion calls or references in ``source``."""
     lines: list[int] = []
     for node in ast.walk(ast.parse(source)):
-        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
-            continue
-        attr = node.func.attr
-        receiver = node.func.value
-        module_attrs = (
-            FORBIDDEN_MODULE_ATTRS.get(receiver.id, frozenset())
-            if isinstance(receiver, ast.Name)
-            else frozenset()
-        )
-        if attr in FORBIDDEN_METHODS or attr in module_attrs:
-            lines.append(node.lineno)
+        if isinstance(node, ast.Attribute):
+            receiver = node.value
+            module_attrs = (
+                FORBIDDEN_MODULE_ATTRS.get(receiver.id, frozenset())
+                if isinstance(receiver, ast.Name)
+                else frozenset()
+            )
+            if node.attr in FORBIDDEN_METHODS or node.attr in module_attrs:
+                lines.append(node.lineno)
+        elif isinstance(node, ast.ImportFrom) and node.module in FORBIDDEN_FROM_IMPORTS:
+            names = FORBIDDEN_FROM_IMPORTS[node.module]
+            lines.extend(node.lineno for alias in node.names if alias.name in names)
     return lines
 
 
