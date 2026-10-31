@@ -18,6 +18,7 @@ from safeclean.core.open_files import NoOpenFileCheck, OpenFileChecker, ProcFdCh
 from safeclean.core.scanner import ScanContext
 from safeclean.quarantine.service import QuarantineService
 from safeclean.storage.db import connect
+from safeclean.storage.lock import InstanceLock
 
 # --- helpers -----------------------------------------------------------------------------------
 
@@ -249,6 +250,16 @@ def test_unusable_data_directory_exits_3(tmp_path: Path, zone: Path) -> None:
 
     assert code == 3
     assert out == ""
+    assert "cannot use the data directory" in err
+
+
+def test_unopenable_journal_exits_3(context: ScanContext, data_dir: Path) -> None:
+    (data_dir / "journal.db").mkdir(parents=True)  # a directory where the journal should be
+
+    code, out, err = run(["quarantine", "list"], context)
+
+    assert code == 3
+    assert out == ""
     assert "cannot open the journal" in err
 
 
@@ -260,6 +271,29 @@ def test_data_directory_inside_a_scan_zone_exits_3(tmp_path: Path, zone: Path) -
     assert code == 3
     assert "inside scan zone" in err
     assert not (zone / "safeclean").exists()  # refused before anything is created there
+
+
+def test_a_second_safeclean_on_the_same_data_directory_exits_3(
+    context: ScanContext, zone: Path, data_dir: Path
+) -> None:
+    write(zone / "a.bin")
+    data_dir.mkdir(parents=True)
+
+    with InstanceLock(data_dir / "safeclean.lock"):
+        code, out, err = run(["quarantine", "add", str(zone / "a.bin")], context)
+
+    assert code == 3
+    assert out == ""
+    assert "another safeclean" in err
+    assert (zone / "a.bin").exists()
+    assert not (data_dir / "journal.db").exists()  # locked out before the journal is opened
+
+
+def test_the_lock_is_released_after_each_command(context: ScanContext, data_dir: Path) -> None:
+    run(["quarantine", "list"], context)
+
+    with InstanceLock(data_dir / "safeclean.lock"):
+        pass
 
 
 def test_data_directory_is_created_private(context: ScanContext, data_dir: Path) -> None:
