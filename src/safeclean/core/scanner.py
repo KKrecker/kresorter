@@ -31,13 +31,28 @@ class JunkFinding:
 
 @dataclass(frozen=True)
 class DuplicateGroup:
+    """Files with the same content, as scanned: size and ``mtime_ns`` travel with each copy."""
+
     digest: str
-    size: int
-    paths: tuple[Path, ...]
+    entries: tuple[FileEntry, ...]
+
+    def __post_init__(self) -> None:
+        if len(self.entries) < 2:
+            raise ValueError("a duplicate group needs at least two copies")
+        if len({e.size for e in self.entries}) != 1:
+            raise ValueError("copies in a duplicate group must have the same size")
+
+    @property
+    def size(self) -> int:
+        return self.entries[0].size
+
+    @property
+    def paths(self) -> tuple[Path, ...]:
+        return tuple(e.path for e in self.entries)
 
     @property
     def wasted_bytes(self) -> int:
-        return self.size * (len(self.paths) - 1)
+        return self.size * (len(self.entries) - 1)
 
 
 @dataclass(frozen=True)
@@ -87,7 +102,7 @@ def _duplicates(entries: list[FileEntry], skipped: list[Skipped]) -> tuple[Dupli
         else:
             by_digest[result.digest].append(result.entry)
     return tuple(
-        DuplicateGroup(digest, group[0].size, tuple(e.path for e in group))
+        DuplicateGroup(digest, tuple(group))
         for digest, group in by_digest.items()
         if len(group) > 1
     )

@@ -30,5 +30,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Quarantine rollback no longer loses track of a file whose rename completed just before an interrupt: rollback checks the vault slot on disk; `recover()` also reconciles quarantined items of an interrupted rollback (decision 0006, addendum).
 
 ### Changed
+- `DuplicateGroup` holds the scanned `FileEntry` of each copy (`entries`); `paths`, `size` and `wasted_bytes` are derived; a group with fewer than two copies or mixed sizes cannot be created. Feeds `analysis.duplicates.decide()` directly; `scan` output unchanged.
 - `safeclean scan` uses the real open-file check on Linux (`checker_for_platform()`); other OSes still disclose that it is missing.
 - Temp is no longer a default safe zone; scanned only on explicit choice (decision 0002).
