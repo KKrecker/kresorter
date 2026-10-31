@@ -142,6 +142,13 @@ def test_overlapping_roots_yield_each_file_once(tmp_path: Path) -> None:
     assert files(run(tmp_path, [root, root / "sub", root])) == [a]
 
 
+def test_file_root_inside_walked_directory_is_not_repeated(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    a = write(root / "sub" / "a.txt")
+
+    assert files(run(tmp_path, [root, a])) == [a]
+
+
 def test_special_files_are_skipped(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()

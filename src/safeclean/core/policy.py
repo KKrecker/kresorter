@@ -196,6 +196,6 @@ class PathPolicy:
             if part == "..":
                 if stack:
                     stack.pop()
-            elif part != ".":
+            else:  # PurePath already drops "." components
                 stack.append(self._fold(part))
         return (self._fold(anchor), *stack)

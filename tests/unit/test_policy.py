@@ -58,6 +58,9 @@ ALLOWED = Verdict(allowed=True, reason=None)
         pytest.param(
             r"C:\Temp\..\Program Files\a.dll", blocked(BlockReason.PROGRAM_FILES), id="dotdot"
         ),
+        pytest.param(
+            r"C:\..\..\Program Files\a.dll", blocked(BlockReason.PROGRAM_FILES), id="dotdot-root"
+        ),
         pytest.param(r"C:\Program Files Backup\a.txt", ALLOWED, id="similar-prefix"),
         pytest.param(r"C:\Windows\System32\x.dll", blocked(BlockReason.SYSTEM), id="windows"),
         pytest.param(r"C:\ProgramData\Vendor\cfg.ini", blocked(BlockReason.SYSTEM), id="pdata"),
