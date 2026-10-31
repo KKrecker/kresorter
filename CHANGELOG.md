@@ -41,6 +41,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `autostart.listing.list_autostart()`: one listing per platform from its readers, in order (Linux XDG and systemd; Windows Run keys, startup folders, services, scheduled tasks; macOS launchd); `AutostartContext` names the environment and directories read and a registry factory called on Windows only, once (decision 0011, addendum).
 - `safeclean autostart list [--json] [--include-machine]`: every autostart entry of this system, grouped by source, with state, scope, command, location, shadowed file and notes, then the skips; report only, exit 0; on Windows a note says when machine-wide entries were not read; JSON with platform, consent, every item field and the skips (decision 0011, addendum).
 - Journal schema v3: table `autostart_changes` (action, writable source only, listed entry, written location, digest, full bytes before and after up to 64 KiB, vault path, state), migrated from v2 with every quarantine row kept (decision 0011, addendum).
+- `autostart.xdg_changes`: the disabled form of an XDG entry, a byte-for-byte copy with `Hidden=true` for the user's own entry (checked by the reader's rules, at most 64 KiB) and a `Hidden=true` stub for a system entry; pure, writes nothing yet (decision 0011, addendum).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Fixed

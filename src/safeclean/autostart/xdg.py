@@ -29,7 +29,7 @@ from safeclean.autostart.models import (
     entry_digest,
 )
 
-__all__ = ["MAX_ENTRY_BYTES", "autostart_dirs", "read_xdg"]
+__all__ = ["GROUP", "MAX_ENTRY_BYTES", "autostart_dirs", "parse_keys", "read_xdg"]
 
 SUFFIX = ".desktop"
 GROUP = "[Desktop Entry]"
@@ -146,10 +146,7 @@ def _item(
 
 def _load(path: Path, scope: Scope, *, stub_allowed: bool = False) -> _Entry:
     raw = read_entry(path)
-    keys = _parse(decode(raw))
-    for key in ("Hidden", "X-GNOME-Autostart-enabled"):
-        if key in keys and keys[key] not in _BOOLEANS:
-            raise BrokenEntryError(f"{key} is not a boolean")
+    keys = parse_keys(decode(raw))
     entry = _Entry(path, scope, raw, keys)
     if stub_allowed and entry.hidden:
         return entry
@@ -162,8 +159,12 @@ def _load(path: Path, scope: Scope, *, stub_allowed: bool = False) -> _Entry:
     return entry
 
 
-def _parse(text: str) -> dict[str, str]:
-    """Keys of the ``[Desktop Entry]`` group, which must come first; later groups are ignored."""
+def parse_keys(text: str) -> dict[str, str]:
+    """Keys of the ``[Desktop Entry]`` group, which must come first; later groups are ignored.
+
+    ``Hidden`` and ``X-GNOME-Autostart-enabled`` must be booleans. Shared with ``xdg_changes``,
+    so a disabled copy is checked by the same rules the reader applies.
+    """
     keys: dict[str, str] = {}
     in_group = False
     for number, line in enumerate(text.splitlines(), start=1):
@@ -186,4 +187,7 @@ def _parse(text: str) -> dict[str, str]:
         keys[key] = value.strip()
     if not in_group:
         raise BrokenEntryError(f"no {GROUP} group")
+    for key in ("Hidden", "X-GNOME-Autostart-enabled"):
+        if key in keys and keys[key] not in _BOOLEANS:
+            raise BrokenEntryError(f"{key} is not a boolean")
     return keys

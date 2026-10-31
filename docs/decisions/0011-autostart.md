@@ -328,3 +328,19 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     quarantine operations until `recover()` has run, and a pending quarantine operation
     refuses autostart changes, as `_require_no_pending` does today. Both write to one journal
     and must not interleave halfway.
+
+## Addendum (step 4, commit 12a1): what an XDG entry becomes when disabled
+
+63. **A user's own entry is replaced by a copy with `Hidden=true`** (`hidden_copy`): every
+    other byte is kept, so enabling only has to put the original back. An existing `Hidden`
+    line of the `[Desktop Entry]` group is replaced in place with its line ending; otherwise
+    one is added right after the group header, with the header's line ending. Comments and
+    later groups (`[Desktop Action ...]`) are not touched.
+64. **The copy is checked by the reader's own rules**: `parse_keys` (shared with the reader,
+    which stays read-only) validates the entry, and the text is split into lines exactly as
+    `parse_keys` splits it, so the copy reads back with the same keys and `Hidden=true`. An
+    entry already `Hidden=true` is refused (nothing would change, item 59); so is a copy that
+    would be larger than `MAX_ENTRY_BYTES`, which the reader would skip.
+65. **A system entry is hidden by `STUB`**, `[Desktop Entry]` and `Hidden=true` only, in the
+    user directory under the same file name; it reads back as the system entry, disabled, with
+    the system file in `shadows`.
