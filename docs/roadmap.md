@@ -78,6 +78,14 @@ Scanner core and `safeclean scan` (read-only report).
 - **`REVIEW` is never moved in bulk**; large/old files go to the quarantine only when named by
   hand (`safeclean quarantine add PATH`).
 
+### Step 4: in progress
+Accepted limitations so far (decision 0011, item 19), to revisit after the first live run on
+Linux:
+- systemd drop-ins (`<unit>.d/*.conf`) are not read: an overridden `ExecStart` is shown as in
+  the main unit file;
+- `<target>.requires/` is not read;
+- units enabled for all users (`/etc/systemd/user`) are not read.
+
 ## Target package layout
 
 ```

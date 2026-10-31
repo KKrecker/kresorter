@@ -74,3 +74,24 @@
     line, a duplicate key or a non-boolean `Hidden`/`X-GNOME-Autostart-enabled` is a skip.
     Only regular files of at most 64 KiB are opened, so a FIFO never blocks the listing.
     `name` is the file name without `.desktop`, the key of the override; `Exec` is kept as is.
+
+## Addendum (step 4, commit 4): reading systemd user units
+
+15. **One item per link** in `$XDG_CONFIG_HOME/systemd/user/<target>.wants/`: a unit enabled for
+    two targets is two items, each its own reason to start. `location` is the link, the target
+    is the note `WantedBy=<target>`, `command` is the `ExecStart` of the unit file the link
+    leads to, as written (prefixes and specifiers kept; several joined with `"; "`; an empty
+    `ExecStart=` resets the list; `\` continues a line).
+16. **The digest covers the link target, then `\0`, then the unit file bytes**, so pointing the
+    link elsewhere changes it even when the content is the same.
+17. **A masked unit** (`<unit>` in the same directory linked to `/dev/null`) is listed as
+    disabled with the note `masked`: it is the real systemd state.
+18. **A unit that is not a service** (`.timer`, `.socket`, `.path`, ...) is listed, not skipped:
+    a timer is a legitimate way to start something. Its `command` is the path of its unit file
+    and it carries the note `not a service: <type>`.
+19. **Accepted limitations** (to revisit after the first live run on Linux, each with its own
+    decision):
+    - drop-ins (`<unit>.d/*.conf`) are not read, so an overridden `ExecStart` is shown as in
+      the main unit file;
+    - `<target>.requires/` is not read;
+    - units enabled for all users (`/etc/systemd/user`) are not read.

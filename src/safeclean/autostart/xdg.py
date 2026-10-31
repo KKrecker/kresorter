@@ -8,11 +8,17 @@ broken user file still replaces the system entry, whose state is then unknown. R
 
 from __future__ import annotations
 
-import stat
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from safeclean.autostart.entries import (
+    MAX_ENTRY_BYTES,
+    BrokenEntryError,
+    config_home,
+    decode,
+    read_entry,
+)
 from safeclean.autostart.models import (
     AutostartItem,
     AutostartListing,
@@ -22,15 +28,12 @@ from safeclean.autostart.models import (
     entry_digest,
 )
 
-MAX_ENTRY_BYTES = 64 * 1024
+__all__ = ["MAX_ENTRY_BYTES", "autostart_dirs", "read_xdg"]
+
 SUFFIX = ".desktop"
 GROUP = "[Desktop Entry]"
 _NOTE_KEYS = ("OnlyShowIn", "NotShowIn")
 _BOOLEANS = {"true": True, "false": False}
-
-
-class _BrokenEntryError(Exception):
-    """The entry cannot be used; the message is the user-facing reason."""
 
 
 @dataclass(frozen=True)
@@ -54,12 +57,9 @@ class _Entry:
 
 def autostart_dirs(env: Mapping[str, str], home: Path) -> tuple[Path, tuple[Path, ...]]:
     """The user autostart directory and the system ones, most important first."""
-    config_home = Path(env.get("XDG_CONFIG_HOME") or ".")
-    if not config_home.is_absolute():
-        config_home = home / ".config"
     dirs = [Path(d) for d in env.get("XDG_CONFIG_DIRS", "").split(":") if d]
     system = [d for d in dirs if d.is_absolute()] or [Path("/etc/xdg")]
-    return config_home / "autostart", tuple(d / "autostart" for d in system)
+    return config_home(env, home) / "autostart", tuple(d / "autostart" for d in system)
 
 
 def read_xdg(user_dir: Path, system_dirs: Sequence[Path]) -> AutostartListing:
@@ -76,7 +76,7 @@ def read_xdg(user_dir: Path, system_dirs: Sequence[Path]) -> AutostartListing:
                 items.append(_user_item(name, user[name], system.get(name)))
             else:
                 items.append(_item(name, _load(system[name], Scope.SYSTEM)))
-        except _BrokenEntryError as error:
+        except BrokenEntryError as error:
             location = user.get(name) or system[name]
             skipped.append(AutostartSkipped(Source.XDG_AUTOSTART, str(location), str(error)))
     return AutostartListing(tuple(items), tuple(skipped))
@@ -94,7 +94,7 @@ def _user_item(name: str, path: Path, shadowed: Path | None) -> AutostartItem:
     entry = _load(path, Scope.USER, stub_allowed=True)
     if entry.hidden and "Exec" not in entry.keys:
         if shadowed is None:
-            raise _BrokenEntryError("Hidden=true hides no entry")
+            raise BrokenEntryError("Hidden=true hides no entry")
         hidden = _load(shadowed, Scope.SYSTEM)
         return _item(name, entry, command=hidden.keys["Exec"], shadows=shadowed)
     return _item(name, entry, shadows=shadowed)
@@ -117,38 +117,21 @@ def _item(
 
 
 def _load(path: Path, scope: Scope, *, stub_allowed: bool = False) -> _Entry:
-    raw = _read(path)
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError:
-        raise _BrokenEntryError("not UTF-8") from None
-    keys = _parse(text)
+    raw = read_entry(path)
+    keys = _parse(decode(raw))
     for key in ("Hidden", "X-GNOME-Autostart-enabled"):
         if key in keys and keys[key] not in _BOOLEANS:
-            raise _BrokenEntryError(f"{key} is not a boolean")
+            raise BrokenEntryError(f"{key} is not a boolean")
     entry = _Entry(path, scope, raw, keys)
     if stub_allowed and entry.hidden:
         return entry
     if "Type" not in keys:
-        raise _BrokenEntryError("no Type key")
+        raise BrokenEntryError("no Type key")
     if keys["Type"] != "Application":
-        raise _BrokenEntryError(f"Type is {keys['Type']}, not Application")
+        raise BrokenEntryError(f"Type is {keys['Type']}, not Application")
     if not keys.get("Exec"):
-        raise _BrokenEntryError("no Exec key")
+        raise BrokenEntryError("no Exec key")
     return entry
-
-
-def _read(path: Path) -> bytes:
-    try:
-        info = path.stat()
-        if not stat.S_ISREG(info.st_mode):
-            raise _BrokenEntryError("not a regular file")
-        if info.st_size > MAX_ENTRY_BYTES:
-            raise _BrokenEntryError(f"larger than {MAX_ENTRY_BYTES} bytes")
-        with path.open("rb") as handle:
-            return handle.read(MAX_ENTRY_BYTES + 1)
-    except OSError as error:
-        raise _BrokenEntryError(f"cannot read: {error.strerror}") from None
 
 
 def _parse(text: str) -> dict[str, str]:
@@ -161,18 +144,18 @@ def _parse(text: str) -> dict[str, str]:
             continue
         if not in_group:
             if stripped != GROUP:
-                raise _BrokenEntryError(f"no {GROUP} group")
+                raise BrokenEntryError(f"no {GROUP} group")
             in_group = True
             continue
         if stripped.startswith("["):
             break
         key, sep, value = stripped.partition("=")
         if not sep:
-            raise _BrokenEntryError(f"malformed line {number}")
+            raise BrokenEntryError(f"malformed line {number}")
         key = key.strip()
         if key in keys:
-            raise _BrokenEntryError(f"duplicate key {key}")
+            raise BrokenEntryError(f"duplicate key {key}")
         keys[key] = value.strip()
     if not in_group:
-        raise _BrokenEntryError(f"no {GROUP} group")
+        raise BrokenEntryError(f"no {GROUP} group")
     return keys
