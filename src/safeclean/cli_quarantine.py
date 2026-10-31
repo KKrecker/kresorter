@@ -18,7 +18,7 @@ from typing import TextIO
 
 from safeclean.core.models import FileEntry
 from safeclean.core.scanner import ScanContext
-from safeclean.quarantine.preflight import Candidate, Refused, UnreliableCheckerError
+from safeclean.quarantine.preflight import Candidate, Refused, RefusalReason, UnreliableCheckerError
 from safeclean.quarantine.service import (
     ItemState,
     PurgeRefused,
@@ -170,8 +170,10 @@ def _report_recovery(report: RecoveryReport, out: TextIO, err: TextIO) -> None:
 
 
 def _path_refusal(refused: Refused) -> str:
+    # Only a blacklist refusal says *which* rule blocked the path; for OPEN_FILE the policy
+    # verdict repeats the reason and adds nothing.
     label = str(refused.reason)
-    if refused.block_reason and refused.block_reason != refused.reason:
+    if refused.reason is RefusalReason.BLOCKED:
         label += f" ({refused.block_reason})"
     detail = f" ({refused.detail})" if refused.detail else ""
     return f"  {label}: {refused.path}{detail}"
