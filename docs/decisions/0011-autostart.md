@@ -170,3 +170,39 @@
       therefore always means "replaces nothing".
     Later directories are still listed, so every directory that cannot be listed is reported.
     Startup folders follow the same rule (item 30: an unreadable flag key hides the folder).
+
+## Addendum (step 4, commit 8): services
+
+The `Registry` protocol gains `subkeys()` (the names of the keys below a key) with the rules
+of `values()` and of items 24–25: a missing key is `None`, any other failure a `RegistryError`.
+
+33. **Services are read only with `--include-machine`.** They live in
+    `HKLM\SYSTEM\CurrentControlSet\Services` (item 5); without consent the registry is not
+    touched at all. Every service is `system` scope and read-only in step 4 (item 9).
+34. **An autostart service is a Win32 service with `Start=2` (automatic)**: `Type` has `0x10`
+    (own process) or `0x20` (shared process), and may also carry `0x40` (per-user service
+    template) and `0x100` (interactive). It is listed as enabled. Not autostart entries, and
+    not listed nor skipped (they would be hundreds of lines of noise): `Start=3` (manual) and
+    `Start=4` (disabled), drivers (`Type` `0x1`/`0x2`/`0x4`/`0x8`), per-user instances (bit
+    `0x80`; their template is listed), and a key without `Type`.
+35. **Parsing is strict; a violation is a skip with its reason**: `Type`, `Start` or
+    `DelayedAutostart` not a `REG_DWORD`; no `Start` or no `ImagePath`; `Start` `0`/`1` on a
+    Win32 service (boot and system starts are for drivers only); an unknown `Start` value or
+    unknown bits in `Type`; an `ImagePath` that is not a string or is empty. `Type` is checked
+    first and `Start` next, so a manual or disabled service is never checked further.
+36. **`command` is `ImagePath` as written** (`REG_EXPAND_SZ` kept unexpanded); `name` is the
+    key name. `DisplayName` is not read: it is often a resource reference
+    (`@%SystemRoot%\...dll,-123`), not a name.
+37. **Notes**: `shared process` (`0x20`), `per-user service template` (`0x40`),
+    `delayed start` (`DelayedAutostart=1`), in that order. Services are ordered by key name,
+    ignoring case.
+38. **The digest covers `Type`, `Start`, `ImagePath` and `DelayedAutostart`** (a missing one
+    included), nothing else. A `Services` key that cannot be read is one skip; a service key
+    that cannot be read skips that service only.
+39. **Accepted limitations** (to revisit after the first live run on Windows):
+    - trigger-start services (`TriggerInfo`, usually `Start=3`) are not shown, although they
+      start on events;
+    - for a service in a shared `svchost` process `Parameters\ServiceDll` is not read, although
+      the service's code lives there: the user sees the `svchost` entry, not what it runs, and
+      no output may present it as a full analysis;
+    - `Group` and `DependOnService` are not taken into account.

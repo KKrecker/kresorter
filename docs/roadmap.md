@@ -89,9 +89,12 @@ Linux:
 Deferred on Windows (decision 0011, item 29): shortcut (`.lnk`) targets in startup folders are
 not resolved; the item's command is the shortcut file itself.
 
-Remaining commits: 8 services (the `Registry` protocol gains sub-keys), 9 scheduled tasks and
-macOS LaunchAgents, 10 `safeclean autostart list`, 11 journal schema v3, 12 `autostart
-disable/enable`.
+Services (decision 0011, item 39): trigger-start services are not shown; for a shared
+`svchost` service `Parameters\ServiceDll` is not read (the user sees the `svchost` entry, not
+what it runs); `Group` and `DependOnService` are not taken into account.
+
+Remaining commits: 9 scheduled tasks and macOS LaunchAgents, 10 `safeclean autostart list`,
+11 journal schema v3, 12 `autostart disable/enable`.
 
 ## Target package layout
 
