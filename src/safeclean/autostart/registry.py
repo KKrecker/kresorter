@@ -1,7 +1,8 @@
 """A read-only view of the Windows registry, so readers can be tested on a fake (0011, item 11).
 
 Value names are case-insensitive, as in the registry. A key that does not exist reads as
-``None``; a key that exists but cannot be read raises ``RegistryError``.
+``None``, for its values and its sub-keys alike; a key that exists but cannot be read raises
+``RegistryError``.
 """
 
 from __future__ import annotations
@@ -45,6 +46,9 @@ class RegValue:
 
 class Registry(Protocol):
     def values(self, hive: Hive, key: str) -> Sequence[RegValue] | None: ...
+
+    def subkeys(self, hive: Hive, key: str) -> Sequence[str] | None:
+        """Names of the keys directly below ``key``, in no particular order."""
 
 
 _KIND_NAMES = {kind.value: kind.name for kind in ValueKind}
