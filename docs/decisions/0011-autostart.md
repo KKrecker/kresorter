@@ -296,3 +296,35 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `include_machine`, every item field and the skips.
 56. **`disableable` is not shown** until `autostart disable` exists (commit 12): the report
     does not promise an action it cannot take yet.
+
+## Addendum (step 4, commit 11): journal schema v3
+
+57. **A table of its own, `autostart_changes`**, with its own `state` (`pending`, `done`,
+    `failed`, `rolled_back`), not new kinds of `operations`: a `CHECK` cannot be changed by
+    `ALTER TABLE` in SQLite, and rebuilding `operations` would mean switching off the foreign
+    keys of `items`, which cannot be done inside a transaction. Quarantine operations and
+    autostart changes are different domains; separate tables keep the quarantine journal
+    untouched by the migration.
+58. **`entry` and `location` are kept apart**: `entry` is what the user saw in the listing,
+    `location` is what is actually written. A user XDG file is both; for a system XDG entry,
+    `entry` is the file in `/etc/xdg/autostart` and `location` the user stub; for `HKCU` Run,
+    `entry` is the `Run` value and `location` its `StartupApproved\Run` flag. The journal
+    itself shows that the system file and the `Run` value are never written.
+59. **The bytes before and after are stored in full**, at most 64 KiB each (the XDG read
+    limit); `NULL` means the entry does not exist. For XDG the original still goes to the
+    vault (`vault_path`) and the journal copy is only for reconciling with the disk; for the
+    registry the journal is the source of the rollback (a `StartupApproved` value is 12
+    bytes). A change that changes nothing (equal values, both `NULL` included) is refused by
+    the schema.
+60. **Only writable sources can be journaled**: `source` is limited by a `CHECK` to
+    `xdg_autostart` and `run_key` (item 8), so a read-only source cannot be written even by
+    a mistake in the code; making another source writable needs a migration that rebuilds
+    this table. `digest` (the entry as listed and checked again right before acting) is 32
+    lowercase hex characters; the table is `STRICT`.
+61. **The journal API and its reconciliation in `recover()` come with the changes
+    themselves** (commit 12: 12a writing and journaling, 12b `recover()`, 12c the CLI with
+    `disableable`), since reconciling depends on the exact order of the write steps.
+62. **Unfinished work blocks both domains**: a pending autostart change refuses new
+    quarantine operations until `recover()` has run, and a pending quarantine operation
+    refuses autostart changes, as `_require_no_pending` does today. Both write to one journal
+    and must not interleave halfway.

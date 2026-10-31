@@ -45,7 +45,33 @@ _V1: Migration = (
 # v2: atime at quarantine time, so restore can put it back (decision 0004, item 6).
 _V2: Migration = ("ALTER TABLE items ADD COLUMN atime_ns INTEGER",)
 
-MIGRATIONS: tuple[Migration, ...] = (_V1, _V2)
+# v3: autostart changes, journaled before they are made (decision 0011, items 10 and 57-62).
+# A table of their own: rebuilding `operations` for new kinds would touch its foreign keys.
+_V3: Migration = (
+    """
+    CREATE TABLE autostart_changes (
+        id             INTEGER PRIMARY KEY,
+        action         TEXT    NOT NULL CHECK (action IN ('disable', 'enable')),
+        source         TEXT    NOT NULL CHECK (source IN ('xdg_autostart', 'run_key')),
+        entry          TEXT    NOT NULL CHECK (entry <> ''),
+        location       TEXT    NOT NULL CHECK (location <> ''),
+        digest         TEXT    NOT NULL
+                       CHECK (length(digest) = 32 AND digest NOT GLOB '*[^0-9a-f]*'),
+        value_before   BLOB    CHECK (length(value_before) <= 65536),
+        value_after    BLOB    CHECK (length(value_after) <= 65536),
+        vault_path     TEXT    UNIQUE,
+        state          TEXT    NOT NULL
+                       CHECK (state IN ('pending', 'done', 'failed', 'rolled_back')),
+        created_at_ns  INTEGER NOT NULL,
+        finished_at_ns INTEGER,
+        error          TEXT,
+        CHECK (value_before IS NOT value_after)
+    ) STRICT
+    """,
+    "CREATE INDEX autostart_changes_by_state ON autostart_changes (state)",
+)
+
+MIGRATIONS: tuple[Migration, ...] = (_V1, _V2, _V3)
 SCHEMA_VERSION = len(MIGRATIONS)
 
 
