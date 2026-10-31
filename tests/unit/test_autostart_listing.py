@@ -27,11 +27,11 @@ from safeclean.core.heuristics import Platform
 DESKTOP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app\n"
 UNIT = b"[Service]\nExecStart=/usr/bin/sync\n"
 TASK = (
-    '<?xml version="1.0" encoding="UTF-8"?>'
-    '<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
-    "<Triggers><LogonTrigger/></Triggers><Actions><Exec><Command>t.exe</Command></Exec>"
-    "</Actions></Task>"
-).encode()
+    b'<?xml version="1.0" encoding="UTF-8"?>'
+    b'<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+    b"<Triggers><LogonTrigger/></Triggers><Actions><Exec><Command>t.exe</Command></Exec>"
+    b"</Actions></Task>"
+)
 
 
 def write(path: Path, raw: bytes) -> Path:
