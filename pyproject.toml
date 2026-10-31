@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "safeclean"
+version = "0.0.1"
+description = "Safe, local-first file cleanup analyzer: report first, quarantine, delete only after confirmation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "mypy>=1.10", "ruff>=0.5"]
+
+[project.scripts]
+safeclean = "safeclean.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/safeclean"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --cov=safeclean --cov-branch --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+source = ["safeclean"]
+branch = true
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src", "tests"]
+mypy_path = "src"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "PT", "RUF", "TID", "ANN", "PTH"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN401"]
+
+# Safety principle: deletion goes only through the quarantine API (see docs/decisions/0001).
+# Applies to src AND tests. Path.unlink/rmdir are method calls ruff cannot ban;
+# tests/test_no_direct_delete.py covers them with an AST check.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"os.remove".msg = "Direct deletion is forbidden. Use the quarantine API."
+"os.unlink".msg = "Direct deletion is forbidden. Use the quarantine API."
+"os.rmdir".msg = "Direct deletion is forbidden. Use the quarantine API."
+"os.removedirs".msg = "Direct deletion is forbidden. Use the quarantine API."
+"shutil.rmtree".msg = "Direct deletion is forbidden. Use the quarantine API."
