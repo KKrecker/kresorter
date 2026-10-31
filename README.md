@@ -22,7 +22,7 @@ pip install -e ".[dev]"
 ruff check . && ruff format --check . && mypy && pytest
 ```
 
-Decisions are logged in [`docs/decisions/`](docs/decisions/).
+Decisions are logged in [`docs/decisions/`](docs/decisions/); the plan is in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## License
 
