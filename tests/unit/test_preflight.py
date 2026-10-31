@@ -127,27 +127,27 @@ def test_failing_checker_counts_as_open(policy: PathPolicy, zone: Path) -> None:
 
 def test_missing_file_is_refused(preflight: Preflight, zone: Path) -> None:
     entry = scanned(write(zone / "a.bin"))
-    os.replace(entry.path, zone / "moved.bin")
+    entry.path.replace(zone / "moved.bin")
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.NOT_FOUND
 
 
 def test_file_replaced_by_symlink_is_refused(preflight: Preflight, zone: Path) -> None:
     entry = scanned(write(zone / "a.bin"))
-    os.replace(entry.path, zone / "real.bin")
+    entry.path.replace(zone / "real.bin")
     entry.path.symlink_to(zone / "real.bin")
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.SYMLINK
 
 
 def test_file_replaced_by_directory_is_refused(preflight: Preflight, zone: Path) -> None:
     entry = scanned(write(zone / "a.bin"))
-    os.replace(entry.path, zone / "moved.bin")
+    entry.path.replace(zone / "moved.bin")
     entry.path.mkdir()
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.NOT_REGULAR
 
 
 def test_file_replaced_by_fifo_is_refused(preflight: Preflight, zone: Path) -> None:
     entry = scanned(write(zone / "a.bin"))
-    os.replace(entry.path, zone / "moved.bin")
+    entry.path.replace(zone / "moved.bin")
     os.mkfifo(entry.path)
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.NOT_REGULAR
 
@@ -168,7 +168,7 @@ def test_mtime_change_is_refused(preflight: Preflight, zone: Path) -> None:
 def test_unreadable_path_is_refused_with_detail(preflight: Preflight, zone: Path) -> None:
     # Parent directory replaced by a regular file: lstat fails with ENOTDIR.
     entry = scanned(write(zone / "dir" / "a.bin"))
-    os.replace(zone / "dir", zone / "old-dir")
+    (zone / "dir").replace(zone / "old-dir")
     write(zone / "dir")
     result = preflight.check(Candidate(entry=entry))
     assert refusal(result) is RefusalReason.UNREADABLE
@@ -184,7 +184,7 @@ def test_parent_swapped_for_symlink_is_refused(preflight: Preflight, zone: Path)
     entry = scanned(write(zone / "dir" / "a.bin"))
     decoy = write(zone / "elsewhere" / "a.bin")
     os.utime(decoy, ns=(entry.mtime_ns, entry.mtime_ns))
-    os.replace(zone / "dir", zone / "old-dir")
+    (zone / "dir").replace(zone / "old-dir")
     (zone / "dir").symlink_to(zone / "elsewhere")
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.PARENT_SWAPPED
 
@@ -193,7 +193,7 @@ def test_grandparent_swapped_for_symlink_is_refused(preflight: Preflight, zone: 
     entry = scanned(write(zone / "top" / "dir" / "a.bin"))
     decoy = write(zone / "elsewhere" / "dir" / "a.bin")
     os.utime(decoy, ns=(entry.mtime_ns, entry.mtime_ns))
-    os.replace(zone / "top", zone / "old-top")
+    (zone / "top").replace(zone / "old-top")
     (zone / "top").symlink_to(zone / "elsewhere")
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.PARENT_SWAPPED
 
@@ -212,7 +212,7 @@ def test_missing_twin_is_refused(
     preflight: Preflight, pair: tuple[FileEntry, FileEntry, str]
 ) -> None:
     entry, twin, digest = pair
-    os.replace(twin.path, twin.path.with_name("gone.bin"))
+    twin.path.replace(twin.path.with_name("gone.bin"))
     result = preflight.check(Candidate(entry=entry, twin=twin, digest=digest))
     assert refusal(result) is RefusalReason.TWIN_MISSING
 
@@ -242,7 +242,7 @@ def test_twin_replaced_by_symlink_is_refused(
 ) -> None:
     # A link back to the candidate would leave no real copy after the move.
     entry, twin, digest = pair
-    os.replace(twin.path, twin.path.with_name("old-b.bin"))
+    twin.path.replace(twin.path.with_name("old-b.bin"))
     twin.path.symlink_to(entry.path)
     result = preflight.check(Candidate(entry=entry, twin=twin, digest=digest))
     assert refusal(result) is RefusalReason.TWIN_CHANGED
