@@ -93,8 +93,13 @@ Services (decision 0011, item 39): trigger-start services are not shown; for a s
 `svchost` service `Parameters\ServiceDll` is not read (the user sees the `svchost` entry, not
 what it runs); `Group` and `DependOnService` are not taken into account.
 
-Remaining commits: 9 scheduled tasks and macOS LaunchAgents, 10 `safeclean autostart list`,
-11 journal schema v3, 12 `autostart disable/enable`.
+Scheduled tasks and launchd (decision 0011, item 40): task `StartBoundary`/`EndBoundary` and
+delays are not taken into account and `TaskCache` is not compared with the XML; the launchd
+state comes from the file only (`/var/db/com.apple.xpc.launchd/` overrides are root-only and not
+read), `LimitLoadToSessionType` is ignored, `/System/Library` is not read.
+
+Remaining commits: 10 `safeclean autostart list`, 11 journal schema v3, 12 `autostart
+disable/enable`.
 
 ## Target package layout
 

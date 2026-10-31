@@ -213,6 +213,12 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     - scheduled tasks: `StartBoundary`/`EndBoundary` and start delays are not taken into
       account; the registry cache of the Task Scheduler (`TaskCache`) is not compared with
       the XML definitions.
+    - launchd: the state comes from the file's `Disabled` key only. launchd keeps overrides of
+      its own (`launchctl enable/disable`) in `/var/db/com.apple.xpc.launchd/`, readable by
+      root only; they are not read, so every launchd item carries the note
+      `state from the file`. Run as root, the real state could be checked there; it also
+      changes at runtime, even between two readings. `LimitLoadToSessionType` is not taken
+      into account; `/System/Library/LaunchAgents` and `LaunchDaemons` are not read.
 
 ### Scheduled tasks (9a)
 
@@ -241,3 +247,31 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
 47. **Tasks do not overlay each other**, so a folder that cannot be listed is one skip with its
     reason and the other folders are still read (unlike XDG, item 32). The digest covers the
     file bytes.
+
+### LaunchAgents and LaunchDaemons (9b)
+
+48. **Where launchd entries are read**: `~/Library/LaunchAgents` (`user` scope),
+    `/Library/LaunchAgents` and `/Library/LaunchDaemons` (`system` scope), without a flag, like
+    `/etc/xdg`: item 5 is about `HKLM` only. `/System/Library` is not read: it is the OS
+    itself, protected by SIP, hundreds of entries the user cannot change. Daemons share
+    `Source.LAUNCH_AGENT` and carry the note `daemon, started at boot`. Order: user agents,
+    system agents, daemons; by file name, ignoring case, within a directory.
+49. **One item per `*.plist`**, as launchd loads them all; other files are not entries. The
+    notes say whether it also starts: `runs at load` (`RunAtLoad`), `kept alive`
+    (`KeepAlive=true`), `kept alive on conditions` (a non-empty `KeepAlive` dictionary),
+    otherwise `loaded at login, started on demand` — listed with a note, not hidden, like the
+    non-service systemd units (item 18).
+50. **`name` is the `Label`; `command` is `shlex.join` of the argv launchd runs**:
+    `ProgramArguments`, with `Program`, if present, as the executable in place of its first
+    element; `Program` alone is the command.
+51. **Parsing is strict and bounded.** XML and binary property lists are read; `plistlib`
+    refuses XML entity declarations. A root that is not a dictionary, no or an empty `Label`,
+    neither `Program` nor `ProgramArguments`, wrong types of `Program`, `ProgramArguments`,
+    `RunAtLoad`, `Disabled` or `KeepAlive`, an empty command, a file over `MAX_ENTRY_BYTES` or
+    not a regular file are skips. `plistlib` is not hardened against malformed input (it also
+    fails with `ExpatError`, `ValueError`, even `AttributeError`), so any failure to parse the
+    at most `MAX_ENTRY_BYTES` read is the same skip, `not a valid property list`.
+52. **The state is the file's `Disabled` key** (`Disabled=true` is disabled, with that note);
+    every item carries `state from the file` (item 40). launchd directories do not overlay each
+    other: one that cannot be listed is a skip with its reason, the others are still read. The
+    digest covers the file bytes; launchd items are read-only in step 4 (item 9).
