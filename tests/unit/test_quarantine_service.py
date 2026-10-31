@@ -187,7 +187,8 @@ def test_files_are_moved_into_the_vault_and_journaled(
     assert result.state is OperationState.DONE
     assert result.refused == ()
     assert [m.original for m in result.moved] == [a.path, b.path]
-    assert not a.path.exists() and not b.path.exists()
+    assert not a.path.exists()
+    assert not b.path.exists()
     first = result.moved[0]
     expected_slot = data_dir / "quarantine" / str(result.operation_id) / str(first.item_id)
     assert first.vault_path == expected_slot
@@ -300,7 +301,8 @@ def test_failure_mid_batch_moves_everything_back(
     assert result.state is OperationState.ROLLED_BACK
     assert "I/O error" in result.error
     assert result.moved == ()
-    assert a.path.read_bytes() == b"aaa" and b.path.read_bytes() == b"bbb"
+    assert a.path.read_bytes() == b"aaa"
+    assert b.path.read_bytes() == b"bbb"
     assert rows(conn, "SELECT state FROM operations") == [("rolled_back",)]
     assert rows(conn, "SELECT state FROM items") == [("rolled_back",), ("rolled_back",)]
 
@@ -315,7 +317,8 @@ def test_interrupt_mid_batch_rolls_back_then_propagates(
     with pytest.raises(KeyboardInterrupt):
         service.quarantine([Candidate(entry=a), Candidate(entry=b)])
 
-    assert a.path.exists() and b.path.exists()
+    assert a.path.exists()
+    assert b.path.exists()
     assert rows(conn, "SELECT state FROM operations") == [("rolled_back",)]
 
 
