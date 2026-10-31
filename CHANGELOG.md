@@ -23,6 +23,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `safeclean quarantine add / list / restore / purge [--yes]`: purge shows its plan and deletes only with `--yes`; every command recovers interrupted operations first (LOST warnings on stderr); exit codes 0/1/2/3 (3 = unsafe to run); the data directory is checked before anything is created and kept 0700 (decision 0009). `safeclean.text` holds the shared size formatting.
 - `storage.lock.InstanceLock`: single-instance lock on the data directory (`flock` / `msvcrt.locking`, released by the kernel on crash, lock file 0600 and never deleted); a second `safeclean quarantine` on the same data directory exits with 3 (decision 0009, addendum).
 - `analysis.duplicates.decide()`: which copy of a duplicate group stays (not junk -> outside safe zones -> oldest `mtime_ns` -> shallowest -> path order) with the winning `KeepReason`; every other copy becomes a quarantine `Candidate` twinned with the keeper; a group never loses all copies; deterministic (decision 0010, which also fixes the safety levels SAFE / LIKELY_SAFE / REVIEW).
+- `analysis.size_age.find_large_and_old()`: large (default >= 500 MiB) and old (unmodified >= 730 days, by `mtime_ns` only; a future `mtime` is never old) files with all their reasons in a fixed order; evidence for `REVIEW` only (decision 0010).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Fixed
