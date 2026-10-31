@@ -37,6 +37,7 @@ from safeclean.autostart.run_keys import (
 ENABLED = bytes([0x02]) + bytes(11)
 DISABLED = bytes([0x03]) + bytes(3) + bytes(range(8))  # flag, padding, FILETIME of the change
 
+
 def sz(name: str, data: str, kind: ValueKind = ValueKind.REG_SZ) -> RegValue:
     return RegValue(name, kind, data)
 
