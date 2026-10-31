@@ -95,3 +95,27 @@
       the main unit file;
     - `<target>.requires/` is not read;
     - units enabled for all users (`/etc/systemd/user`) are not read.
+
+## Addendum (step 4, commit 5): Run and RunOnce values
+
+20. **Where Run values are read.** `HKCU` `Run` and `RunOnce` always; with `--include-machine`
+    also `HKLM` `Run`/`RunOnce` and, read apart, the 32-bit view of `HKLM`
+    (`Software\WOW6432Node\...\Run`/`RunOnce`) with its own flags in
+    `Explorer\StartupApproved\Run32`. The 32-bit view is not a separate `Source` (the
+    mechanism is the same Run); it differs by `location` and the note `32-bit view`, and the
+    flags of one view never apply to the other. `HKCU` has no 32-bit view of `Run`. Without
+    consent `HKLM` is not even read. Order: HKCU Run, HKCU RunOnce, HKLM Run, HKLM RunOnce,
+    HKLM Run (32-bit), HKLM RunOnce (32-bit); by value name, ignoring case, within a key.
+21. **The state of a Run value is its `StartupApproved` flag** of the same hive and view,
+    matched by name ignoring case, as the Task Manager does: no flag is enabled; a binary flag
+    starting with `0x02`/`0x06` is enabled, `0x03`/`0x07` disabled (with the note naming the
+    flag key). Any other flag (another first byte, empty, not binary) is an unknown state and
+    the value is skipped (item 12). A flag key that cannot be read makes the state of every
+    Run value of that view unknown: one skip for the flag key, no items. A flag without a Run
+    value is not an item.
+22. **RunOnce values have no flag**; they are listed as they are with the note
+    `runs once at the next logon`. A value that is not `REG_SZ`/`REG_EXPAND_SZ`, or is empty,
+    is skipped; `REG_EXPAND_SZ` is kept unexpanded; the default value is named `(Default)`.
+23. **The digest of a Run value covers the value and its flag** (name, type and data of each,
+    every field length-prefixed, a missing flag included), so a changed flag counts as a
+    changed entry.
