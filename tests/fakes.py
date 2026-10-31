@@ -9,6 +9,8 @@ from safeclean.core.policy import BlockReason, PathPolicy
 class FakeOpenFiles:
     """Open-file checker that reports a fixed set of paths as open."""
 
+    reliable = True
+
     def __init__(self, open_paths: Iterable[PurePath] = ()) -> None:
         self._open = {str(p) for p in open_paths}
         self.calls: list[PurePath] = []
@@ -20,6 +22,8 @@ class FakeOpenFiles:
 
 class BrokenOpenFiles:
     """Open-file checker whose backend fails (e.g. access denied to the process list)."""
+
+    reliable = True
 
     def is_open(self, path: PurePath) -> bool:
         raise OSError("cannot enumerate open handles")
