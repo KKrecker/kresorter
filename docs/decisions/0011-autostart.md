@@ -206,3 +206,38 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
       the service's code lives there: the user sees the `svchost` entry, not what it runs, and
       no output may present it as a full analysis;
     - `Group` and `DependOnService` are not taken into account.
+
+## Addendum (step 4, commit 9): scheduled tasks and launchd
+
+40. **Accepted limitations** (to revisit after the first live run on each system):
+    - scheduled tasks: `StartBoundary`/`EndBoundary` and start delays are not taken into
+      account; the registry cache of the Task Scheduler (`TaskCache`) is not compared with
+      the XML definitions.
+
+### Scheduled tasks (9a)
+
+41. **Task definitions are read only with `--include-machine`.** They are XML files under
+    `%SystemRoot%\System32\Tasks` (`%windir%` if unset), machine-wide, mostly readable only
+    by administrators; every item is `system` scope and read-only in step 4 (item 9).
+42. **A task is an autostart entry if it has a `BootTrigger` or a `LogonTrigger`.** Tasks with
+    other triggers only (time, calendar, idle, event, registration, session state) are not
+    listed nor skipped, like manual services (item 34).
+43. **`name` is the task path** as the Task Scheduler shows it (`\Microsoft\Windows\...`);
+    folders are read recursively, linked folders are not followed (skipped as `not a regular
+    file`). Order: by name, ignoring case.
+44. **Notes and state.** `at boot`, `at logon` or `at logon of <UserId>`, boot first; a trigger
+    with `Enabled=false` gets ` (trigger disabled)`; `Settings/Enabled=false` adds
+    `task disabled`. `enabled` is: the task is enabled and at least one boot or logon trigger
+    is. Booleans follow `xs:boolean` (`true`, `false`, `1`, `0`); anything else is a skip.
+45. **`command` is the first action as written**: `Exec` is `Command` and `Arguments`
+    (`%VAR%` kept unexpanded); more actions add `N more action(s)`. A `ComHandler` is
+    `COM handler {CLSID}` with the note `COM handler, not resolved`. Other actions
+    (`SendEmail`, `ShowMessage`) are skipped as `unsupported action`.
+46. **Parsing is strict and bounded**: invalid XML, a root that is not `Task` in the Task
+    Scheduler namespace, no actions, an empty `Command` or a `ComHandler` without `ClassId`
+    are skips; only regular files of at most `MAX_ENTRY_BYTES` are opened. **A DTD is refused**
+    by a first expat pass before the tree is built, so no entity is ever expanded and no
+    dependency is added. UTF-16 with a BOM (as Windows writes tasks) and UTF-8 are read alike.
+47. **Tasks do not overlay each other**, so a folder that cannot be listed is one skip with its
+    reason and the other folders are still read (unlike XDG, item 32). The digest covers the
+    file bytes.
