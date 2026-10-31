@@ -49,6 +49,11 @@ def test_placeholder_is_not_reliable() -> None:
     assert NoOpenFileCheck().reliable is False
 
 
+def test_placeholder_reports_nothing_as_open(tmp_path: Path) -> None:
+    # Which is exactly why it is unreliable: a scan may use it only with disclosure.
+    assert NoOpenFileCheck().is_open(tmp_path) is False
+
+
 def test_proc_backend_is_reliable(proc: Path) -> None:
     assert ProcFdChecker(proc_root=proc).reliable is True
 
