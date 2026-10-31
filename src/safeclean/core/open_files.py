@@ -12,3 +12,15 @@ class OpenFileChecker(Protocol):
     def is_open(self, path: PurePath) -> bool:
         """Return True if any process holds ``path`` open. May raise on backend failure."""
         ...
+
+
+class NoOpenFileCheck:
+    """Placeholder until OS backends exist: reports nothing as open.
+
+    Only acceptable for read-only reports, and callers must disclose it
+    (``ScanContext.open_files_checked = False``). Actions (quarantine, step 2) must refuse to run
+    without a real checker (decision 0003).
+    """
+
+    def is_open(self, path: PurePath) -> bool:
+        return False

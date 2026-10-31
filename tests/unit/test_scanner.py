@@ -73,7 +73,12 @@ def test_duplicates_can_be_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     write(root / "a.bin", b"same")
     write(root / "b.bin", b"same")
     calls: list[Path] = []
-    monkeypatch.setattr(hashing, "hash_file", lambda path, **kw: calls.append(path) or "")
+
+    def spy(path: Path, **kwargs: object) -> str:
+        calls.append(path)
+        return ""
+
+    monkeypatch.setattr(hashing, "hash_file", spy)
 
     report = scan([root], context(tmp_path), hash_duplicates=False)
 

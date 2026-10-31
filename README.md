@@ -14,6 +14,17 @@ Open source, local-only, no telemetry.
 - **Safe zones by default.** Program Files, user profiles and open files are blacklisted.
 - **Local only.** No telemetry; the optional LLM (Ollama) runs locally.
 
+## Usage (step 1: console, report only)
+
+```bash
+safeclean scan                 # default safe zones: ~/.cache and ~/Downloads
+safeclean scan ~/Projects /tmp # explicit roots (Temp only when chosen explicitly)
+safeclean scan --json --no-hash ~/Downloads
+```
+
+`scan` never changes the disk. It lists junk candidates, duplicate groups and everything it
+skipped, with the reason.
+
 ## Development
 
 ```bash

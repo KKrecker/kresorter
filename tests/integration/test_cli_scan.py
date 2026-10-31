@@ -32,10 +32,13 @@ def tree(tmp_path: Path) -> Path:
 
 
 def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
+    # tmp_path lives under /tmp, which the real "posix-temp" rule (rightly) marks as junk.
+    # Drop that one rule so the test sees the tree's own junk, not its location.
+    rules = [r for r in default_rules() if r.id != "posix-temp"]
     return ScanContext(
         policy=make_policy(tmp_path, tree / "blocked", default_roots=[tree]),
         open_files=FakeOpenFiles(),
-        classifier=JunkClassifier(default_rules(), platform="linux"),
+        classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checked,
     )
 
@@ -138,6 +141,23 @@ def test_bad_usage_exits_with_2(tmp_path: Path, tree: Path, args: list[str]) -> 
 
 
 @pytest.mark.parametrize(
+    ("size", "text"),
+    [
+        (0, "0 B"),
+        (1023, "1023 B"),
+        (1024, "1.0 KiB"),
+        (1536, "1.5 KiB"),
+        (5 * 1024**2, "5.0 MiB"),
+        (3 * 1024**3, "3.0 GiB"),
+        (2 * 1024**4, "2.0 TiB"),
+        (2048 * 1024**4, "2048.0 TiB"),
+    ],
+)
+def test_format_size(size: int, text: str) -> None:
+    assert cli.format_size(size) == text
+
+
+@pytest.mark.parametrize(
     ("sys_platform", "expected"),
     [("win32", "windows"), ("linux", "linux"), ("darwin", "darwin")],
 )
@@ -156,6 +176,7 @@ def test_default_context_posix(tmp_path: Path, platform: Platform) -> None:
 
     assert context.policy.default_roots() == (tmp_path / ".cache", tmp_path / "Downloads")
     assert context.open_files_checked is False
+    assert context.open_files.is_open(tmp_path) is False
 
 
 def test_default_context_windows() -> None:

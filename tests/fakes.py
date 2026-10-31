@@ -25,9 +25,7 @@ class BrokenOpenFiles:
         raise OSError("cannot enumerate open handles")
 
 
-def make_policy(
-    tmp_path: Path, *blocked: Path, default_roots: Iterable[Path] = ()
-) -> PathPolicy:
+def make_policy(tmp_path: Path, *blocked: Path, default_roots: Iterable[Path] = ()) -> PathPolicy:
     """Policy rooted in ``tmp_path``: blocks ``blocked`` (as SYSTEM), no real system paths."""
     return PathPolicy(
         flavor=type(PurePath(tmp_path)),
