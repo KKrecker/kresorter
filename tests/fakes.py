@@ -1,9 +1,12 @@
 """Fakes for OS boundaries. Tests never touch the live system state they describe."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path, PurePath
 
+from safeclean.autostart.registry import Hive, RegistryError, RegValue
 from safeclean.core.policy import BlockReason, PathPolicy
+
+RegistryKeys = Mapping[tuple[Hive, str], Sequence[RegValue]]
 
 
 class FakeOpenFiles:
@@ -48,3 +51,18 @@ def make_policy(
         default_roots=list(default_roots),
         app_data_dir=app_data_dir or tmp_path / "appdata",
     )
+
+
+class FakeRegistry:
+    """Read-only registry: keys by (hive, path); a denied key raises like a real one would."""
+
+    def __init__(self, keys: RegistryKeys, denied: Iterable[tuple[Hive, str]] = ()) -> None:
+        self._keys = dict(keys)
+        self._denied = set(denied)
+        self.reads: list[tuple[Hive, str]] = []
+
+    def values(self, hive: Hive, key: str) -> Sequence[RegValue] | None:
+        self.reads.append((hive, key))
+        if (hive, key) in self._denied:
+            raise RegistryError("access denied")
+        return self._keys.get((hive, key))

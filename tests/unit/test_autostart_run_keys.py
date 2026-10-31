@@ -7,10 +7,9 @@ values have no such flag and are listed as they are. The registry is a fake: not
 from, or written to, a real one.
 """
 
-from collections.abc import Iterable, Mapping, Sequence
-
 import pytest
 
+from fakes import FakeRegistry, RegistryKeys
 from safeclean.autostart.models import (
     AutostartItem,
     AutostartListing,
@@ -21,7 +20,6 @@ from safeclean.autostart.models import (
 from safeclean.autostart.registry import (
     Hive,
     Registry,
-    RegistryError,
     RegValue,
     ValueKind,
     value_digest,
@@ -39,24 +37,6 @@ from safeclean.autostart.run_keys import (
 ENABLED = bytes([0x02]) + bytes(11)
 DISABLED = bytes([0x03]) + bytes(3) + bytes(range(8))  # flag, padding, FILETIME of the change
 
-Keys = Mapping[tuple[Hive, str], Sequence[RegValue]]
-
-
-class FakeRegistry:
-    """Read-only registry: keys by (hive, path); a denied key raises like a real one would."""
-
-    def __init__(self, keys: Keys, denied: Iterable[tuple[Hive, str]] = ()) -> None:
-        self._keys = dict(keys)
-        self._denied = set(denied)
-        self.reads: list[tuple[Hive, str]] = []
-
-    def values(self, hive: Hive, key: str) -> Sequence[RegValue] | None:
-        self.reads.append((hive, key))
-        if (hive, key) in self._denied:
-            raise RegistryError("access denied")
-        return self._keys.get((hive, key))
-
-
 def sz(name: str, data: str, kind: ValueKind = ValueKind.REG_SZ) -> RegValue:
     return RegValue(name, kind, data)
 
@@ -65,7 +45,7 @@ def flag(name: str, data: bytes) -> RegValue:
     return RegValue(name, ValueKind.REG_BINARY, data)
 
 
-def read(keys: Keys, *, include_machine: bool = False) -> AutostartListing:
+def read(keys: RegistryKeys, *, include_machine: bool = False) -> AutostartListing:
     registry: Registry = FakeRegistry(keys)
     return read_run_keys(registry, include_machine=include_machine)
 
