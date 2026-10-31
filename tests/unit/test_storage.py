@@ -129,6 +129,22 @@ def test_migrations_apply_in_order_from_current_version(tmp_path: Path) -> None:
     raw.close()
 
 
+def test_v1_journal_gains_atime_and_keeps_its_rows(tmp_path: Path) -> None:
+    # v2 adds items.atime_ns (restore puts atime back); v1 rows keep NULL there.
+    path = tmp_path / "journal.db"
+    raw = sqlite3.connect(path, isolation_level=None)
+    migrate(raw, MIGRATIONS[:1])
+    add_item(raw, add_operation(raw))
+    raw.close()
+
+    upgraded = connect(path)
+
+    assert SCHEMA_VERSION >= 2
+    assert pragma(upgraded, "user_version") == SCHEMA_VERSION
+    assert upgraded.execute("SELECT size, atime_ns FROM items").fetchall() == [(3, None)]
+    upgraded.close()
+
+
 # --- transactions ------------------------------------------------------------------------------
 
 

@@ -250,6 +250,22 @@ def test_refused_candidates_are_reported_and_the_rest_proceeds(
     assert changed.path.read_bytes() == b"different size"
 
 
+def test_same_file_twice_in_one_batch_is_refused_up_front(
+    service: QuarantineService, zone: Path
+) -> None:
+    # Refused on input, not discovered later as an OSError that rolls back the whole batch.
+    a = scanned(write(zone / "a.bin"))
+    b = scanned(write(zone / "b.bin"))
+
+    result = service.quarantine([Candidate(entry=a), Candidate(entry=b), Candidate(entry=a)])
+
+    assert result.state is OperationState.DONE
+    assert [m.original for m in result.moved] == [a.path, b.path]
+    assert [(r.path, r.reason) for r in result.refused] == [
+        (a.path, RefusalReason.DUPLICATE_CANDIDATE)
+    ]
+
+
 def test_all_refused_creates_no_operation(
     service: QuarantineService, conn: sqlite3.Connection, zone: Path
 ) -> None:
