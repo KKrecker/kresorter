@@ -7,8 +7,8 @@ Symlink resolution is the walker's job, so symlink cases live in test_walker.py.
 from pathlib import PurePath, PurePosixPath, PureWindowsPath
 
 import pytest
-from fakes import BrokenOpenFiles, FakeOpenFiles
 
+from fakes import BrokenOpenFiles, FakeOpenFiles
 from safeclean.core.policy import BlockReason, PathPolicy, Verdict
 
 WIN_ENV = {

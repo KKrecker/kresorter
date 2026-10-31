@@ -122,10 +122,12 @@ class PathPolicy:
     @classmethod
     def for_posix(cls, *, home: PurePosixPath, platform: Literal["linux", "darwin"]) -> PathPolicy:
         """Build a Linux or macOS policy. macOS paths are compared case-insensitively (APFS)."""
+        system: tuple[str, ...]
+        program_files: tuple[str, ...]
         common = ("/bin", "/sbin", "/usr", "/etc", "/dev", "/var/lib", "/var/db")
         if platform == "darwin":
             system = (*common, "/System", "/Library", "/private", "/cores")
-            program_files: tuple[str, ...] = ("/Applications", "/opt")
+            program_files = ("/Applications", "/opt")
         else:
             system = (*common, "/boot", "/lib", "/lib32", "/lib64", "/proc", "/sys", "/run")
             program_files = ("/opt", "/snap")

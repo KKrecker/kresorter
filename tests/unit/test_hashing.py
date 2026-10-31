@@ -119,9 +119,7 @@ def test_unique_size_is_never_read(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert calls == []
 
 
-def test_partial_mismatch_skips_full_hash(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_partial_mismatch_skips_full_hash(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     calls = spy_hash_file(monkeypatch)
     a = make(tmp_path / "a", b"AAAA-tail")
     b = make(tmp_path / "b", b"BBBB-tail")

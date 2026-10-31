@@ -10,8 +10,8 @@ from pathlib import Path, PurePath
 from typing import Any
 
 import pytest
-from fakes import FakeOpenFiles
 
+from fakes import FakeOpenFiles
 from safeclean.core.models import FileEntry, Skipped, SkipReason
 from safeclean.core.policy import BlockReason, PathPolicy
 from safeclean.core.walker import walk
@@ -179,9 +179,7 @@ def test_permission_denied_directory_is_reported_and_walk_continues(
     assert skips(events) == [Skipped(path=root / "locked", reason=SkipReason.PERMISSION_DENIED)]
 
 
-def test_unreadable_directory_is_reported(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_unreadable_directory_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "root"
     root.mkdir()
     failing_scandir(monkeypatch, root, OSError(5, "I/O error"))

@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import stat
 from collections.abc import Callable, Iterable, Iterator
+from functools import partial
 from pathlib import Path
 
 from safeclean.core.models import FileEntry, Skipped, SkipReason, skipped_from_os_error
@@ -21,9 +22,7 @@ from safeclean.core.policy import PathPolicy
 Event = FileEntry | Skipped
 
 
-def walk(
-    roots: Iterable[Path], policy: PathPolicy, open_files: OpenFileChecker
-) -> Iterator[Event]:
+def walk(roots: Iterable[Path], policy: PathPolicy, open_files: OpenFileChecker) -> Iterator[Event]:
     """Yield a FileEntry for every allowed regular file under ``roots``, Skipped for the rest."""
     walker = _Walker(policy, open_files)
     for root in roots:
@@ -84,7 +83,7 @@ class _Walker:
             elif entry.is_dir(follow_symlinks=False):
                 subdirs.append(path)
             else:
-                yield self._file_event(path, lambda e=entry: e.stat(follow_symlinks=False))
+                yield self._file_event(path, partial(entry.stat, follow_symlinks=False))
 
     def _file_event(self, path: Path, get_stat: Callable[[], os.stat_result]) -> Event:
         try:
