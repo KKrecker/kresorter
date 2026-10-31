@@ -193,6 +193,97 @@ def test_blacklisted_file_skips_open_check(linux: PathPolicy) -> None:
     assert checker.calls == []
 
 
+# --- app data directory: vault and journal are never candidates (decision 0004) ----------------
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        pytest.param(
+            "/home/alice/.local/share/safeclean/quarantine/1/2",
+            blocked(BlockReason.APP_DATA),
+            id="vault",
+        ),
+        pytest.param(
+            "/home/alice/.local/share/safeclean/journal.db",
+            blocked(BlockReason.APP_DATA),
+            id="journal",
+        ),
+        pytest.param(
+            "/home/alice/.local/share/safeclean", blocked(BlockReason.APP_DATA), id="dir-itself"
+        ),
+        pytest.param("/home/alice/.local/share/other/a", ALLOWED, id="sibling-app"),
+        pytest.param("/home/alice/.local/share/safeclean-old/a", ALLOWED, id="name-prefix-only"),
+    ],
+)
+def test_linux_app_data_is_blocked(linux: PathPolicy, path: str, expected: Verdict) -> None:
+    assert linux.check_path(PurePosixPath(path)) == expected
+
+
+def test_linux_app_data_follows_xdg_data_home() -> None:
+    policy = PathPolicy.for_posix(
+        home=PurePosixPath("/home/alice"), platform="linux", env={"XDG_DATA_HOME": "/data/xdg"}
+    )
+    assert policy.app_data_dir == PurePosixPath("/data/xdg/safeclean")
+    assert policy.check_path(PurePosixPath("/data/xdg/safeclean/q")) == blocked(
+        BlockReason.APP_DATA
+    )
+
+
+@pytest.mark.parametrize("value", ["", "relative/share"])
+def test_linux_ignores_empty_or_relative_xdg_data_home(value: str) -> None:
+    # XDG Base Directory spec: relative paths are invalid and must be ignored.
+    policy = PathPolicy.for_posix(
+        home=PurePosixPath("/home/alice"), platform="linux", env={"XDG_DATA_HOME": value}
+    )
+    assert policy.app_data_dir == PurePosixPath("/home/alice/.local/share/safeclean")
+
+
+def test_app_data_inside_a_default_root_is_still_blocked() -> None:
+    # A custom XDG_DATA_HOME under ~/.cache must not expose the vault as junk.
+    policy = PathPolicy.for_posix(
+        home=PurePosixPath("/home/alice"),
+        platform="linux",
+        env={"XDG_DATA_HOME": "/home/alice/.cache/xdg"},
+    )
+    assert policy.check_path(PurePosixPath("/home/alice/.cache/xdg/safeclean/q/1")) == blocked(
+        BlockReason.APP_DATA
+    )
+    assert policy.check_path(PurePosixPath("/home/alice/.cache/other")) == ALLOWED
+
+
+def test_macos_app_data_is_blocked_case_insensitively(mac: PathPolicy) -> None:
+    assert mac.app_data_dir == PurePosixPath("/Users/alice/Library/Application Support/safeclean")
+    for path in (
+        "/Users/alice/Library/Application Support/safeclean/q",
+        "/users/ALICE/library/application support/SafeClean/q",
+    ):
+        assert mac.check_path(PurePosixPath(path)) == blocked(BlockReason.APP_DATA)
+
+
+def test_windows_app_data_uses_localappdata() -> None:
+    policy = PathPolicy.for_windows({**WIN_ENV, "LOCALAPPDATA": r"D:\Local"})
+    assert policy.app_data_dir == PureWindowsPath(r"D:\Local\safeclean")
+    assert policy.check_path(PureWindowsPath(r"d:\LOCAL\SafeClean\q")) == blocked(
+        BlockReason.APP_DATA
+    )
+
+
+def test_windows_app_data_falls_back_to_profile(win: PathPolicy) -> None:
+    assert win.app_data_dir == PureWindowsPath(r"C:\Users\Alice\AppData\Local\safeclean")
+    assert win.check_path(PureWindowsPath(r"C:\Users\Alice\AppData\Local\safeclean\q")) == (
+        blocked(BlockReason.APP_DATA)
+    )
+    assert win.check_path(PureWindowsPath(r"C:\Users\Alice\AppData\Local\Other\a")) == ALLOWED
+
+
+def test_app_data_skips_the_open_file_check(linux: PathPolicy) -> None:
+    checker = FakeOpenFiles()
+    path = PurePosixPath("/home/alice/.local/share/safeclean/journal.db")
+    assert linux.check_file(path, checker) == blocked(BlockReason.APP_DATA)
+    assert checker.calls == []
+
+
 # --- default safe zones (decision 0002) --------------------------------------------------------
 
 

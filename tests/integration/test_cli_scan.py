@@ -170,11 +170,42 @@ def test_unsupported_platform_is_rejected() -> None:
         cli.detect_platform("sunos5")
 
 
+def test_explicit_scan_never_lists_the_app_data_dir(tmp_path: Path, tree: Path) -> None:
+    # Even when the user scans a parent of the data dir (e.g. ~), the vault stays invisible.
+    app_data = tree / "appdata" / "safeclean"
+    write(app_data / "quarantine" / "1" / "1" / "m.cpython-313.pyc", b"in vault")
+    base = ctx(tmp_path, tree)
+    context = ScanContext(
+        policy=make_policy(tmp_path, tree / "blocked", default_roots=[tree], app_data_dir=app_data),
+        open_files=base.open_files,
+        classifier=base.classifier,
+        open_files_checked=True,
+    )
+    _, out = run(["scan", "--json", str(tree)], context)
+    data = json.loads(out)
+
+    assert all(not item["path"].startswith(str(app_data)) for item in data["junk"])
+    assert {
+        "path": str(app_data),
+        "reason": "blocked",
+        "block_reason": "app_data",
+        "detail": "",
+    } in data["skipped"]
+
+
+def test_default_context_passes_environment_to_posix_policy(tmp_path: Path) -> None:
+    env = {"XDG_DATA_HOME": str(tmp_path / "xdg")}
+    context = cli.default_context(platform="linux", env=env, home=tmp_path)
+
+    assert context.policy.app_data_dir == tmp_path / "xdg" / "safeclean"
+
+
 @pytest.mark.parametrize("platform", ["linux", "darwin"])
 def test_default_context_posix(tmp_path: Path, platform: Platform) -> None:
     context = cli.default_context(platform=platform, env={}, home=tmp_path)
 
     assert context.policy.default_roots() == (tmp_path / ".cache", tmp_path / "Downloads")
+    assert context.policy.app_data_dir.name == "safeclean"
     assert context.open_files_checked is False
     assert context.open_files.is_open(tmp_path) is False
 
