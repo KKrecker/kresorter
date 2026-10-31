@@ -1,0 +1,111 @@
+# Junk heuristics: data, not code. Interpreted by safeclean.core.heuristics.
+#
+# Fields:
+#   id           unique, stable identifier (used in reports, journal and tests)
+#   category     cache | temp | thumbnails | crash_dump | os_metadata
+#   description  short human explanation of why this is junk
+#   dirs         path patterns that must appear as consecutive parent directories;
+#                segments are globs; a leading "/" anchors at the filesystem root
+#   files        file-name globs
+#   platforms    optional subset of windows | linux | darwin (default: all)
+#
+# A rule with both dirs and files matches only when both match.
+# Order matters: the first matching rule wins, so specific rules come first.
+# Every rule must have an example in tests/unit/test_heuristics.py (enforced by a test).
+#
+# Deliberately NOT junk: node_modules and build dirs (break projects), partial downloads
+# (*.part, *.crdownload: resumable), Office lock files (~$*: live while a document is open),
+# browser cookies/sessions, generic folders named "cache" or "tmp" inside user data.
+
+[[rule]]
+id = "python-bytecode"
+category = "cache"
+description = "Python bytecode cache; regenerated automatically on import."
+dirs = ["__pycache__"]
+
+[[rule]]
+id = "tool-caches"
+category = "cache"
+description = "Developer tool cache (pytest, mypy, ruff); rebuilt on next run."
+dirs = [".pytest_cache", ".mypy_cache", ".ruff_cache"]
+
+[[rule]]
+id = "chromium-cache"
+category = "cache"
+description = "Chromium-based browser cache (Chrome, Edge, Brave); re-downloaded as needed."
+dirs = ["User Data/*/Cache", "User Data/*/Code Cache", "User Data/*/GPUCache"]
+platforms = ["windows"]
+
+[[rule]]
+id = "firefox-cache"
+category = "cache"
+description = "Firefox disk cache; re-downloaded as needed."
+dirs = ["Mozilla/Firefox/Profiles/*/cache2"]
+platforms = ["windows"]
+
+[[rule]]
+id = "inet-cache"
+category = "cache"
+description = "Windows internet cache (WinINet)."
+dirs = ["AppData/Local/Microsoft/Windows/INetCache"]
+platforms = ["windows"]
+
+[[rule]]
+id = "windows-thumbcache"
+category = "thumbnails"
+description = "Explorer thumbnail and icon cache; rebuilt automatically."
+dirs = ["AppData/Local/Microsoft/Windows/Explorer"]
+files = ["thumbcache_*.db", "iconcache_*.db"]
+platforms = ["windows"]
+
+[[rule]]
+id = "thumbs-db"
+category = "thumbnails"
+description = "Legacy per-folder thumbnail database."
+files = ["Thumbs.db", "ehthumbs.db"]
+
+[[rule]]
+id = "crash-dumps"
+category = "crash_dump"
+description = "Application crash dump; only useful for debugging a past crash."
+dirs = ["AppData/Local/CrashDumps"]
+platforms = ["windows"]
+
+[[rule]]
+id = "macos-library-caches"
+category = "cache"
+description = "macOS application caches; rebuilt by applications."
+dirs = ["Library/Caches"]
+platforms = ["darwin"]
+
+[[rule]]
+id = "user-cache-dir"
+category = "cache"
+description = "Per-user cache directory (XDG ~/.cache and tools using it)."
+dirs = [".cache"]
+
+[[rule]]
+id = "windows-user-temp"
+category = "temp"
+description = "User temp directory. Scanned only on explicit choice (decision 0002)."
+dirs = ["AppData/Local/Temp"]
+platforms = ["windows"]
+
+[[rule]]
+id = "posix-temp"
+category = "temp"
+description = "System temp directory. Scanned only on explicit choice (decision 0002)."
+dirs = ["/tmp", "/var/tmp"]
+platforms = ["linux", "darwin"]
+
+[[rule]]
+id = "temp-files"
+category = "temp"
+description = "File with a temporary-file extension."
+files = ["*.tmp", "*.temp"]
+
+[[rule]]
+id = "ds-store"
+category = "os_metadata"
+description = "macOS Finder folder metadata; recreated by Finder."
+files = [".DS_Store"]

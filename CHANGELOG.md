@@ -11,6 +11,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `core.policy`: path blacklist (Windows/Linux/macOS) and default safe zones (`~/.cache`, `~/Downloads`).
 - `core.walker`: safe traversal (no symlinks/junctions, pruning of blocked dirs, every skip reported).
 - `core.hashing`: streaming BLAKE2b; duplicate candidates via size groups -> prefix hash -> full hash; files changed since scan or during hashing reported as `changed`.
+- `core.heuristics` + `core/junk_rules.toml`: junk rules as data (14 default rules: caches, temp, thumbnails, crash dumps, OS metadata) with strict validation.
 
 ### Changed
 - Temp is no longer a default safe zone; scanned only on explicit choice (decision 0002).

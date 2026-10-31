@@ -112,6 +112,10 @@ def test_match_carries_category_and_description() -> None:
     )
 
 
+def test_filesystem_root_is_not_junk() -> None:
+    assert classifier("linux").classify(PurePosixPath("/")) is None
+
+
 def test_relative_path_is_rejected() -> None:
     with pytest.raises(ValueError, match="absolute"):
         classifier("linux").classify(PurePosixPath("a/b.tmp"))
@@ -135,6 +139,7 @@ BASE = 'id = "r"\ncategory = "cache"\ndescription = "d"\n'
         pytest.param(BASE + 'dirs = ["a//b"]', "empty segment", id="empty-segment"),
         pytest.param(BASE + 'dirs = ["a/../b"]', r"'\.\.'", id="dotdot"),
         pytest.param(BASE + 'files = ["a/b.tmp"]', "file pattern", id="slash-in-file"),
+        pytest.param(BASE + 'files = [""]', "file pattern", id="empty-file-pattern"),
         pytest.param(BASE + 'dirs = "a"', "list of strings", id="not-a-list"),
         pytest.param(BASE + "dirs = [1]", "list of strings", id="not-strings"),
         pytest.param(BASE + 'dirs = ["a"]\nplatforms = ["beos"]', "platform", id="bad-platform"),
