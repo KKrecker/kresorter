@@ -26,9 +26,9 @@ exact plan once, from the service that issued it, and deletes vault copies throu
 never deleted; the original path is never touched.
 
 ``recover()`` reconciles what a crash left behind (``pending`` quarantine items, and quarantined
-items of a ``pending`` restore or purge); until it has run, new operations are refused. A vault copy that
-no longer matches the journaled size/``mtime_ns`` is not ours to restore or purge: it becomes
-``lost`` and is reported loudly.
+items of a ``pending`` restore or purge); until it has run, new operations are refused. A vault
+copy that no longer matches the journaled size/``mtime_ns`` is not ours to restore or purge: it
+becomes ``lost`` and is reported loudly.
 """
 
 from __future__ import annotations
