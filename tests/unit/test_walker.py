@@ -6,26 +6,15 @@ reason and keeps going after errors. OS failures are injected by patching ``os.s
 
 import os
 from collections.abc import Callable, Iterator
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from fakes import FakeOpenFiles
+from fakes import FakeOpenFiles, make_policy
 from safeclean.core.models import FileEntry, Skipped, SkipReason
-from safeclean.core.policy import BlockReason, PathPolicy
+from safeclean.core.policy import BlockReason
 from safeclean.core.walker import walk
-
-
-def make_policy(tmp_path: Path, *blocked: Path) -> PathPolicy:
-    return PathPolicy(
-        flavor=type(PurePath(tmp_path)),
-        case_sensitive=True,
-        prefix_rules=[(p, BlockReason.SYSTEM) for p in blocked],
-        root_entry_names=(),
-        profile=(tmp_path / "users", tmp_path / "users" / "me", [], []),
-        default_roots=[],
-    )
 
 
 def write(path: Path, data: bytes = b"x") -> Path:
