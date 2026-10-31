@@ -277,6 +277,25 @@ def test_windows_app_data_falls_back_to_profile(win: PathPolicy) -> None:
     assert win.check_path(PureWindowsPath(r"C:\Users\Alice\AppData\Local\Other\a")) == ALLOWED
 
 
+def test_linux_default_data_dir_stays_blocked_under_custom_xdg() -> None:
+    # A vault left at the default location before XDG_DATA_HOME changed must stay invisible.
+    policy = PathPolicy.for_posix(
+        home=PurePosixPath("/home/alice"), platform="linux", env={"XDG_DATA_HOME": "/data/xdg"}
+    )
+    assert policy.app_data_dir == PurePosixPath("/data/xdg/safeclean")
+    assert policy.check_path(PurePosixPath("/home/alice/.local/share/safeclean/q")) == blocked(
+        BlockReason.APP_DATA
+    )
+
+
+def test_windows_default_data_dir_stays_blocked_under_custom_localappdata() -> None:
+    policy = PathPolicy.for_windows({**WIN_ENV, "LOCALAPPDATA": r"D:\Local"})
+    assert policy.app_data_dir == PureWindowsPath(r"D:\Local\safeclean")
+    assert policy.check_path(PureWindowsPath(r"C:\Users\Alice\AppData\Local\safeclean\q")) == (
+        blocked(BlockReason.APP_DATA)
+    )
+
+
 def test_app_data_skips_the_open_file_check(linux: PathPolicy) -> None:
     checker = FakeOpenFiles()
     path = PurePosixPath("/home/alice/.local/share/safeclean/journal.db")

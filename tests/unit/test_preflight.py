@@ -294,4 +294,5 @@ def test_every_reason_has_a_case() -> None:
         "twin_missing",
         "twin_changed",
         "twin_same_file",
+        "cross_device",  # checked by the service: tests/unit/test_quarantine_service.py
     }
