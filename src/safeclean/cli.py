@@ -18,7 +18,7 @@ from safeclean.core.policy import PathPolicy
 from safeclean.core.scanner import JunkFinding, ScanContext, ScanReport, scan
 
 _PLATFORMS: dict[str, Platform] = {"win32": "windows", "linux": "linux", "darwin": "darwin"}
-_UNITS = ("KiB", "MiB", "GiB", "TiB")
+_UNITS = ("B", "KiB", "MiB", "GiB", "TiB")
 
 
 def detect_platform(sys_platform: str = sys.platform) -> Platform:
@@ -77,14 +77,12 @@ def main(
 
 
 def format_size(size: int) -> str:
-    if size < 1024:
-        return f"{size} B"
     value = float(size)
-    for unit in _UNITS:
+    index = 0
+    while value >= 1024 and index < len(_UNITS) - 1:
         value /= 1024
-        if value < 1024:
-            break
-    return f"{value:.1f} {unit}"
+        index += 1
+    return f"{size} B" if index == 0 else f"{value:.1f} {_UNITS[index]}"
 
 
 def _count(n: int, noun: str) -> str:
