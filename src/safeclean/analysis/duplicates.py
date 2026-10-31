@@ -74,4 +74,3 @@ def decide(
     reason = next(r for r, ours, theirs in pairs if ours != theirs)  # paths are unique
     remove = tuple(Candidate(entry=c, twin=keeper, digest=digest) for c in ranked[1:])
     return DuplicateDecision(digest, keeper, reason, remove)
-
