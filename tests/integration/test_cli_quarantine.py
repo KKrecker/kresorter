@@ -7,7 +7,9 @@ first. Purge deletes only with ``--yes``; without it the plan is shown and nothi
 
 import functools
 import io
-from pathlib import Path
+import os
+import time
+from pathlib import Path, PurePath
 
 import pytest
 
@@ -401,3 +403,169 @@ def test_a_loosened_data_directory_is_made_private_again(
     run(["quarantine", "list"], context)
 
     assert data_dir.stat().st_mode & 0o777 == 0o700
+
+
+# --- bulk add from an analysis (decision 0010, item 14) ----------------------------------------
+
+DAY_NS = 86_400 * 10**9
+
+
+def aged(path: Path, days: int) -> Path:
+    stamp = time.time_ns() - days * DAY_NS
+    os.utime(path, ns=(stamp, stamp))
+    return path
+
+
+@pytest.fixture
+def junk(zone: Path) -> dict[str, Path]:
+    """One SAFE file (bytecode), one LIKELY_SAFE copy and its kept original, one plain file."""
+    return {
+        "pyc": write(zone / "proj" / "__pycache__" / "m.cpython-313.pyc", b"bytecode"),
+        "original": aged(write(zone / "photos" / "img.jpg", b"jpeg-bytes"), 10),
+        "copy": aged(write(zone / "backup" / "img.jpg", b"jpeg-bytes"), 5),
+        "notes": write(zone / "notes.txt", b"hello"),
+    }
+
+
+def test_bulk_add_without_yes_shows_the_plan_and_moves_nothing(
+    context: ScanContext, junk: dict[str, Path], data_dir: Path
+) -> None:
+    code, out, _ = run(["quarantine", "add", "--from-analysis", "--level", "safe"], context)
+
+    assert code == 1
+    assert out.splitlines() == [
+        "Would quarantine 1 file, 8 B (level: safe):",
+        f"  {junk['pyc']}  8 B",
+        "    junk_cache: python-bytecode",
+        "Nothing was moved. Re-run with --yes to quarantine these files.",
+    ]
+    assert all(path.exists() for path in junk.values())
+    assert states(data_dir) == []
+
+
+def test_bulk_add_with_yes_moves_only_the_chosen_level(
+    context: ScanContext, junk: dict[str, Path], data_dir: Path
+) -> None:
+    args = ["quarantine", "add", "--from-analysis", "--level", "safe", "--yes"]
+    code, out, err = run(args, context)
+
+    assert (code, err) == (0, "")
+    assert out.splitlines() == ["Quarantined 1 file, 8 B", f"  [1] {junk['pyc']}"]
+    assert not junk["pyc"].exists()
+    assert junk["copy"].exists()
+    assert states(data_dir) == [(1, "quarantined")]
+
+
+def test_likely_safe_includes_safe_and_keeps_the_original(
+    context: ScanContext, junk: dict[str, Path]
+) -> None:
+    args = ["quarantine", "add", "--from-analysis", "--level", "likely_safe", "--yes"]
+    code, out, _ = run(args, context)
+
+    assert code == 0
+    assert "Quarantined 2 files, 18 B" in out
+    assert not junk["pyc"].exists()
+    assert not junk["copy"].exists()
+    assert junk["original"].read_bytes() == b"jpeg-bytes"
+    assert junk["notes"].exists()
+
+
+def test_bulk_add_never_moves_a_kept_copy_even_when_it_is_junk(
+    context: ScanContext, zone: Path
+) -> None:
+    kept = aged(write(zone / "a" / "__pycache__" / "x.pyc", b"same"), 9)
+    copy = aged(write(zone / "b" / "__pycache__" / "x.pyc", b"same"), 3)
+
+    args = ["quarantine", "add", "--from-analysis", "--level", "likely_safe", "--yes"]
+    code, _, _ = run(args, context)
+
+    assert code == 0
+    assert kept.read_bytes() == b"same"
+    assert not copy.exists()
+
+
+def test_bulk_add_analyzes_only_the_given_paths(
+    context: ScanContext, junk: dict[str, Path]
+) -> None:
+    root = str(junk["pyc"].parent.parent)
+    args = ["quarantine", "add", "--from-analysis", root, "--level", "likely_safe", "--yes"]
+    code, out, _ = run(args, context)
+
+    assert code == 0
+    assert "Quarantined 1 file, 8 B" in out
+    assert junk["copy"].exists()
+
+
+class OpenedAfterTheScan:
+    """Reports ``target`` closed while it is scanned and open from then on."""
+
+    reliable = True
+
+    def __init__(self, target: Path) -> None:
+        self._target = target
+        self._checks = 0
+
+    def is_open(self, path: PurePath) -> bool:
+        if path != self._target:
+            return False
+        self._checks += 1
+        return self._checks > 1
+
+
+def test_bulk_add_rechecks_each_file_and_moves_the_rest(
+    tmp_path: Path, zone: Path, data_dir: Path, junk: dict[str, Path]
+) -> None:
+    context = ctx(tmp_path, zone, data_dir, OpenedAfterTheScan(junk["pyc"]))
+
+    args = ["quarantine", "add", "--from-analysis", "--level", "likely_safe", "--yes"]
+    code, out, _ = run(args, context)
+
+    assert code == 1
+    assert f"open_file: {junk['pyc']}" in out
+    assert junk["pyc"].exists()
+    assert not junk["copy"].exists()
+
+
+def test_bulk_add_with_nothing_to_quarantine_exits_1(context: ScanContext, zone: Path) -> None:
+    write(zone / "notes.txt", b"hello")
+
+    args = ["quarantine", "add", "--from-analysis", "--level", "likely_safe", "--yes"]
+    code, out, _ = run(args, context)
+
+    assert code == 1
+    assert out == "Nothing to quarantine.\n"
+
+
+@pytest.mark.parametrize("confirm", [[], ["--yes"]])
+def test_bulk_add_without_a_reliable_open_file_check_exits_3(
+    tmp_path: Path, zone: Path, data_dir: Path, junk: dict[str, Path], confirm: list[str]
+) -> None:
+    context = ctx(tmp_path, zone, data_dir, NoOpenFileCheck())
+
+    args = ["quarantine", "add", "--from-analysis", "--level", "safe", *confirm]
+    code, out, err = run(args, context)
+
+    assert code == 3
+    assert out == ""
+    assert "open-file check" in err
+    assert all(path.exists() for path in junk.values())
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (["quarantine", "add"], "or use --from-analysis"),
+        (["quarantine", "add", "--level", "safe", "a.bin"], "only go with --from-analysis"),
+        (["quarantine", "add", "--yes", "a.bin"], "only go with --from-analysis"),
+        (["quarantine", "add", "--from-analysis"], "needs --level"),
+        (["quarantine", "add", "--from-analysis", "--level", "review"], "invalid choice: 'review'"),
+    ],
+)
+def test_bulk_add_bad_usage_exits_with_2(
+    context: ScanContext, capsys: pytest.CaptureFixture[str], args: list[str], message: str
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        run(args, context)
+
+    assert exc.value.code == 2
+    assert message in capsys.readouterr().err
