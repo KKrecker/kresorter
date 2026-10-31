@@ -25,6 +25,7 @@ class SkipReason(StrEnum):
     NOT_FOUND = "not_found"
     PERMISSION_DENIED = "permission_denied"
     UNREADABLE = "unreadable"  # any other OS error; see Skipped.detail
+    CHANGED = "changed"  # size/mtime differ from the scan; never acted on
 
 
 @dataclass(frozen=True)
@@ -35,3 +36,12 @@ class Skipped:
     reason: SkipReason
     block_reason: BlockReason | None = None
     detail: str = ""
+
+
+def skipped_from_os_error(path: Path, error: OSError) -> Skipped:
+    """Map an OSError to a Skipped record with the most specific reason."""
+    if isinstance(error, FileNotFoundError):
+        return Skipped(path=path, reason=SkipReason.NOT_FOUND)
+    if isinstance(error, PermissionError):
+        return Skipped(path=path, reason=SkipReason.PERMISSION_DENIED)
+    return Skipped(path=path, reason=SkipReason.UNREADABLE, detail=error.strerror or str(error))

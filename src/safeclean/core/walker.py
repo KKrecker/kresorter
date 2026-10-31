@@ -14,7 +14,7 @@ import stat
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
 
-from safeclean.core.models import FileEntry, Skipped, SkipReason
+from safeclean.core.models import FileEntry, Skipped, SkipReason, skipped_from_os_error
 from safeclean.core.open_files import OpenFileChecker
 from safeclean.core.policy import PathPolicy
 
@@ -28,14 +28,6 @@ def walk(
     walker = _Walker(policy, open_files)
     for root in roots:
         yield from walker.walk_root(Path(root))
-
-
-def _os_error(path: Path, error: OSError) -> Skipped:
-    if isinstance(error, FileNotFoundError):
-        return Skipped(path=path, reason=SkipReason.NOT_FOUND)
-    if isinstance(error, PermissionError):
-        return Skipped(path=path, reason=SkipReason.PERMISSION_DENIED)
-    return Skipped(path=path, reason=SkipReason.UNREADABLE, detail=error.strerror or str(error))
 
 
 def _is_link(entry: os.DirEntry[str]) -> bool:
@@ -53,7 +45,7 @@ class _Walker:
         try:
             resolved = root.resolve(strict=True)
         except OSError as error:
-            yield _os_error(root, error)
+            yield skipped_from_os_error(root, error)
             return
         if resolved.is_dir():
             yield from self._walk_dir(resolved)
@@ -83,7 +75,7 @@ class _Walker:
             with os.scandir(directory) as listing:
                 entries = sorted(listing, key=lambda e: e.name)
         except OSError as error:
-            yield _os_error(directory, error)
+            yield skipped_from_os_error(directory, error)
             return
         for entry in entries:
             path = Path(entry.path)
@@ -98,7 +90,7 @@ class _Walker:
         try:
             info = get_stat()
         except OSError as error:
-            return _os_error(path, error)
+            return skipped_from_os_error(path, error)
         if not stat.S_ISREG(info.st_mode):
             return Skipped(path=path, reason=SkipReason.SPECIAL)
         verdict = self._policy.check_file(path, self._open_files)
