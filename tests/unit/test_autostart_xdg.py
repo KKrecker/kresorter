@@ -95,6 +95,57 @@ def test_missing_directories_give_an_empty_listing(user: Path, system: Path) -> 
     assert read(user, system) == AutostartListing(items=(), skipped=())
 
 
+def not_a_directory(path: Path) -> Path:
+    """A directory path that exists but cannot be listed (``NotADirectoryError``)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"")
+    return path
+
+
+def unreadable(path: Path) -> AutostartSkipped:
+    return AutostartSkipped(Source.XDG_AUTOSTART, str(path), "cannot read: Not a directory")
+
+
+def test_a_user_directory_that_cannot_be_listed_hides_every_entry(user: Path, system: Path) -> None:
+    desktop(system, "app")  # a user stub that could not be seen may hide it
+
+    assert read(not_a_directory(user), system) == AutostartListing((), (unreadable(user),))
+
+
+def test_entries_above_an_unreadable_system_directory_are_still_shown(
+    tmp_path: Path, user: Path
+) -> None:
+    first, broken, last = (tmp_path / d / "autostart" for d in ("a", "b", "c"))
+    desktop(first, "kept")
+    desktop(last, "kept")
+    desktop(last, "below")  # an entry of the same name in `broken` could replace it
+    desktop(user, "own")  # it could shadow an entry in `broken`: `shadows` is unknown
+    desktop(user, "over")
+    over = desktop(first, "over")
+
+    listing = read(user, first, not_a_directory(broken), last)
+
+    assert [(i.name, i.location) for i in listing.items] == [
+        ("kept", str(first / "kept.desktop")),
+        ("over", str(user / "over.desktop")),
+    ]
+    assert listing.items[1].shadows == str(over)
+    assert listing.skipped == (unreadable(broken),)
+
+
+def test_an_unreadable_directory_is_reported_before_the_entries(
+    tmp_path: Path, user: Path, system: Path
+) -> None:
+    desktop(user, "broken", "[Desktop Entry]\nType=Application\n")
+    desktop(system, "broken")
+    later = not_a_directory(tmp_path / "later" / "autostart")
+
+    assert read(user, system, later).skipped == (
+        unreadable(later),
+        AutostartSkipped(Source.XDG_AUTOSTART, str(user / "broken.desktop"), "no Exec key"),
+    )
+
+
 # --- overrides ---------------------------------------------------------------------------------
 
 
