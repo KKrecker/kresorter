@@ -21,9 +21,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Restore: `QuarantineService.restore()` puts files back with journaled mode/atime/mtime, never overwrites (`CONFLICT`), recreates missing parents, refuses a swapped parent chain, marks a missing or changed vault copy `lost`; items are independent; interrupted restores are reconciled by `recover()` (decision 0007). Journal schema v2: `items.atime_ns`. Duplicate candidates in one batch are refused up front.
 - Purge: `QuarantineService.plan_purge()` (read-only plan with `total_bytes` and a one-time token) and `purge(plan)` (same service, unchanged plan, once); deletes only vault copies that still match the journal, never the original path; a changed copy becomes `lost` and is kept; `DELETE_FAILED` keeps the item quarantined; interrupted purges are reconciled by `recover()` (`RecoveryReport.purged`). `quarantine.purge.delete_from_vault` is the single deletion point (vault slots only, `UnsafeDeleteError`); the AST guard now also catches uncalled references and `from os import remove`-style imports, with a pinned one-file allowlist (decision 0008).
 - `safeclean quarantine add / list / restore / purge [--yes]`: purge shows its plan and deletes only with `--yes`; every command recovers interrupted operations first (LOST warnings on stderr); exit codes 0/1/2/3 (3 = unsafe to run); the data directory is checked before anything is created and kept 0700 (decision 0009). `safeclean.text` holds the shared size formatting.
+- `storage.lock.InstanceLock`: single-instance lock on the data directory (`flock` / `msvcrt.locking`, released by the kernel on crash, lock file 0600 and never deleted); a second `safeclean quarantine` on the same data directory exits with 3 (decision 0009, addendum).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Fixed
+- An unopenable journal (`sqlite3.Error`) exits with 3 and a message instead of a traceback.
 - Quarantine rollback no longer loses track of a file whose rename completed just before an interrupt: rollback checks the vault slot on disk; `recover()` also reconciles quarantined items of an interrupted rollback (decision 0006, addendum).
 
 ### Changed

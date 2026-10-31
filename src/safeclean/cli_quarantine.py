@@ -1,8 +1,8 @@
 """``safeclean quarantine add | list | restore | purge`` (decisions 0004, 0006-0009).
 
-Every command checks the data directory before creating anything, opens the journal there and
-runs ``recover()`` first. ``purge`` shows its plan and deletes only with ``--yes``, in the same
-process (decision 0008).
+Every command checks the data directory before creating anything, takes the single-instance
+lock, opens the journal there and runs ``recover()`` first. ``purge`` shows its plan and
+deletes only with ``--yes``, in the same process (decision 0008).
 
 Exit codes: 0 everything requested was done; 1 something was refused, not confirmed or there
 was nothing to do; 2 usage error (argparse); 3 the quarantine cannot run safely here.
@@ -30,9 +30,11 @@ from safeclean.quarantine.service import (
 )
 from safeclean.quarantine.vault import PRIVATE
 from safeclean.storage.db import StorageError, connect
+from safeclean.storage.lock import InstanceLock, LockedError
 from safeclean.text import count, format_size
 
 JOURNAL_NAME = "journal.db"
+LOCK_NAME = "safeclean.lock"
 UNSAFE = 3
 
 Action = Callable[[QuarantineService, sqlite3.Connection, argparse.Namespace, TextIO], int]
@@ -59,8 +61,22 @@ def run(args: argparse.Namespace, context: ScanContext, out: TextIO, err: TextIO
         return UNSAFE
     try:
         data_dir.mkdir(mode=PRIVATE, parents=True, exist_ok=True)
+        with InstanceLock(data_dir / LOCK_NAME):
+            return _run_locked(args, context, data_dir, out, err)
+    except LockedError as error:
+        err.write(f"safeclean: {error}\n")
+        return UNSAFE
+    except OSError as error:
+        err.write(f"safeclean: cannot use the data directory: {error}\n")
+        return UNSAFE
+
+
+def _run_locked(
+    args: argparse.Namespace, context: ScanContext, data_dir: Path, out: TextIO, err: TextIO
+) -> int:
+    try:
         conn = connect(data_dir / JOURNAL_NAME)
-    except (OSError, StorageError) as error:
+    except (OSError, sqlite3.Error, StorageError) as error:
         err.write(f"safeclean: cannot open the journal: {error}\n")
         return UNSAFE
     try:

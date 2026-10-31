@@ -33,7 +33,8 @@ safeclean quarantine purge 3                   # show what would be deleted; del
 safeclean quarantine purge --yes 3             # permanently delete the vault copy
 ```
 
-Every `quarantine` command first recovers interrupted operations. Quarantine needs a reliable
+Every `quarantine` command first recovers interrupted operations; only one runs at a time per
+data directory. Quarantine needs a reliable
 open-file check: Linux has one; on macOS and Windows these commands refuse (exit code 3) until
 their backends exist. Exit codes: 0 done, 1 something refused or not confirmed, 2 usage, 3 unsafe.
 

@@ -33,8 +33,22 @@
 10. **`format_size`/`count` live in `safeclean.text`**, shared by both command modules
     (`cli.format_size` stays importable).
 
-## Known limitation
+## Addendum (commit 9): single-instance lock
 
-Two safeclean processes on the same data directory are not coordinated: the second one's
-startup `recover()` would treat the first one's in-flight operation as interrupted. A
-single-instance lock on the data directory is needed before parallel use is safe.
+The known limitation above is closed. Two safeclean processes on one data directory (cron,
+a double click, a second terminal) would each treat the other's in-flight operation as
+interrupted, and the journal would disagree with the disk.
+
+1. **`storage.lock.InstanceLock`** takes an exclusive, non-blocking OS advisory lock on
+   `<data dir>/safeclean.lock`: `fcntl.flock` on Linux/macOS, `msvcrt.locking` (first byte) on
+   Windows. The lock belongs to the open file, so the kernel releases it when the holder exits
+   or crashes: no stale locks, no pid files, no cleanup.
+2. **The lock file is created 0600 (tightened if loosened) and never deleted** (0001).
+3. **A held lock is `LockedError`** (a `StorageError`); the CLI exits with 3 and changes
+   nothing. Order in every `quarantine` command: data directory check -> `mkdir` 0700 ->
+   lock -> journal -> `recover()` -> command; the lock is held until the command ends.
+4. **`scan` takes no lock**: it never touches the data directory.
+5. **`msvcrt` is imported lazily**, so the Windows backend is tested on any OS with a fake
+   module, and its import path is covered without `pragma: no cover`.
+6. **Error messages split**: "cannot use the data directory" (directory or lock file) and
+   "cannot open the journal" (now also catching `sqlite3.Error`, which escaped as a traceback).
