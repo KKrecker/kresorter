@@ -18,7 +18,7 @@ from typing import TextIO
 
 from safeclean.core.models import FileEntry
 from safeclean.core.scanner import ScanContext
-from safeclean.quarantine.preflight import Candidate, Refused, RefusalReason, UnreliableCheckerError
+from safeclean.quarantine.preflight import Candidate, RefusalReason, Refused, UnreliableCheckerError
 from safeclean.quarantine.service import (
     ItemState,
     PurgeRefused,
