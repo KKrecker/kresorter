@@ -4,7 +4,7 @@
 adapter with a stand-in module, like ``MsvcrtBackend`` (decision 0009). Keys are opened for
 reading in the 64-bit view, so an explicit ``WOW6432Node`` path means exactly that key. A
 missing key reads as ``None``; any other failure is a ``RegistryError`` with the reason; the
-key is closed whatever happens.
+key is closed whatever happens. Sub-keys (step 4, commit 8) follow the same rules.
 """
 
 import sys
@@ -29,13 +29,17 @@ class MoreDataError(OSError):
 
 
 class FakeKey:
-    def __init__(self, path: tuple[int, str], values: list[Raw]) -> None:
+    def __init__(self, path: tuple[int, str], values: list[Raw], subkeys: list[str]) -> None:
         self.path = path
         self.values = values
+        self.subkeys = subkeys
 
 
 class FakeWinreg:
-    """Stand-in for ``winreg``: keys by (hive handle, path), with the calls recorded."""
+    """Stand-in for ``winreg``: keys by (hive handle, path), with the calls recorded.
+
+    A key exists if it has values (``keys``) or sub-keys (``subkeys``) listed.
+    """
 
     HKEY_CURRENT_USER = 0x80000001
     HKEY_LOCAL_MACHINE = 0x80000002
@@ -45,11 +49,13 @@ class FakeWinreg:
     def __init__(
         self,
         keys: dict[tuple[int, str], list[Raw]],
+        subkeys: dict[tuple[int, str], list[str]] | None = None,
         *,
         open_error: OSError | None = None,
         enum_error: OSError | None = None,
     ) -> None:
         self._keys = keys
+        self._subkeys = subkeys or {}
         self._open_error = open_error
         self._enum_error = enum_error
         self.opened: list[tuple[int, str, int, int]] = []
@@ -59,9 +65,10 @@ class FakeWinreg:
         self.opened.append((key, sub_key, reserved, access))
         if self._open_error is not None:
             raise self._open_error
-        if (key, sub_key) not in self._keys:
+        path = (key, sub_key)
+        if path not in self._keys and path not in self._subkeys:
             raise FileNotFoundError(2, "The system cannot find the file specified")
-        return FakeKey((key, sub_key), self._keys[(key, sub_key)])
+        return FakeKey(path, self._keys.get(path, []), self._subkeys.get(path, []))
 
     def EnumValue(self, key: object, index: int) -> Raw:
         assert isinstance(key, FakeKey)
@@ -71,6 +78,14 @@ class FakeWinreg:
             raise NoMoreItemsError(22, "No more data is available")
         return key.values[index]
 
+    def EnumKey(self, key: object, index: int) -> str:
+        assert isinstance(key, FakeKey)
+        if self._enum_error is not None and index == 1:
+            raise self._enum_error
+        if index >= len(key.subkeys):
+            raise NoMoreItemsError(22, "No more data is available")
+        return key.subkeys[index]
+
     def CloseKey(self, key: object) -> None:
         assert isinstance(key, FakeKey)
         self.closed.append(key)
@@ -78,12 +93,14 @@ class FakeWinreg:
 
 HKCU, HKLM = FakeWinreg.HKEY_CURRENT_USER, FakeWinreg.HKEY_LOCAL_MACHINE
 READ_64 = FakeWinreg.KEY_READ | FakeWinreg.KEY_WOW64_64KEY
+SERVICES = r"SYSTEM\CurrentControlSet\Services"
 
 
 def test_it_is_a_registry() -> None:
     registry: Registry = WinRegistry(module=FakeWinreg({}))  # checked by mypy
 
     assert registry.values(Hive.HKCU, RUN) is None
+    assert registry.subkeys(Hive.HKLM, SERVICES) is None
 
 
 def test_values_are_read_in_order_and_converted() -> None:
@@ -163,6 +180,49 @@ def test_only_no_more_items_ends_the_enumeration() -> None:
 
     with pytest.raises(RegistryError, match="More data"):
         WinRegistry(module=fake).values(Hive.HKCU, RUN)
+
+
+# --- sub-keys ------------------------------------------------------------------------------------
+
+
+def test_sub_keys_are_read_in_order_read_only_in_the_64_bit_view() -> None:
+    fake = FakeWinreg({}, {(HKLM, SERVICES): ["Sync", "Agent"]})
+
+    assert WinRegistry(module=fake).subkeys(Hive.HKLM, SERVICES) == ["Sync", "Agent"]
+    assert fake.opened == [(HKLM, SERVICES, 0, READ_64)]
+    assert [k.path for k in fake.closed] == [(HKLM, SERVICES)]
+
+
+def test_a_key_with_values_only_has_no_sub_keys() -> None:
+    fake = FakeWinreg({(HKLM, SERVICES): [("A", "a", ValueKind.REG_SZ)]})
+
+    assert WinRegistry(module=fake).subkeys(Hive.HKLM, SERVICES) == []
+
+
+def test_sub_keys_of_a_missing_key_read_as_none() -> None:
+    fake = FakeWinreg({})
+
+    assert WinRegistry(module=fake).subkeys(Hive.HKLM, SERVICES) is None
+    assert fake.closed == []
+
+
+def test_sub_keys_of_a_key_that_cannot_be_opened_are_a_registry_error() -> None:
+    fake = FakeWinreg({}, open_error=PermissionError(13, "Access is denied"))
+
+    with pytest.raises(RegistryError, match="Access is denied"):
+        WinRegistry(module=fake).subkeys(Hive.HKLM, SERVICES)
+
+
+@pytest.mark.parametrize(
+    "error", [PermissionError(5, "Access is denied"), MoreDataError(234, "More data")]
+)
+def test_only_no_more_items_ends_the_sub_keys_and_the_key_is_closed(error: OSError) -> None:
+    fake = FakeWinreg({}, {(HKLM, SERVICES): ["A", "B"]}, enum_error=error)
+
+    with pytest.raises(RegistryError, match=str(error.strerror)):
+        WinRegistry(module=fake).subkeys(Hive.HKLM, SERVICES)
+
+    assert [k.path for k in fake.closed] == [(HKLM, SERVICES)]
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="winreg exists there")

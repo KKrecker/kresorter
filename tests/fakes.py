@@ -54,7 +54,11 @@ def make_policy(
 
 
 class FakeRegistry:
-    """Read-only registry: keys by (hive, path); a denied key raises like a real one would."""
+    """Read-only registry: keys by (hive, path); a denied key raises like a real one would.
+
+    The sub-keys of a key are the next path parts of the keys below it, in the order given, so
+    readers that need a sorted listing must sort it themselves.
+    """
 
     def __init__(self, keys: RegistryKeys, denied: Iterable[tuple[Hive, str]] = ()) -> None:
         self._keys = dict(keys)
@@ -66,3 +70,13 @@ class FakeRegistry:
         if (hive, key) in self._denied:
             raise RegistryError("access denied")
         return self._keys.get((hive, key))
+
+    def subkeys(self, hive: Hive, key: str) -> Sequence[str] | None:
+        self.reads.append((hive, key))
+        if (hive, key) in self._denied:
+            raise RegistryError("access denied")
+        prefix = key + "\\"
+        below = [k for h, k in self._keys if h is hive and k.startswith(prefix)]
+        if not below and (hive, key) not in self._keys:
+            return None
+        return list(dict.fromkeys(k.removeprefix(prefix).split("\\")[0] for k in below))
