@@ -1,6 +1,7 @@
 """Safety guard: no direct file deletion anywhere in project code (see decision 0001).
 
 Complements ruff's banned-api, which cannot see method calls such as ``Path.unlink()``.
+The single exception is ``quarantine/purge.py`` (decision 0004, item 8); the allowlist is pinned.
 """
 
 import ast
@@ -15,6 +16,8 @@ SCANNED_DIRS = ("src", "tests", "scripts")
 FORBIDDEN_METHODS = frozenset({"unlink", "rmdir", "rmtree", "removedirs"})
 # Names forbidden only on these modules (``list.remove`` is fine).
 FORBIDDEN_MODULE_ATTRS = {"os": frozenset({"remove", "unlink", "rmdir", "removedirs"})}
+# The only file allowed to delete: final purge of verified vault copies.
+ALLOWED_TO_DELETE = frozenset({"src/safeclean/quarantine/purge.py"})
 
 
 def find_direct_deletes(source: str) -> list[int]:
@@ -43,6 +46,12 @@ def find_direct_deletes(source: str) -> list[int]:
         "import shutil\nshutil.rmtree('x')",
         "from pathlib import Path\nPath('x').unlink()",
         "from pathlib import Path\nPath('x').rmdir()",
+        # Referencing the function is as good as calling it (callbacks, defaults).
+        "from pathlib import Path\ndelete = Path.unlink",
+        "import os\ndelete = os.remove",
+        "from os import remove",
+        "from os import unlink as u",
+        "from shutil import rmtree",
     ],
 )
 def test_detector_flags_deletion(snippet: str) -> None:
@@ -53,12 +62,28 @@ def test_detector_allows_list_remove() -> None:
     assert find_direct_deletes("items = [1]\nitems.remove(1)") == []
 
 
+def test_detector_allows_unrelated_imports() -> None:
+    assert find_direct_deletes("from os import replace\nfrom shutil import copy2") == []
+
+
 def test_project_code_has_no_direct_deletes() -> None:
     offenders = [
-        f"{path.relative_to(PROJECT_ROOT)}:{line}"
+        f"{relative}:{line}"
         for folder in SCANNED_DIRS
         if (PROJECT_ROOT / folder).is_dir()
         for path in sorted((PROJECT_ROOT / folder).rglob("*.py"))
+        if (relative := path.relative_to(PROJECT_ROOT).as_posix()) not in ALLOWED_TO_DELETE
         for line in find_direct_deletes(path.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+def test_allowlist_is_exactly_the_purge_module() -> None:
+    # Growing this set needs a decision record, not a quiet edit.
+    assert frozenset({"src/safeclean/quarantine/purge.py"}) == ALLOWED_TO_DELETE
+
+
+def test_allowlisted_file_really_deletes() -> None:
+    # A stale allowlist entry would be a silent hole: the exempt file must exist and delete.
+    for relative in ALLOWED_TO_DELETE:
+        assert find_direct_deletes((PROJECT_ROOT / relative).read_text(encoding="utf-8")) != []
