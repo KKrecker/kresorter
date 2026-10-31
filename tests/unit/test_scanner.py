@@ -93,6 +93,17 @@ def test_duplicate_entries_carry_the_scanned_metadata(tmp_path: Path) -> None:
     ]
 
 
+def test_the_report_keeps_every_scanned_entry(tmp_path: Path) -> None:
+    # Analysis needs all of them: large and old files are not junk or duplicates.
+    root = tmp_path / "root"
+    a = write(root / "a.txt", b"12345")
+    b = write(root / "x.tmp", b"abc")
+
+    report = scan([root], context(tmp_path))
+
+    assert sorted(report.entries, key=lambda e: e.path) == [entry(a), entry(b)]
+
+
 def test_a_duplicate_group_needs_two_copies(tmp_path: Path) -> None:
     one = FileEntry(path=tmp_path / "a.bin", size=10, mtime_ns=1)
     with pytest.raises(ValueError, match="at least two"):
