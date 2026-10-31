@@ -39,6 +39,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - An unopenable journal (`sqlite3.Error`) exits with 3 and a message instead of a traceback.
 - Quarantine rollback no longer loses track of a file whose rename completed just before an interrupt: rollback checks the vault slot on disk; `recover()` also reconciles quarantined items of an interrupted rollback (decision 0006, addendum).
+- `autostart.xdg.read_xdg()`: an autostart directory that exists but cannot be listed is now skipped with `cannot read: <reason>` instead of silently reading as empty; nothing it could change is shown: no items at all for the user directory, and for a system directory only the names found in the directories before it (decision 0011, item 32).
 
 ### Changed
 - `DuplicateGroup` holds the scanned `FileEntry` of each copy (`entries`); `paths`, `size` and `wasted_bytes` are derived; a group with fewer than two copies or mixed sizes cannot be created. Feeds `analysis.duplicates.decide()` directly; `scan` output unchanged.

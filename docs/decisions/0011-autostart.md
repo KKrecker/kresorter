@@ -154,3 +154,19 @@
 31. **The digest covers the file bytes and its flag** (length-prefixed, a missing flag
     included), so a changed file or a changed flag counts as a changed entry. Startup folder
     items are read-only in step 4 (item 9): `disableable` is false.
+
+## Addendum (step 4, XDG fix): directories that cannot be listed
+
+32. **An autostart directory that exists but cannot be listed is a skip, never silence**: one
+    `cannot read: <reason>` per directory, reported before the skipped entries; a missing
+    directory is simply empty. As the directories overlay each other, nothing the unlisted one
+    could change is shown (item 12):
+    - the user directory: no items at all, since a stub we cannot see may hide any system
+      entry;
+    - system directory *k*: names found in the directories before it are shown, with their
+      user overrides and correct `shadows`; names found only after it are not (an entry of the
+      same name in *k* would replace them); a user entry without a system file before *k* is
+      not shown either (it may shadow a file in *k*, so `shadows` is unknown). `shadows=None`
+      therefore always means "replaces nothing".
+    Later directories are still listed, so every directory that cannot be listed is reported.
+    Startup folders follow the same rule (item 30: an unreadable flag key hides the folder).

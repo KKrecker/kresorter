@@ -3,7 +3,8 @@
 One item per file name with its effective state. A user file replaces the first system file of
 the same name (``shadows``); a user ``Hidden=true`` stub lists that system entry as disabled.
 ``OnlyShowIn``/``NotShowIn`` become notes. Anything unreadable is skipped with a reason; a
-broken user file still replaces the system entry, whose state is then unknown. Read-only.
+broken user file still replaces the system entry, whose state is then unknown. A directory
+that cannot be listed is skipped with a reason, and nothing it could change is shown. Read-only.
 """
 
 from __future__ import annotations
@@ -65,12 +66,13 @@ def autostart_dirs(env: Mapping[str, str], home: Path) -> tuple[Path, tuple[Path
 def read_xdg(user_dir: Path, system_dirs: Sequence[Path]) -> AutostartListing:
     items: list[AutostartItem] = []
     skipped: list[AutostartSkipped] = []
-    user = _files(user_dir)
-    system: dict[str, Path] = {}
-    for directory in system_dirs:
-        for name, path in _files(directory).items():
-            system.setdefault(name, path)
+    user = _files(user_dir, skipped)
+    if user is None:  # a stub that cannot be seen may hide any system entry (item 32)
+        return AutostartListing((), tuple(skipped))
+    system, complete = _system_files(system_dirs, skipped)
     for name in sorted(user.keys() | system.keys()):
+        if name not in system and not complete:
+            continue  # it may be in a directory that could not be listed: `shadows` is unknown
         try:
             if name in user:
                 items.append(_user_item(name, user[name], system.get(name)))
@@ -82,11 +84,37 @@ def read_xdg(user_dir: Path, system_dirs: Sequence[Path]) -> AutostartListing:
     return AutostartListing(tuple(items), tuple(skipped))
 
 
-def _files(directory: Path) -> dict[str, Path]:
+def _system_files(
+    directories: Sequence[Path], skipped: list[AutostartSkipped]
+) -> tuple[dict[str, Path], bool]:
+    """The first file of each name, and whether every directory could be listed.
+
+    Only directories before the first one that cannot be listed count: an entry found after it
+    may be replaced by one we cannot see. The later ones are still listed, so every directory
+    that cannot be listed is reported.
+    """
+    system: dict[str, Path] = {}
+    complete = True
+    for directory in directories:
+        found = _files(directory, skipped)
+        if found is None:
+            complete = False
+        elif complete:
+            for name, path in found.items():
+                system.setdefault(name, path)
+    return system, complete
+
+
+def _files(directory: Path, skipped: list[AutostartSkipped]) -> dict[str, Path] | None:
+    """Entries by name: ``{}`` if missing, ``None`` and a skip if it cannot be listed."""
     try:
         children = list(directory.iterdir())
-    except OSError:
+    except FileNotFoundError:
         return {}
+    except OSError as error:
+        detail = f"cannot read: {error.strerror}"
+        skipped.append(AutostartSkipped(Source.XDG_AUTOSTART, str(directory), detail))
+        return None
     return {p.name.removesuffix(SUFFIX): p for p in children if p.name.endswith(SUFFIX)}
 
 
