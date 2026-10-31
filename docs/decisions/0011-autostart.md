@@ -58,3 +58,19 @@
 11. Linux readers are tested on real temporary trees. Windows and macOS readers are tested on
     a fake registry (a `Registry` protocol) and on sample files; the thin adapter to `winreg`
     imports it lazily and is tested with a stand-in module, like `MsvcrtBackend` (0009).
+
+## Addendum (step 4, commit 3): reading XDG entries
+
+12. **An unknown effective state means the entry is not shown.** A user file that cannot be
+    read still replaces the system entry of the same name, as it does for the desktop; since
+    its effective state is unknown, the listing shows neither: the user file is skipped with
+    its reason and the system entry is not listed as enabled. The same holds for a `Hidden=true`
+    stub over a broken system entry, and for a stub that hides no entry at all.
+13. **A `Hidden=true` stub shows the command it blocks.** Its `command` comes from the system
+    file it hides (`shadows`), its `location` and `digest` from the stub itself, so the user
+    sees what is being kept from starting and where that decision lives.
+14. **Parsing is strict and bounded.** `[Desktop Entry]` must be the first group; `Type` must
+    be `Application` and `Exec` non-empty (a `Hidden=true` user stub needs neither); a malformed
+    line, a duplicate key or a non-boolean `Hidden`/`X-GNOME-Autostart-enabled` is a skip.
+    Only regular files of at most 64 KiB are opened, so a FIFO never blocks the listing.
+    `name` is the file name without `.desktop`, the key of the override; `Exec` is kept as is.

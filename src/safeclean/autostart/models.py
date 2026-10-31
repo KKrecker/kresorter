@@ -44,6 +44,7 @@ class AutostartItem:
     enabled: bool  # effective state
     digest: str  # entry_digest() of the raw entry at `location`
     shadows: str | None = None  # XDG only: the system file a user entry replaces
+    notes: tuple[str, ...] = ()  # conditions reported as they are, never evaluated
 
     def __post_init__(self) -> None:
         for field in ("name", "command", "location"):
@@ -70,3 +71,9 @@ class AutostartSkipped:
     source: Source
     location: str
     detail: str
+
+
+@dataclass(frozen=True)
+class AutostartListing:
+    items: tuple[AutostartItem, ...]
+    skipped: tuple[AutostartSkipped, ...]
