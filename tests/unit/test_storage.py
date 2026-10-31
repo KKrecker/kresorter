@@ -145,6 +145,23 @@ def test_v1_journal_gains_atime_and_keeps_its_rows(tmp_path: Path) -> None:
     upgraded.close()
 
 
+def test_v2_journal_gains_autostart_changes_and_keeps_its_rows(tmp_path: Path) -> None:
+    # v3 adds autostart_changes (decision 0011, item 10); quarantine rows are untouched.
+    path = tmp_path / "journal.db"
+    raw = sqlite3.connect(path, isolation_level=None)
+    migrate(raw, MIGRATIONS[:2])
+    add_item(raw, add_operation(raw), atime_ns=7)
+    raw.close()
+
+    upgraded = connect(path)
+
+    assert SCHEMA_VERSION == 3
+    assert pragma(upgraded, "user_version") == SCHEMA_VERSION
+    assert upgraded.execute("SELECT size, atime_ns FROM items").fetchall() == [(3, 7)]
+    assert count(upgraded, "autostart_changes") == 0
+    upgraded.close()
+
+
 # --- transactions ------------------------------------------------------------------------------
 
 
@@ -261,3 +278,111 @@ def test_all_item_states_are_accepted(conn: sqlite3.Connection, state: str) -> N
     add_item(conn, op, state=state)
 
     assert count(conn, "items") == 1
+
+
+# --- autostart changes (schema v3) -------------------------------------------------------------
+
+
+def add_change(conn: sqlite3.Connection, **overrides: object) -> int:
+    row: dict[str, object] = {
+        "action": "disable",
+        "source": "xdg_autostart",
+        "entry": "/etc/xdg/autostart/app.desktop",
+        "location": "/home/a/.config/autostart/app.desktop",
+        "digest": "0123456789abcdef0123456789abcdef",
+        "value_before": None,
+        "value_after": b"[Desktop Entry]\nHidden=true\n",
+        "vault_path": None,
+        "state": "pending",
+        "created_at_ns": 1,
+        **overrides,
+    }
+    columns = ", ".join(row)
+    marks = ", ".join("?" for _ in row)
+    cursor = conn.execute(
+        f"INSERT INTO autostart_changes ({columns}) VALUES ({marks})", tuple(row.values())
+    )
+    assert cursor.lastrowid is not None
+    return cursor.lastrowid
+
+
+def test_autostart_change_is_recorded_with_its_values(conn: sqlite3.Connection) -> None:
+    change = add_change(
+        conn,
+        source="run_key",
+        entry="HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\App",
+        location="HKCU\\...\\StartupApproved\\Run\\App",
+        value_before=bytes(12),
+        value_after=b"\x03" + bytes(11),
+    )
+
+    row = conn.execute(
+        "SELECT value_before, value_after, finished_at_ns, error FROM autostart_changes"
+        " WHERE id = ?",
+        (change,),
+    ).fetchone()
+    assert row == (bytes(12), b"\x03" + bytes(11), None, None)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        pytest.param({"action": "delete"}, "CHECK", id="unknown-action"),
+        pytest.param({"source": "service"}, "CHECK", id="read-only-source"),
+        pytest.param({"source": "launch_agent"}, "CHECK", id="another-read-only-source"),
+        pytest.param({"state": "lost"}, "CHECK", id="unknown-state"),
+        pytest.param({"entry": ""}, "CHECK", id="empty-entry"),
+        pytest.param({"location": ""}, "CHECK", id="empty-location"),
+        pytest.param({"location": None}, "NOT NULL", id="no-location"),
+        pytest.param({"digest": "0123"}, "CHECK", id="short-digest"),
+        pytest.param({"digest": "0123456789ABCDEF0123456789ABCDEF"}, "CHECK", id="upper-digest"),
+        pytest.param({"digest": "0123456789abcdef0123456789abcdeg"}, "CHECK", id="non-hex"),
+        pytest.param({"value_after": None}, "CHECK", id="nothing-changes-absent"),
+        pytest.param({"value_before": b"x", "value_after": b"x"}, "CHECK", id="nothing-changes"),
+        pytest.param({"value_after": bytes(65537)}, "CHECK", id="after-too-large"),
+        pytest.param(
+            {"value_before": bytes(65537), "value_after": None}, "CHECK", id="before-too-large"
+        ),
+        pytest.param({"value_after": "Hidden=true"}, "cannot store TEXT", id="strict-types"),
+        pytest.param({"created_at_ns": None}, "NOT NULL", id="no-created-at"),
+    ],
+)
+def test_autostart_change_constraints(
+    conn: sqlite3.Connection, overrides: dict[str, object], message: str
+) -> None:
+    with pytest.raises(sqlite3.IntegrityError, match=message):
+        add_change(conn, **overrides)
+
+
+def test_largest_entry_is_accepted(conn: sqlite3.Connection) -> None:
+    add_change(conn, value_before=bytes(65536), value_after=None)
+
+    assert count(conn, "autostart_changes") == 1
+
+
+def test_autostart_vault_path_is_unique(conn: sqlite3.Connection) -> None:
+    add_change(conn, vault_path="/vault/autostart/1")
+
+    with pytest.raises(sqlite3.IntegrityError, match="UNIQUE"):
+        add_change(conn, vault_path="/vault/autostart/1")
+
+
+def test_changes_without_a_vault_path_do_not_collide(conn: sqlite3.Connection) -> None:
+    add_change(conn)
+    add_change(conn)
+
+    assert count(conn, "autostart_changes") == 2
+
+
+@pytest.mark.parametrize("state", ["pending", "done", "failed", "rolled_back"])
+def test_all_autostart_change_states_are_accepted(conn: sqlite3.Connection, state: str) -> None:
+    add_change(conn, state=state)
+
+    assert count(conn, "autostart_changes") == 1
+
+
+@pytest.mark.parametrize("action", ["disable", "enable"])
+def test_both_actions_are_accepted(conn: sqlite3.Connection, action: str) -> None:
+    add_change(conn, action=action)
+
+    assert count(conn, "autostart_changes") == 1
