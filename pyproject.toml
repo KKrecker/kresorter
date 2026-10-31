@@ -29,6 +29,9 @@ addopts = "-ra --strict-markers --cov=safeclean --cov-branch --cov-report=term-m
 source = ["safeclean"]
 branch = true
 
+[tool.coverage.report]
+exclude_also = ["^\\s*\\.\\.\\.$", "if TYPE_CHECKING:"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
