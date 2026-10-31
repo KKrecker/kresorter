@@ -312,16 +312,24 @@ class QuarantineService:
         return operation_id, items
 
     def _roll_back(self, items: list[Moved], moved: list[Moved]) -> tuple[Moved, ...]:
-        """Move files back, newest first. Returns the items that had to stay in the vault."""
+        """Move files back, newest first. Returns the items that had to stay in the vault.
+
+        An interrupt can land between a completed rename and ``moved.append``: an item whose
+        slot exists is treated as moved, whatever the in-memory list says (decision 0006).
+        """
+        moved_ids = {item.item_id for item in moved}
+        landed = moved + [
+            item for item in items if item.item_id not in moved_ids and _exists(item.vault_path)
+        ]
         kept: list[Moved] = []
-        for item in reversed(moved):
+        for item in reversed(landed):
             if self._move_back(item):
                 self._set_item(item.item_id, ItemState.ROLLED_BACK)
             else:
                 kept.append(item)
-        moved_ids = {item.item_id for item in moved}
+        landed_ids = {item.item_id for item in landed}
         for item in items:
-            if item.item_id not in moved_ids:
+            if item.item_id not in landed_ids:
                 self._set_item(item.item_id, ItemState.ROLLED_BACK)
         return tuple(reversed(kept))
 
@@ -504,6 +512,25 @@ class QuarantineService:
             else:
                 state = ItemState.LOST
                 warnings.append(f"LOST: {original} is neither at its path nor in the vault")
+            self._set_item(item_id, state)
+            found[state].append(original)
+        rolling_back = self._conn.execute(
+            "SELECT items.id, original_path, vault_path, size, mtime_ns FROM items"
+            " JOIN operations ON items.operation_id = operations.id"
+            " WHERE operations.state = ? AND items.state = ? ORDER BY items.id",
+            (OperationState.PENDING, ItemState.QUARANTINED),
+        ).fetchall()
+        for item_id, original_text, vault_text, size, mtime_ns in rolling_back:
+            # Interrupted during rollback: the move back may have happened unrecorded.
+            original, slot = Path(original_text), Path(vault_text)
+            copy = _probe(slot, size, mtime_ns)
+            if copy is _Copy.MATCHES:
+                continue  # still in the vault: stays quarantined, not reported again
+            if copy is _Copy.MISSING and _probe(original, size, mtime_ns) is _Copy.MATCHES:
+                state = ItemState.ROLLED_BACK
+            else:
+                state = ItemState.LOST
+                warnings.append(f"LOST: {original} is neither at its path nor intact in the vault")
             self._set_item(item_id, state)
             found[state].append(original)
         restoring = self._conn.execute(

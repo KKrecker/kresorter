@@ -35,3 +35,19 @@
 - Restore (commit 6) and purge (commit 7) act only on `quarantined` items; `lost` is final
   until a human looks at it.
 - Preflight is not atomic with the rename; journal-before-move and `recover()` cover that window.
+
+## Addendum (commit 8a): the disk decides, not the in-memory list
+
+Found while writing the CLI tests: an interrupt (`KeyboardInterrupt`) can arrive after
+`Path.replace` has renamed a file into its slot but before the service records it as moved.
+Rollback then marked the item `rolled_back` while the file sat in the vault with its original
+path empty: invisible to `recover()`, `restore()` and the user at the same time.
+
+1. **Rollback asks the disk.** An item whose vault slot exists is treated as moved and is moved
+   back (newest first, never overwriting), whatever the in-memory list says. The slot belongs to
+   a fresh operation directory, so its existence can only mean our rename happened.
+2. **`recover()` also reconciles quarantined items of a `pending` quarantine operation**
+   (an interrupt during the rollback itself, after a move back but before its journal update):
+   - intact vault copy: stays `quarantined`, not reported again;
+   - no vault copy and the original matches the journaled size/`mtime_ns`: `rolled_back`;
+   - anything else: `lost`, with a warning.

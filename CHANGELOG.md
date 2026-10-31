@@ -22,5 +22,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Purge: `QuarantineService.plan_purge()` (read-only plan with `total_bytes` and a one-time token) and `purge(plan)` (same service, unchanged plan, once); deletes only vault copies that still match the journal, never the original path; a changed copy becomes `lost` and is kept; `DELETE_FAILED` keeps the item quarantined; interrupted purges are reconciled by `recover()` (`RecoveryReport.purged`). `quarantine.purge.delete_from_vault` is the single deletion point (vault slots only, `UnsafeDeleteError`); the AST guard now also catches uncalled references and `from os import remove`-style imports, with a pinned one-file allowlist (decision 0008).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
+### Fixed
+- Quarantine rollback no longer loses track of a file whose rename completed just before an interrupt: rollback checks the vault slot on disk; `recover()` also reconciles quarantined items of an interrupted rollback (decision 0006, addendum).
+
 ### Changed
 - Temp is no longer a default safe zone; scanned only on explicit choice (decision 0002).
