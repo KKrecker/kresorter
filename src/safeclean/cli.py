@@ -39,7 +39,11 @@ def default_context(
         policy = PathPolicy.for_windows(os.environ if env is None else env)
     else:
         posix: Literal["linux", "darwin"] = "darwin" if current == "darwin" else "linux"
-        policy = PathPolicy.for_posix(home=PurePosixPath(home or Path.home()), platform=posix)
+        policy = PathPolicy.for_posix(
+            home=PurePosixPath(home or Path.home()),
+            platform=posix,
+            env=os.environ if env is None else env,
+        )
     return ScanContext(
         policy=policy,
         open_files=NoOpenFileCheck(),

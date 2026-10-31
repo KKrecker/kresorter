@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `FileEntry.mtime_ns` (int) replaces float `mtime`: exact change detection.
 - `storage`: SQLite journal (WAL, foreign keys, synchronous=FULL, busy_timeout), all-or-nothing versioned migrations, `BEGIN IMMEDIATE` transactions with rollback on any exception; schema v1 (`operations`, `items`, STRICT + CHECK).
 - `core.open_files` package: `reliable` flag on the checker protocol; Linux backend `ProcFdChecker` (`/proc/*/fd`, matches by `st_dev`/`st_ino`, fails closed); `checker_for_platform()` gives other OSes an unreliable placeholder (decision 0005).
+- `BlockReason.APP_DATA`: safeclean's data directory (`$XDG_DATA_HOME/safeclean` or `~/.local/share/safeclean`, `~/Library/Application Support/safeclean`, `%LOCALAPPDATA%\safeclean`) is blacklisted, so the vault and journal never appear in a scan, even when a parent is scanned explicitly; exposed as `PathPolicy.app_data_dir` (decision 0004).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Changed

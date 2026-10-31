@@ -28,6 +28,7 @@ class BlockReason(StrEnum):
     SYSTEM = "system"
     PROFILE = "profile"
     OPEN_FILE = "open_file"
+    APP_DATA = "app_data"  # safeclean's own data dir: vault and journal (decision 0004)
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,15 @@ class _ProfileRules:
     blocked_name_prefixes: tuple[str, ...]
 
 
+APP_NAME = "safeclean"
+
+
+def _xdg_data_home(home: PurePosixPath, env: Mapping[str, str]) -> PurePosixPath:
+    """``$XDG_DATA_HOME`` if absolute (the spec says to ignore relative values), else default."""
+    value = PurePosixPath(env.get("XDG_DATA_HOME") or ".")
+    return value if value.is_absolute() else home / ".local" / "share"
+
+
 def _is_under(parts: Parts, prefix: Parts) -> bool:
     return parts[: len(prefix)] == prefix
 
@@ -65,10 +75,14 @@ class PathPolicy:
         root_entry_names: Iterable[str],
         profile: tuple[PurePath, PurePath, Sequence[PurePath], Sequence[str]],
         default_roots: Sequence[PurePath],
+        app_data_dir: PurePath,
     ) -> None:
         self._flavor = flavor
         self._case_sensitive = case_sensitive
-        self._prefix_rules = tuple((self._normalize(p), r) for p, r in prefix_rules)
+        self._app_data_dir = app_data_dir
+        # APP_DATA first: the vault is blocked even inside a default root or a system path.
+        rules = [(app_data_dir, BlockReason.APP_DATA), *prefix_rules]
+        self._prefix_rules = tuple((self._normalize(p), r) for p, r in rules)
         self._root_entry_names = frozenset(self._fold(n) for n in root_entry_names)
         users_root, home, subpaths, name_prefixes = profile
         home_parts = self._normalize(home)
@@ -98,6 +112,8 @@ class PathPolicy:
             ("Program Files", "Program Files (x86)"),
         )
         system = paths(("SystemRoot", "ProgramData"), ("Windows", "ProgramData"))
+        local = env.get("LOCALAPPDATA")
+        local_root = PureWindowsPath(local) if local else home / "AppData" / "Local"
         return cls(
             flavor=PureWindowsPath,
             case_sensitive=False,
@@ -117,10 +133,17 @@ class PathPolicy:
                 ["ntuser.dat", "usrclass.dat"],
             ),
             default_roots=[home / ".cache", home / "Downloads"],
+            app_data_dir=local_root / APP_NAME,
         )
 
     @classmethod
-    def for_posix(cls, *, home: PurePosixPath, platform: Literal["linux", "darwin"]) -> PathPolicy:
+    def for_posix(
+        cls,
+        *,
+        home: PurePosixPath,
+        platform: Literal["linux", "darwin"],
+        env: Mapping[str, str] | None = None,
+    ) -> PathPolicy:
         """Build a Linux or macOS policy. macOS paths are compared case-insensitively (APFS)."""
         system: tuple[str, ...]
         program_files: tuple[str, ...]
@@ -128,9 +151,11 @@ class PathPolicy:
         if platform == "darwin":
             system = (*common, "/System", "/Library", "/private", "/cores")
             program_files = ("/Applications", "/opt")
+            data_root = home / "Library" / "Application Support"
         else:
             system = (*common, "/boot", "/lib", "/lib32", "/lib64", "/proc", "/sys", "/run")
             program_files = ("/opt", "/snap")
+            data_root = _xdg_data_home(home, env or {})
         return cls(
             flavor=PurePosixPath,
             case_sensitive=platform == "linux",
@@ -139,6 +164,7 @@ class PathPolicy:
             root_entry_names=(),
             profile=(home.parent, home, [PurePosixPath(".ssh"), PurePosixPath(".gnupg")], []),
             default_roots=[home / ".cache", home / "Downloads"],
+            app_data_dir=data_root / APP_NAME,
         )
 
     # --- public API ----------------------------------------------------------------------------
@@ -163,6 +189,11 @@ class PathPolicy:
         except Exception:
             is_open = True
         return _blocked(BlockReason.OPEN_FILE) if is_open else ALLOWED
+
+    @property
+    def app_data_dir(self) -> PurePath:
+        """safeclean's own data directory (vault, journal). Always blocked as APP_DATA."""
+        return self._app_data_dir
 
     def default_roots(self) -> tuple[PurePath, ...]:
         """Safe zones scanned when the user selects nothing. Temp is never among them."""
