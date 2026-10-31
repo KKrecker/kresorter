@@ -15,7 +15,7 @@ class FileEntry:
 
     path: Path
     size: int
-    mtime: float
+    mtime_ns: int
 
 
 class SkipReason(StrEnum):
@@ -25,7 +25,7 @@ class SkipReason(StrEnum):
     NOT_FOUND = "not_found"
     PERMISSION_DENIED = "permission_denied"
     UNREADABLE = "unreadable"  # any other OS error; see Skipped.detail
-    CHANGED = "changed"  # size/mtime differ from the scan; never acted on
+    CHANGED = "changed"  # size/mtime_ns differ from the scan; never acted on
 
 
 @dataclass(frozen=True)

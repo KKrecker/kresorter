@@ -95,4 +95,4 @@ class _Walker:
         verdict = self._policy.check_file(path, self._open_files)
         if not verdict.allowed:
             return Skipped(path=path, reason=SkipReason.BLOCKED, block_reason=verdict.reason)
-        return FileEntry(path=path, size=info.st_size, mtime=info.st_mtime)
+        return FileEntry(path=path, size=info.st_size, mtime_ns=info.st_mtime_ns)

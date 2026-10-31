@@ -94,7 +94,7 @@ def _hash_all(
 
 
 def _changed(entry: FileEntry, info: os.stat_result) -> bool:
-    return info.st_size != entry.size or info.st_mtime != entry.mtime
+    return info.st_size != entry.size or info.st_mtime_ns != entry.mtime_ns
 
 
 def _stable_hash(entry: FileEntry, limit: int | None) -> str | Skipped:

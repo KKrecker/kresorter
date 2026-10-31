@@ -210,9 +210,7 @@ class FakeEntry:
         if self._stat_error:
             raise FileNotFoundError(2, "gone")
         # st_size=7, st_mtime_ns=42 (fields 10-12: float times, 13-15: integer ns times)
-        return os.stat_result(
-            (0o100644, 0, 0, 1, 0, 0, 7, 0, 0, 0, 0.0, 0.0, 0.0, 0, 42, 0)
-        )
+        return os.stat_result((0o100644, 0, 0, 1, 0, 0, 7, 0, 0, 0, 0.0, 0.0, 0.0, 0, 42, 0))
 
 
 def fake_listing(monkeypatch: pytest.MonkeyPatch, root: Path, entries: list[FakeEntry]) -> None:
