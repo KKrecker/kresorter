@@ -30,7 +30,7 @@ def make(path: Path, data: bytes) -> FileEntry:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     info = path.stat()
-    return FileEntry(path=path, size=info.st_size, mtime=info.st_mtime)
+    return FileEntry(path=path, size=info.st_size, mtime_ns=info.st_mtime_ns)
 
 
 def spy_hash_file(monkeypatch: pytest.MonkeyPatch) -> list[tuple[Path, int | None]]:
@@ -152,7 +152,7 @@ def test_vanished_file_is_reported_and_rest_still_compared(tmp_path: Path) -> No
     data = b"duplicate data"
     a = make(tmp_path / "a", data)
     b = make(tmp_path / "b", data)
-    ghost = FileEntry(path=tmp_path / "ghost", size=len(data), mtime=0.0)
+    ghost = FileEntry(path=tmp_path / "ghost", size=len(data), mtime_ns=0)
 
     assert candidates([a, ghost, b]) == [
         Skipped(path=ghost.path, reason=SkipReason.NOT_FOUND),
@@ -181,13 +181,24 @@ def test_file_changed_since_scan_is_not_hashed(
 ) -> None:
     a = make(tmp_path / "a", b"data-data")
     b = make(tmp_path / "b", b"data-data")
-    os.utime(b.path, (b.mtime + 10, b.mtime + 10))
+    os.utime(b.path, ns=(b.mtime_ns + 10**10, b.mtime_ns + 10**10))
     calls = spy_hash_file(monkeypatch)
 
     assert candidates([a, b]) == [
         Skipped(path=b.path, reason=SkipReason.CHANGED, detail="modified since scan")
     ]
     assert [path for path, _ in calls] == [a.path]
+
+
+def test_one_nanosecond_change_is_detected(tmp_path: Path) -> None:
+    # A float st_mtime (~1.7e9 s) cannot represent 1 ns; mtime_ns can.
+    a = make(tmp_path / "a", b"data-data")
+    b = make(tmp_path / "b", b"data-data")
+    os.utime(b.path, ns=(b.mtime_ns + 1, b.mtime_ns + 1))
+
+    assert candidates([a, b]) == [
+        Skipped(path=b.path, reason=SkipReason.CHANGED, detail="modified since scan")
+    ]
 
 
 def test_file_changed_during_hashing_is_reported(
@@ -201,7 +212,7 @@ def test_file_changed_during_hashing_is_reported(
         digest = real(path, limit=limit, chunk_size=chunk_size)
         if path == b.path:
             path.write_bytes(b"other-dat")
-            os.utime(path, (b.mtime + 10, b.mtime + 10))
+            os.utime(path, ns=(b.mtime_ns + 10**10, b.mtime_ns + 10**10))
         return digest
 
     monkeypatch.setattr(hashing, "hash_file", mutate_b)

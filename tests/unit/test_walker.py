@@ -36,17 +36,17 @@ def run(tmp_path: Path, roots: list[Path], *blocked: Path, open_files: Any = Non
     return list(walk(roots, make_policy(tmp_path, *blocked), checker))
 
 
-def test_yields_nested_files_with_size_and_mtime(tmp_path: Path) -> None:
+def test_yields_nested_files_with_size_and_mtime_ns(tmp_path: Path) -> None:
     root = tmp_path / "root"
     a = write(root / "a.txt", b"hello")
     b = write(root / "sub" / "deep" / "b.bin", b"12")
-    os.utime(a, (1_000_000, 1_000_000))
+    os.utime(a, ns=(1_000_000_000_000_000_001, 1_000_000_000_000_000_001))
 
     events = run(tmp_path, [root])
 
     assert events == [
-        FileEntry(path=a, size=5, mtime=1_000_000.0),
-        FileEntry(path=b, size=2, mtime=b.stat().st_mtime),
+        FileEntry(path=a, size=5, mtime_ns=1_000_000_000_000_000_001),
+        FileEntry(path=b, size=2, mtime_ns=b.stat().st_mtime_ns),
     ]
 
 
@@ -209,8 +209,10 @@ class FakeEntry:
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
         if self._stat_error:
             raise FileNotFoundError(2, "gone")
-        # st_size=7, st_mtime=42.0 (float fields follow the 10 integer ones)
-        return os.stat_result((0o100644, 0, 0, 1, 0, 0, 7, 0, 42, 0, 0.0, 42.0, 0.0))
+        # st_size=7, st_mtime_ns=42 (fields 10-12: float times, 13-15: integer ns times)
+        return os.stat_result(
+            (0o100644, 0, 0, 1, 0, 0, 7, 0, 0, 0, 0.0, 0.0, 0.0, 0, 42, 0)
+        )
 
 
 def fake_listing(monkeypatch: pytest.MonkeyPatch, root: Path, entries: list[FakeEntry]) -> None:
@@ -247,6 +249,6 @@ def test_file_vanishing_during_walk_is_reported(
 
     # Sorted by name: "b" < "gone.txt".
     assert events == [
-        FileEntry(path=root / "b", size=7, mtime=42.0),
+        FileEntry(path=root / "b", size=7, mtime_ns=42),
         Skipped(path=root / "gone.txt", reason=SkipReason.NOT_FOUND),
     ]
