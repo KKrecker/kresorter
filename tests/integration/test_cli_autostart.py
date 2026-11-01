@@ -3,6 +3,7 @@
 Report only: nothing is created, changed or deleted, the scan context is never built, and the
 registry is read only on Windows. Entries are grouped by source in reader order; machine-wide
 entries on Windows need ``--include-machine``, and the report says when they were not read.
+Each entry says whether safeclean can disable and enable it (``disableable``, item 8).
 """
 
 import io
@@ -88,12 +89,12 @@ def test_text_report_groups_entries_by_source(tmp_path: Path, linux: AutostartCo
         "Entries: 2, 1 disabled\n"
         "\n"
         "XDG autostart: 2\n"
-        "  app  [enabled, user]\n"
+        "  app  [enabled, user, disableable]\n"
         "    command: /usr/bin/app --tray\n"
         f"    location: {user}\n"
         f"    shadows: {system / 'app.desktop'}\n"
         "    note: OnlyShowIn=GNOME;\n"
-        "  tray  [disabled, system]\n"
+        "  tray  [disabled, system, disableable]\n"
         "    command: /usr/bin/app --tray\n"
         f"    location: {system / 'tray.desktop'}\n"
         "\n"
@@ -132,7 +133,7 @@ def test_windows_without_consent_says_what_was_not_read(tmp_path: Path) -> None:
     _, out = run(["autostart", "list"], context("windows", tmp_path, registry))
 
     assert out.splitlines()[1:4] == ["Entries: 1, 0 disabled", HINT, ""]
-    assert "Run keys: 1\n  Sync  [enabled, user]\n    command: sync.exe\n" in out
+    assert "Run keys: 1\n  Sync  [enabled, user, disableable]\n    command: sync.exe\n" in out
     assert Hive.HKLM not in {hive for hive, _ in registry.reads}
 
 
@@ -143,7 +144,7 @@ def test_windows_with_consent_reads_the_machine_too(tmp_path: Path) -> None:
     _, out = run(["autostart", "list", "--include-machine"], context("windows", tmp_path, registry))
 
     assert HINT not in out
-    assert "  Agent  [enabled, system]\n" in out
+    assert "  Agent  [enabled, system]\n" in out  # HKLM: read-only, so not disableable
 
 
 def test_other_systems_have_no_machine_scope_to_consent_to(linux: AutostartContext) -> None:
@@ -174,6 +175,7 @@ def test_json_lists_every_field(tmp_path: Path, linux: AutostartContext) -> None
         "command": "/usr/bin/app --tray",
         "location": str(user),
         "enabled": True,
+        "disableable": True,
         "digest": data["items"][0]["digest"],
         "shadows": str(system / "app.desktop"),
         "notes": ["OnlyShowIn=GNOME;"],
@@ -219,7 +221,7 @@ def test_without_a_context_the_detected_platform_is_listed(
 
     assert cli.main(["autostart", "list"], out=out, context_factory=no_scan_context) == 0
     assert platforms == [cli.detect_platform()]
-    assert "  app  [enabled, user]\n" in out.getvalue()
+    assert "  app  [enabled, user, disableable]\n" in out.getvalue()
 
 
 # --- usage ---------------------------------------------------------------------------------------
