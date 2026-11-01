@@ -338,9 +338,11 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     later groups (`[Desktop Action ...]`) are not touched.
 64. **The copy is checked by the reader's own rules**: `parse_keys` (shared with the reader,
     which stays read-only) validates the entry, and the text is split into lines exactly as
-    `parse_keys` splits it, so the copy reads back with the same keys and `Hidden=true`. An
-    entry already `Hidden=true` is refused (nothing would change, item 59); so is a copy that
-    would be larger than `MAX_ENTRY_BYTES`, which the reader would skip.
+    `parse_keys` splits it: the split matches the reader (`str.splitlines` after UTF-8), not
+    `bytes.splitlines`, which misses `\x0b`, `\x85`, `\u2028` and the like and would add a
+    second `Hidden` the reader skips as broken. So the copy reads back with the same keys and
+    `Hidden=true`. An entry already `Hidden=true` is refused (nothing would change, item 59);
+    so is a copy that would be larger than `MAX_ENTRY_BYTES`, which the reader would skip.
 65. **A system entry is hidden by `STUB`**, `[Desktop Entry]` and `Hidden=true` only, in the
     user directory under the same file name; it reads back as the system entry, disabled, with
     the system file in `shadows`.

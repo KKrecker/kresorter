@@ -12,7 +12,7 @@ import pytest
 
 from safeclean.autostart.entries import MAX_ENTRY_BYTES, BrokenEntryError
 from safeclean.autostart.models import Scope, entry_digest
-from safeclean.autostart.xdg import read_xdg
+from safeclean.autostart.xdg import parse_keys, read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
@@ -67,6 +67,22 @@ def test_comments_and_later_groups_are_untouched() -> None:
         b"# Hidden=false in a comment\n\n[Desktop Entry]\nHidden=true\nType=Application\n"
         b"Exec=app\n[Desktop Action quit]\nHidden=false\nExec=app --quit\n"
     )
+
+
+@pytest.mark.parametrize(
+    "separator",
+    ["\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", "\u2028", "\u2029"],
+    ids=["vt", "ff", "fs", "gs", "rs", "nel", "line-sep", "paragraph-sep"],
+)
+def test_lines_are_split_as_the_reader_splits_them(separator: str) -> None:
+    # str.splitlines after UTF-8, as parse_keys does; bytes.splitlines would miss this Hidden
+    # line, add a second one and give a copy the reader skips as broken.
+    raw = f"[Desktop Entry]\nType=Application\nExec=app{separator}Hidden=false\n".encode()
+
+    copy = hidden_copy(raw)
+
+    assert copy == f"[Desktop Entry]\nType=Application\nExec=app{separator}Hidden=true\n".encode()
+    assert parse_keys(copy.decode()) == {"Type": "Application", "Exec": "app", "Hidden": "true"}
 
 
 def test_an_entry_already_hidden_is_refused() -> None:
