@@ -26,14 +26,10 @@ from safeclean.analysis.size_age import Thresholds
 from safeclean.cli_journal import UNSAFE, with_journal
 from safeclean.core.models import FileEntry
 from safeclean.core.scanner import ScanContext
+from safeclean.quarantine.journal import ItemState
 from safeclean.quarantine.preflight import Candidate, RefusalReason, Refused, UnreliableCheckerError
-from safeclean.quarantine.service import (
-    ItemState,
-    PurgeRefused,
-    QuarantineService,
-    RecoveryReport,
-    RestoreRefused,
-)
+from safeclean.quarantine.recovery import RecoveryReport
+from safeclean.quarantine.service import PurgeRefused, QuarantineService, RestoreRefused
 from safeclean.storage.pending import has_pending
 from safeclean.text import count, format_size
 

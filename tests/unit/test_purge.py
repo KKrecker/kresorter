@@ -19,10 +19,10 @@ from fakes import FakeOpenFiles, make_policy
 from safeclean.core.heuristics import JunkClassifier
 from safeclean.core.models import FileEntry
 from safeclean.core.policy import PathPolicy
+from safeclean.quarantine.journal import OperationState
 from safeclean.quarantine.preflight import Candidate
 from safeclean.quarantine.purge import UnsafeDeleteError, delete_from_vault
 from safeclean.quarantine.service import (
-    OperationState,
     PurgeError,
     PurgeRefusal,
     QuarantineError,

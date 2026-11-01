@@ -669,3 +669,10 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     not imported: an imported fixture reads as an unused import, and the parameter that
     requests it shadows it. Fixtures that share a name but not a setup stay in their files
     (`conn`: one keeps the journal apart from the tree under test).
+124. **The quarantine's recovery is `quarantine.recovery.recover(conn, *, now)`, apart from the
+    service** (B7): it reads the journal and the disk and needs nothing else, so it runs
+    without a reliable open-file check, a policy or a vault to make; `QuarantineService.recover()`
+    runs it with its own clock. The states, the two updates (`set_item`, `finish_operation`)
+    and the check of a file against the journal (`probe`) are `quarantine.journal`, shared by
+    both, as `autostart.journal` is (item 119). Behaviour is unchanged; `safeclean recover`
+    builds on it.

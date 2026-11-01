@@ -66,6 +66,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `autostart.xdg.read_xdg()`: an autostart directory that exists but cannot be listed is now skipped with `cannot read: <reason>` instead of silently reading as empty; nothing it could change is shown: no items at all for the user directory, and for a system directory only the names found in the directories before it (decision 0011, item 32).
 
 ### Changed
+- The quarantine's recovery (`recover`, `RecoveryReport`) moved to `quarantine.recovery`, its states and journal updates to `quarantine.journal`; it needs no open-file check; behaviour is unchanged (decision 0011, item 124).
 - The journal's times (`created_at_ns`, `finished_at_ns`) come from a clock given to `QuarantineService`, `XdgChanges` and `RunKeyChanges` (`now`, `time.time_ns` by default); `RunKeyChanges` dates its rows with the clock of its flag (decision 0011, item 121).
 - `storage.journal.insert_row()` is the one journal insert of the quarantine and the autostart changes (decision 0011, item 120).
 - The journal of autostart changes (`ChangeState`, `ChangeResult`, `insert_change`, ...) moved from `autostart.changes` to `autostart.journal`; behaviour is unchanged (decision 0011, item 119).
