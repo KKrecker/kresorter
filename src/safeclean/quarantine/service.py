@@ -44,6 +44,7 @@ from pathlib import Path
 from safeclean.core.heuristics import JunkClassifier
 from safeclean.core.open_files import OpenFileChecker
 from safeclean.core.policy import PathPolicy
+from safeclean.core.preflight import Candidate, Cleared, Preflight, RefusalReason, Refused
 from safeclean.quarantine import recovery
 from safeclean.quarantine.journal import (
     Copy,
@@ -54,7 +55,6 @@ from safeclean.quarantine.journal import (
     probe,
     set_item,
 )
-from safeclean.quarantine.preflight import Candidate, Cleared, Preflight, RefusalReason, Refused
 from safeclean.quarantine.purge import delete_from_vault
 from safeclean.quarantine.recovery import RecoveryReport
 from safeclean.quarantine.vault import Vault

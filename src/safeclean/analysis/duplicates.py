@@ -16,7 +16,7 @@ from pathlib import PurePath
 
 from safeclean.core.heuristics import JunkClassifier
 from safeclean.core.models import FileEntry
-from safeclean.quarantine.preflight import Candidate
+from safeclean.core.preflight import Candidate
 
 
 class KeepReason(StrEnum):

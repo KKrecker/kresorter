@@ -26,9 +26,9 @@ from safeclean.analysis.score import Level
 from safeclean.analysis.size_age import Thresholds
 from safeclean.cli_journal import RECOVER, UNSAFE, unfinished, with_journal
 from safeclean.core.models import FileEntry
+from safeclean.core.preflight import Candidate, RefusalReason, Refused, UnreliableCheckerError
 from safeclean.core.scanner import ScanContext
 from safeclean.quarantine.journal import ItemState
-from safeclean.quarantine.preflight import Candidate, RefusalReason, Refused, UnreliableCheckerError
 from safeclean.quarantine.recovery import RecoveryReport
 from safeclean.quarantine.service import PurgeRefused, QuarantineService, RestoreRefused
 from safeclean.storage.pending import pending_domains

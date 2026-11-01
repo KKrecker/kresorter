@@ -24,8 +24,8 @@ from safeclean.analysis.score import (
 from safeclean.analysis.size_age import Thresholds, find_large_and_old
 from safeclean.core.heuristics import JunkClassifier
 from safeclean.core.models import FileEntry
+from safeclean.core.preflight import Candidate
 from safeclean.core.scanner import ScanReport
-from safeclean.quarantine.preflight import Candidate
 
 
 @dataclass(frozen=True)

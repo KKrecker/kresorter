@@ -22,8 +22,8 @@ from fakes import FakeOpenFiles, make_policy
 from safeclean.analysis.duplicates import DuplicateDecision, KeepReason, decide
 from safeclean.core.heuristics import JunkClassifier, load_rules
 from safeclean.core.models import FileEntry
+from safeclean.core.preflight import Candidate
 from safeclean.core.scanner import ScanContext, scan
-from safeclean.quarantine.preflight import Candidate
 
 DIGEST = "ab" * 32
 SIZE = 4096

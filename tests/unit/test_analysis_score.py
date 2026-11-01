@@ -26,7 +26,7 @@ from safeclean.analysis.score import (
 from safeclean.analysis.size_age import SizeAgeFinding, SizeAgeReason
 from safeclean.core.heuristics import JunkCategory, JunkMatch
 from safeclean.core.models import FileEntry
-from safeclean.quarantine.preflight import Candidate
+from safeclean.core.preflight import Candidate
 
 MIB = 1024**2
 

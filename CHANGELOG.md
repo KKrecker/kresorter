@@ -67,6 +67,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `autostart.xdg.read_xdg()`: an autostart directory that exists but cannot be listed is now skipped with `cannot read: <reason>` instead of silently reading as empty; nothing it could change is shown: no items at all for the user directory, and for a system directory only the names found in the directories before it (decision 0011, item 32).
 
 ### Changed
+- Preflight moved from `quarantine.preflight` to `core.preflight`, which the quarantine and organize share; behaviour is unchanged (decision 0012, amending 0004).
 - The README covers every command (`analyze`, `autostart`, `recover`), the data directory and the exit codes of each (pre-step-5 audit, A5); the roadmap records step 5.0.
 - A command that would act while another domain has unfinished work names `safeclean recover` (`the journal has unfinished <domain> work`), and so does a journal failure in a quarantine command (it named `safeclean quarantine list`); the quarantine's recovery reads `Recovered an interrupted quarantine operation`; `storage.pending.pending_domains` says whose work is unfinished (decision 0011, items 125, 127).
 - The quarantine's recovery (`recover`, `RecoveryReport`) moved to `quarantine.recovery`, its states and journal updates to `quarantine.journal`; it needs no open-file check; behaviour is unchanged (decision 0011, item 124).

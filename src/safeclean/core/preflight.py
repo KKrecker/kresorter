@@ -1,4 +1,6 @@
-"""Preflight: re-validate one candidate right before the quarantine acts (decision 0004, item 5).
+"""Preflight: re-validate one candidate right before a domain acts on it (decision 0004, item 5).
+
+The quarantine and organize both use it (decision 0012, amending 0004).
 
 Order (first failing check wins, cheap before expensive):
 
@@ -9,8 +11,8 @@ Order (first failing check wins, cheap before expensive):
    the same inode, and still has the group digest;
 4. open files last (a full ``/proc`` scan on Linux); a failing checker counts as open.
 
-Not atomic with the move: the file can change between preflight and ``os.replace``. That window
-is inherent, which is why journal-before-move and ``recover()`` stay mandatory.
+Not atomic with the move: the file can change between preflight and the rename. That window is
+inherent, which is why journal-before-move and ``recover()`` stay mandatory.
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ class RefusalReason(StrEnum):
     TWIN_MISSING = "twin_missing"  # the copy that stays is gone or unreadable
     TWIN_CHANGED = "twin_changed"  # the copy that stays is no longer the scanned one
     TWIN_SAME_FILE = "twin_same_file"  # hard link: moving frees nothing
-    CROSS_DEVICE = "cross_device"  # not on the vault's device; checked by the service
+    CROSS_DEVICE = "cross_device"  # not on the destination's device; checked by the domain
     DUPLICATE_CANDIDATE = "duplicate_candidate"  # same path twice in one batch; by the service
 
 

@@ -14,7 +14,7 @@ from safeclean.core.hashing import hash_file
 from safeclean.core.models import FileEntry
 from safeclean.core.open_files import NoOpenFileCheck
 from safeclean.core.policy import BlockReason, PathPolicy
-from safeclean.quarantine.preflight import (
+from safeclean.core.preflight import (
     Candidate,
     Cleared,
     Preflight,

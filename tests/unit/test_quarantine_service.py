@@ -21,8 +21,8 @@ from safeclean.core.heuristics import JunkClassifier, load_rules
 from safeclean.core.models import FileEntry
 from safeclean.core.open_files import NoOpenFileCheck
 from safeclean.core.policy import PathPolicy
+from safeclean.core.preflight import Candidate, RefusalReason, UnreliableCheckerError
 from safeclean.quarantine.journal import OperationState
-from safeclean.quarantine.preflight import Candidate, RefusalReason, UnreliableCheckerError
 from safeclean.quarantine.recovery import RecoveryReport
 from safeclean.quarantine.service import QuarantineError, QuarantineService
 from safeclean.quarantine.vault import Vault
