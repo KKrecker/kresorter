@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, TextIO
 
-from safeclean import cli_analyze, cli_autostart, cli_quarantine
+from safeclean import cli_analyze, cli_autostart, cli_quarantine, cli_recover
 from safeclean.autostart.listing import AutostartContext, default_autostart_context
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.open_files import checker_for_platform
@@ -74,6 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     cli_analyze.add_parser(commands)
     cli_quarantine.add_parser(commands)
     cli_autostart.add_parser(commands)
+    cli_recover.add_parser(commands)
     return parser
 
 
@@ -87,12 +88,14 @@ def main(
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command == "autostart":  # needs no scan context
+    if args.command in ("autostart", "recover"):  # autostart list needs no scan context
         if autostart_context is None:
             listing_context = default_autostart_context(detect_platform())
         else:
             listing_context = autostart_context()
         factory = context_factory or default_context  # built only by the commands that act
+        if args.command == "recover" or args.action == "recover":  # one command, an alias
+            return cli_recover.run(listing_context, factory(), out or sys.stdout, err or sys.stderr)
         return cli_autostart.run(
             args, listing_context, factory, out or sys.stdout, err or sys.stderr
         )

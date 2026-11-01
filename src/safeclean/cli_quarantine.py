@@ -1,7 +1,8 @@
 """``safeclean quarantine add | list | restore | purge`` (decisions 0004, 0006-0010).
 
 Every command checks the data directory before creating anything, takes the single-instance
-lock, opens the journal there and runs ``recover()`` first. ``purge`` shows its plan and
+lock, opens the journal there and runs ``recover()`` first; an action that then finds work of
+another domain refuses and names ``safeclean recover`` (item 127). ``purge`` shows its plan and
 deletes only with ``--yes``, in the same process (decision 0008). ``add --from-analysis``
 analyzes inside the lock, shows its plan and moves files only with ``--yes`` (decision 0010);
 REVIEW findings and kept duplicate copies are never part of the plan.
@@ -23,14 +24,14 @@ from typing import TextIO
 from safeclean import cli_analyze
 from safeclean.analysis.score import Level
 from safeclean.analysis.size_age import Thresholds
-from safeclean.cli_journal import UNSAFE, with_journal
+from safeclean.cli_journal import RECOVER, UNSAFE, unfinished, with_journal
 from safeclean.core.models import FileEntry
 from safeclean.core.scanner import ScanContext
 from safeclean.quarantine.journal import ItemState
 from safeclean.quarantine.preflight import Candidate, RefusalReason, Refused, UnreliableCheckerError
 from safeclean.quarantine.recovery import RecoveryReport
 from safeclean.quarantine.service import PurgeRefused, QuarantineService, RestoreRefused
-from safeclean.storage.pending import has_pending
+from safeclean.storage.pending import pending_domains
 from safeclean.text import count, format_size
 
 # Levels a bulk add may take, each including the stricter ones before it; REVIEW never.
@@ -87,7 +88,7 @@ def check_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> No
 
 def run(args: argparse.Namespace, context: ScanContext, out: TextIO, err: TextIO) -> int:
     session = functools.partial(_run_locked, args, context, out, err)
-    return with_journal(context, err, session, recover="safeclean quarantine list")
+    return with_journal(context, err, session, recover=RECOVER)
 
 
 def _run_locked(
@@ -102,12 +103,10 @@ def _run_locked(
         service = _service(conn, context, err)
         if service is None:
             return UNSAFE
-        _report_recovery(service.recover(), out, err)
-        if args.action != "list" and has_pending(conn):  # what is left is an autostart change
-            err.write(
-                "safeclean: an autostart change is unfinished; run 'safeclean autostart recover'"
-                " first; nothing was changed\n"
-            )
+        report_recovery(service.recover(), out, err)
+        others = set() if args.action == "list" else pending_domains(conn)
+        if others:  # its own was recovered above (item 127)
+            err.write(unfinished(others))
             return UNSAFE
         return _ACTIONS[args.action](Session(service, conn, context), args, out)
     except UnreliableCheckerError:
@@ -228,13 +227,16 @@ _ACTIONS: dict[str, Action] = {"add": _add, "list": _list, "restore": _restore, 
 # --- rendering ---------------------------------------------------------------------------------
 
 
-def _report_recovery(report: RecoveryReport, out: TextIO, err: TextIO) -> None:
+def report_recovery(report: RecoveryReport, out: TextIO, err: TextIO) -> bool:
+    """Show what the recovery found, warnings on ``err``; was there anything?"""
     found = report.quarantined + report.rolled_back + report.restored + report.purged
     found += report.lost
     if found:
-        out.write(f"Recovered an interrupted operation ({count(len(found), 'file')}).\n")
+        files = count(len(found), "file")
+        out.write(f"Recovered an interrupted quarantine operation ({files}).\n")
     for warning in report.warnings:
         err.write(f"safeclean: {warning}\n")
+    return bool(found)
 
 
 def _path_refusal(refused: Refused) -> str:

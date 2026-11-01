@@ -6,7 +6,8 @@ taken, and the journal is opened in it; quarantine and autostart changes share a
 Exit code 3: the data directory, the lock or the journal cannot be used safely, the body
 stopped on an ``OSError`` it did not handle (only the first two are named the data directory),
 or the journal failed in the middle of the command: then the domain's ``recover`` command, given
-by it, is named (decision 0011, item 114).
+by it, is named (decision 0011, item 114). Work of another domain left in the journal is named
+with ``safeclean recover``, the one command that recovers every domain (item 127).
 """
 
 from __future__ import annotations
@@ -20,10 +21,12 @@ from safeclean.core.scanner import ScanContext
 from safeclean.storage.data_dir import PRIVATE, DataDirError, check_data_dir
 from safeclean.storage.db import StorageError, connect
 from safeclean.storage.lock import InstanceLock, LockedError
+from safeclean.storage.pending import Domain
 
 JOURNAL_NAME = "journal.db"
 LOCK_NAME = "safeclean.lock"
 UNSAFE = 3
+RECOVER = "safeclean recover"
 
 Body = Callable[[sqlite3.Connection, Path], int]  # (journal, data directory) -> exit code
 
@@ -62,3 +65,12 @@ def _open(data_dir: Path, err: TextIO, body: Body, recover: str) -> int:
         return UNSAFE
     finally:
         conn.close()
+
+
+def unfinished(domains: set[Domain]) -> str:
+    """The refusal of a command that would act while other domains have unfinished work."""
+    work = " and ".join(sorted(domains))
+    return (
+        f"safeclean: the journal has unfinished {work} work; run '{RECOVER}' first;"
+        " nothing was changed\n"
+    )

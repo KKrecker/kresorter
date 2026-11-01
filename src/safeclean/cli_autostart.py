@@ -1,16 +1,16 @@
-"""``safeclean autostart list | recover`` (decision 0011).
+"""``safeclean autostart list | disable | enable`` (decision 0011).
 
 ``list`` reports every autostart entry of this system: grouped by source in reader order; on
 Windows, machine-wide entries are read only with ``--include-machine``, and the report says
 when they were not. It creates, changes and deletes nothing and opens no journal.
 
-``recover`` opens the shared journal (data directory, lock) and reconciles the interrupted
-autostart changes of this platform; ``disable`` and ``enable`` do the same, then change one
-entry named by any unique beginning of its digest, only with ``--yes`` (without it they show
-what would be written).
+``disable`` and ``enable`` open the shared journal (data directory, lock), reconcile the
+interrupted autostart changes of this platform, then change one entry named by any unique
+beginning of its digest, only with ``--yes`` (without it they show what would be written).
+``autostart recover`` is ``safeclean recover`` (``cli_recover``, item 126).
 
 Exit codes: 0 done; 1 refused, rolled back, not confirmed or no such entry; 2 usage error
-(argparse); 3 failed, unfinished quarantine work, an unfinished change that cannot be
+(argparse); 3 failed, unfinished work of another domain, an unfinished change that cannot be
 checked, or a data directory, lock or journal that cannot be used.
 """
 
@@ -39,8 +39,9 @@ from safeclean.autostart.models import (
 from safeclean.autostart.registry import RegistryError
 from safeclean.autostart.run_changes import RunKeyChanges
 from safeclean.autostart.xdg import autostart_dirs
-from safeclean.cli_journal import UNSAFE, with_journal
+from safeclean.cli_journal import UNSAFE, unfinished, with_journal
 from safeclean.core.scanner import ScanContext
+from safeclean.storage.pending import pending_domains
 from safeclean.text import count
 
 MACHINE_NOTE = (
@@ -82,7 +83,7 @@ def add_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) ->
         action="store_true",
         help="Windows: also read HKLM, services, scheduled tasks and the common startup folder",
     )
-    actions.add_parser("recover", help="reconcile interrupted autostart changes with the system")
+    actions.add_parser("recover", help="the same as 'safeclean recover'")
     for action in ("disable", "enable"):
         change = actions.add_parser(action, help=f"{action} one entry (reversible)")
         change.add_argument(
@@ -105,12 +106,10 @@ def run(
     out: TextIO,
     err: TextIO,
 ) -> int:
+    """``list``, ``disable`` or ``enable``; ``recover`` is ``cli_recover``'s."""
     if args.action == "list":
         return _list(args, context, out)
-    if args.action == "recover":
-        session = functools.partial(_recover, context, out, err)
-    else:
-        session = functools.partial(_change, args, context, out, err)
+    session = functools.partial(_change, args, context, out, err)
     return with_journal(scan(), err, session, recover=RECOVER)
 
 
@@ -124,17 +123,7 @@ def _list(args: argparse.Namespace, context: AutostartContext, out: TextIO) -> i
     return 0
 
 
-def _recover(
-    context: AutostartContext, out: TextIO, err: TextIO, conn: sqlite3.Connection, data_dir: Path
-) -> int:
-    report = _recovered(changes_for(context, conn, data_dir), err)
-    if report is None:
-        return UNSAFE
-    out.write(render_recovery(report) or "Nothing to recover.\n")
-    return 0
-
-
-def _recovered(changes: XdgChanges | RunKeyChanges | None, err: TextIO) -> ChangeRecovery | None:
+def recovered(changes: XdgChanges | RunKeyChanges | None, err: TextIO) -> ChangeRecovery | None:
     """The autostart ``recover()``; ``None``, with the reason, if a change stays unfinished."""
     try:
         return ChangeRecovery() if changes is None else changes.recover()
@@ -154,7 +143,7 @@ def _change(
     data_dir: Path,
 ) -> int:
     changes = changes_for(context, conn, data_dir)
-    report = _recovered(changes, err)
+    report = recovered(changes, err)
     if report is None:
         return UNSAFE
     out.write(render_recovery(report))
@@ -184,6 +173,9 @@ def _change(
         return UNSAFE
     except OSError as error:  # a check before acting: nothing is journaled (items 111, 113)
         err.write(f"safeclean: cannot {args.action} {item.name}: {error}; nothing was changed\n")
+        return UNSAFE
+    if result.refusal is ChangeRefusal.PENDING:  # another domain's: its own was recovered above
+        err.write(unfinished(pending_domains(conn)))
         return UNSAFE
     return _outcome(result, item, args.action, out, err)
 
@@ -229,12 +221,6 @@ def _how(action: str, item: AutostartItem, context: AutostartContext) -> str:
 def _outcome(
     result: ChangeResult, item: AutostartItem, action: str, out: TextIO, err: TextIO
 ) -> int:
-    if result.refusal is ChangeRefusal.PENDING:  # autostart work was recovered above
-        err.write(
-            "safeclean: a quarantine operation is unfinished; run 'safeclean quarantine list'"
-            " first; nothing was changed\n"
-        )
-        return UNSAFE
     if result.refusal is not None:
         out.write(f"Refused: {result.refusal}: {result.detail}\n")
         return 1

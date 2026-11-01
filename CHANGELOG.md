@@ -52,6 +52,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `safeclean autostart list` shows which entries are `disableable` (a mark in the text, a field in JSON): the source can be written, which does not promise that every action passes (decision 0011, item 56).
 - `safeclean autostart recover`: reconciles interrupted autostart changes of this platform (XDG on Linux, `HKCU` Run on Windows) in the shared journal and data directory, under the single-instance lock; an unfinished change that cannot be checked exits with 3 and says what to do. Quarantine `add`, `restore` and `purge` exit with 3 and name this command while an autostart change is unfinished (decision 0011, addendum).
 - `safeclean autostart disable|enable ID [--yes]`: changes one XDG entry (Linux) or `HKCU` Run value (Windows) named by any unique beginning of its digest, as `autostart list` now shows it (`id`, 12 characters); without `--yes` it shows what would be written and changes nothing; the change is journaled in the shared journal after the autostart `recover()`; read-only sources, unknown or ambiguous ids and entries already in that state are refused (decision 0011, addendum).
+- `safeclean recover`: reconciles the interrupted work of every domain in the shared journal, the quarantine's first (it needs no open-file check, so it also runs on macOS and Windows), then the autostart changes of this platform; `safeclean autostart recover` is its alias (decision 0011, items 124, 126).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Fixed
@@ -66,6 +67,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `autostart.xdg.read_xdg()`: an autostart directory that exists but cannot be listed is now skipped with `cannot read: <reason>` instead of silently reading as empty; nothing it could change is shown: no items at all for the user directory, and for a system directory only the names found in the directories before it (decision 0011, item 32).
 
 ### Changed
+- A command that would act while another domain has unfinished work names `safeclean recover` (`the journal has unfinished <domain> work`), and so does a journal failure in a quarantine command (it named `safeclean quarantine list`); the quarantine's recovery reads `Recovered an interrupted quarantine operation`; `storage.pending.pending_domains` says whose work is unfinished (decision 0011, items 125, 127).
 - The quarantine's recovery (`recover`, `RecoveryReport`) moved to `quarantine.recovery`, its states and journal updates to `quarantine.journal`; it needs no open-file check; behaviour is unchanged (decision 0011, item 124).
 - The journal's times (`created_at_ns`, `finished_at_ns`) come from a clock given to `QuarantineService`, `XdgChanges` and `RunKeyChanges` (`now`, `time.time_ns` by default); `RunKeyChanges` dates its rows with the clock of its flag (decision 0011, item 121).
 - `storage.journal.insert_row()` is the one journal insert of the quarantine and the autostart changes (decision 0011, item 120).

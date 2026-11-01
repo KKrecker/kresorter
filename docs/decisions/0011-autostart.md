@@ -676,3 +676,24 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     and the check of a file against the journal (`probe`) are `quarantine.journal`, shared by
     both, as `autostart.journal` is (item 119). Behaviour is unchanged; `safeclean recover`
     builds on it.
+125. **`storage.pending.pending_domains(conn) -> set[Domain]` says whose work is unfinished**
+    (B4): `Domain` names each domain as its command (`quarantine`, `autostart`), and one query
+    per domain is the only place that knows their tables; `has_pending` is "any of them"
+    (item 99). Organize adds its domain and its query there, and every message follows.
+126. **`safeclean recover` recovers every domain; `safeclean autostart recover` is its alias**
+    (audit, decision 2; amends item 102): it opens the shared journal and closes the
+    quarantine's work first, by `quarantine.recovery` (item 124), so it runs where the
+    quarantine refuses to act, then the autostart changes of this platform. It prints what
+    each domain closed, or `Nothing to recover.`, and exits with 0; with 3 when an autostart
+    change cannot be checked or closed (item 103), the quarantine's being closed already. It
+    makes neither the vault nor the store. Domain commands still recover their own work first,
+    and a domain's own messages still name its own command (`autostart recover`, the alias):
+    one command and an alias are cheaper than one command per domain.
+127. **Work of another domain is named with `safeclean recover`** (B4; amends item 104): a
+    command that would act and finds, after its own recovery, that another domain has
+    unfinished work exits with 3: `the journal has unfinished <domains> work; run 'safeclean
+    recover' first; nothing was changed`, from `pending_domains`, so no command assumes which
+    domain is left. The quarantine has no recover command of its own: after a journal failure
+    it names `safeclean recover` too (it named `quarantine list`), and its recovery reads
+    `Recovered an interrupted quarantine operation`, beside the autostart lines of
+    `safeclean recover`.
