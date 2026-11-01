@@ -139,6 +139,30 @@ Scanner core and `safeclean scan` (read-only report).
 - README: every command, the data directory, recovery and exit codes (A5).
 - Decision 0011, items 110-127. 1063 tests, 100 % line and branch coverage.
 
+### Step 5: done (organize)
+- Decision 0012: sort one folder by kind, journaled, reversible, never overwriting; every item
+  cited by a test, the meta-test's pending list empty.
+- `core.preflight`, shared by the quarantine and organize; schema v4 (`move_batches`, `moves`
+  with the file's device and inode) and `Domain.ORGANIZE`.
+- `organize`: the category table and the folder markers as data, the platform table, the
+  read-only planner (the folder refused as a whole, every file that stays with its reason), the
+  mover (checked again, journal first, rename only, all or nothing), recovery by the file's
+  identity, undo as a batch of its own.
+- CLI: `safeclean organize move FOLDER [--yes]`, `organize list`, `organize undo BATCH
+  [--yes]`; `move` and `undo` refuse on macOS and Windows, and on Linux when the open-file
+  check is not reliable, before the journal is opened; `safeclean recover` closes organize's
+  batches too, on every system. `ScanContext.platform`, required, is the system a context was
+  made for, and the refusal reads it.
+
+### Accepted limitations carried into step 6
+- Everything from steps 2 to 4 still holds.
+- **Organize** (decision 0012): one level only; a taken name is not renamed; empty category
+  directories stay after undo; the plan and `--yes` are two passes; the category table is fixed
+  and English; dependencies are recognized by markers and names only; Linux only until each
+  blocker of item 38 is lifted by its own decision; a device or inode renumbered by a remount
+  leaves a move `failed` for the user; folders watched by a sync client on Linux are sorted like
+  any other.
+
 ### Left for later
 - B8: one environment object for `cli.main` instead of a factory per parameter.
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
@@ -155,7 +179,7 @@ src/safeclean/
 ├── storage/      # step 2: SQLite journal, data directory, lock, unfinished work by domain
 ├── analysis/     # step 3: duplicates, size_age, score, report
 ├── autostart/    # step 4: readers, listing, XDG and HKCU Run changes, recover
-├── organize/     # step 5: moves journaled in their own table (decision 0012)
+├── organize/     # step 5: categories, planner, mover, journal, recovery, undo (decision 0012)
 ├── llm/          # step 6
 └── ui/           # step 7
 ```

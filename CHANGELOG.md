@@ -75,6 +75,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `autostart.xdg.read_xdg()`: an autostart directory that exists but cannot be listed is now skipped with `cannot read: <reason>` instead of silently reading as empty; nothing it could change is shown: no items at all for the user directory, and for a system directory only the names found in the directories before it (decision 0011, item 32).
 
 ### Changed
+- The README covers `organize` and its exit codes; the roadmap records step 5 and its accepted limitations (decision 0012).
 - `ScanContext` carries the platform it was made for (`platform`, required; `default_context` sets it): organize refuses by it, not by the system the code runs on; a context that does not say its system cannot be made. The lines of files refused at action time (`text.refusal_line`, `text.refusals`) are shared by the quarantine and organize; output unchanged (decision 0012, item 39).
 - Preflight moved from `quarantine.preflight` to `core.preflight`, which the quarantine and organize share; behaviour is unchanged (decision 0012, amending 0004).
 - The README covers every command (`analyze`, `autostart`, `recover`), the data directory and the exit codes of each (pre-step-5 audit, A5); the roadmap records step 5.0.

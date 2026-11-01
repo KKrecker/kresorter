@@ -70,7 +70,7 @@ def failed(source: Path, destination: Path, at_source: str, at_destination: str)
 def test_a_crash_right_after_a_rename_is_settled_done(
     conn: sqlite3.Connection, tmp_path: Path, zone: Path, folder: Path
 ) -> None:
-    # [0012.31] b moved, its done never written: the disk says done
+    # [0012.31] [0012.40] b moved, its done never written: the disk says done; a real exit
     crashed(tmp_path, folder, {folder / B: "exit-after"})
     before = tree(zone)
     report = recover(conn)

@@ -3,8 +3,8 @@
 Cross-platform desktop app for **safe** cleanup and triage of files on your PC.
 Open source, local-only, no telemetry.
 
-> Status: early development, console mode only. Steps 1-4 are done (scanner; quarantine and
-> journal; analysis; autostart); step 5, the file organizer, is next
+> Status: early development, console mode only. Steps 1-5 are done (scanner; quarantine and
+> journal; analysis; autostart; file organizer); step 6, local explanations, is next
 > ([roadmap](docs/roadmap.md)).
 
 ## Safety principles
@@ -69,20 +69,45 @@ system entry is shadowed by a stub in your autostart directory, `/etc` is never 
 value gets the `StartupApproved` flag the Task Manager writes, the value itself is never
 touched. `enable` puts back only what safeclean changed.
 
+### Organize
+
+```bash
+safeclean organize move ~/Downloads        # show the plan; changes nothing
+safeclean organize move ~/Downloads --yes  # sort it: ~/Downloads/<Category>/<name>
+safeclean organize list                    # batches, newest first
+safeclean organize undo 4                  # show what would move back
+safeclean organize undo 4 --yes            # move it back
+```
+
+Only the regular files directly in the folder move, each to `<folder>/<Category>/<its name>`
+(`Images`, `Videos`, `Audio`, `Documents`, `Archives`, `Installers`); subdirectories are never
+entered or moved. Nothing is renamed, overwritten or deleted: a file whose destination is taken
+stays, and undo leaves the category directories. A folder whose files break when moved is
+refused as a whole (the home directory or above it, a game library, a project, a cache or temp
+directory), and every file that stays is listed with its reason: links, the folder's own
+metadata, downloads in progress, junk, unknown kinds (web pages included), files with
+companions (`movie.mkv` and `movie.srt`), programs next to their libraries. Every file is
+checked again right before it moves; a batch that stops puts back what it moved. Organize moves
+files only where nothing blocks it, today Linux with its open-file check: on macOS and Windows,
+and on Linux if the open-file check cannot be trusted, `move` and `undo` refuse (exit code 3)
+and name what blocks them, while `list` and `recover` run.
+
 ### Recovery
 
 ```bash
 safeclean recover   # close interrupted work of every kind; `autostart recover` is the same
 ```
 
-The commands that act (`quarantine`, `autostart disable|enable`, `recover`) share one journal
-in one data directory, and only one of them runs at a time. The data directory is
+The commands that act (`quarantine`, `organize`, `autostart disable|enable`, `recover`) share
+one journal in one data directory, and only one of them runs at a time. The data directory is
 `$XDG_DATA_HOME/safeclean` (by default `~/.local/share/safeclean`) on Linux,
 `~/Library/Application Support/safeclean` on macOS and `%LOCALAPPDATA%\safeclean` on Windows;
 safeclean refuses to use one inside a scan zone. Each command first closes its own interrupted
 work; if work of another kind is left, it changes nothing and names `safeclean recover`.
 Recovery decides by what is on the disk or in the registry, never redoing or undoing anything.
-`safeclean recover` needs no open-file check, so it also runs where the quarantine cannot act.
+`safeclean recover` needs no open-file check, so it also runs where the quarantine and organize
+cannot act; it names the files an interrupted organize batch left sorted and the `organize
+undo` that moves them back.
 
 ### Exit codes
 
@@ -91,9 +116,10 @@ Recovery decides by what is on the disk or in the registry, never redoing or und
 | 0 | done; reports always end with 0 |
 | 1 | something was refused, rolled back or not confirmed (a preview), or there was nothing to do |
 | 2 | usage error |
-| 3 | cannot act safely here: no reliable open-file check, unfinished work of another kind, a data directory, lock or journal that cannot be used, or a change that failed or cannot be checked |
+| 3 | cannot act safely here: no reliable open-file check (or, for organize, another blocker of the system), unfinished work of another kind, a data directory, lock or journal that cannot be used, a change that failed or cannot be checked, or a batch of moves that stopped |
 
-`scan`, `analyze` and `autostart list` exit with 0 or 2; `recover` with 0, 2 or 3.
+`scan`, `analyze` and `autostart list` exit with 0 or 2; `recover` and `organize list` with 0, 2
+or 3. For `organize`, files that stay by the plan are not refusals.
 
 ## Development
 
