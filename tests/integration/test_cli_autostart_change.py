@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from fakes import FakeOpenFiles, FakeRegistry, make_policy
+from fakes import FakeOpenFiles, FakeRegistry, deny_stat, make_policy
 from safeclean import cli
 from safeclean.autostart.changes import ChangeResult, ChangeState
 from safeclean.autostart.listing import AutostartContext
@@ -332,6 +332,32 @@ def test_unfinished_quarantine_work_names_its_command(
         " first; nothing was changed\n"
     )
     assert entry.read_bytes() == APP
+
+
+def test_a_check_before_acting_that_fails_stops_with_the_reason(
+    tmp_path: Path,
+    scan: ScanContext,
+    data_dir: Path,
+    user: Path,
+    system: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    write(system / "app.desktop", APP)
+    user.mkdir(parents=True)
+    auto = autostart("linux", tmp_path)
+    change_id = only_id(scan, auto)
+    deny_stat(monkeypatch, user)  # where the stub would go: its device cannot be known
+
+    code, out, err = run(["autostart", "disable", change_id, "--yes"], scan, auto)
+
+    monkeypatch.undo()
+    assert (code, out) == (3, "")
+    assert err == (
+        f"safeclean: cannot disable app: [Errno 13] Permission denied: '{user}';"
+        " nothing was changed\n"
+    )
+    assert rows(data_dir) == []
+    assert list(user.iterdir()) == []
 
 
 # --- Windows -------------------------------------------------------------------------------------

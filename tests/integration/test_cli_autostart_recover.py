@@ -8,7 +8,9 @@ While one is unfinished, quarantine commands that would act refuse with exit 3 a
 fake registry.
 """
 
+import errno
 import io
+import os
 from pathlib import Path
 
 import pytest
@@ -105,6 +107,32 @@ def interrupted_xdg_disable(tmp_path: Path, data_dir: Path) -> Path:
     return entry
 
 
+def no_space(*args: object, **kwargs: object) -> None:
+    raise OSError(errno.ENOSPC, "No space left on device")
+
+
+def denied_rename(source: object, target: object, **kwargs: object) -> None:
+    raise PermissionError(errno.EACCES, "Permission denied", str(source), None, str(target))
+
+
+def failed_partial_stub(tmp_path: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Change 1 failed on a double fault, leaving an empty stub over a system entry: the stub."""
+    user, system = tmp_path / "config" / "autostart", tmp_path / "etc" / "xdg" / "autostart"
+    write(system / "app.desktop", APP)
+    data_dir.mkdir(parents=True)
+    conn = connect(data_dir / "journal.db")
+    try:
+        changes = XdgChanges(conn, AutostartStore(data_dir), user, (system,))
+        (item,) = read_xdg(user, (system,)).items
+        monkeypatch.setattr(os, "write", no_space)
+        monkeypatch.setattr(os, "rename", no_space)  # it cannot go to the store either
+        changes.disable(item)
+        monkeypatch.undo()
+    finally:
+        conn.close()
+    return user / "app.desktop"
+
+
 def pending_run_change(data_dir: Path) -> None:
     data_dir.mkdir(parents=True)
     conn = connect(data_dir / "journal.db")
@@ -175,6 +203,34 @@ def test_an_entry_that_cannot_be_read_stops_with_the_reason(
         " fix or move what is there, then run 'safeclean autostart recover' again\n"
     )
     assert query(data_dir, "SELECT state FROM autostart_changes") == [("pending",)]
+
+
+@pytest.mark.parametrize(
+    "command", [["recover"], ["disable", "0", "--yes"]], ids=["recover", "disable"]
+)
+def test_a_partial_stub_that_cannot_be_moved_stops_with_the_reason(
+    tmp_path: Path,
+    scan: ScanContext,
+    data_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    command: list[str],
+) -> None:
+    stub = failed_partial_stub(tmp_path, data_dir, monkeypatch)
+    before = query(data_dir, "SELECT state, error FROM autostart_changes")
+    monkeypatch.setattr(os, "rename", denied_rename)
+
+    code, out, err = run(["autostart", *command], scan, autostart("linux", tmp_path))
+
+    monkeypatch.undo()
+    slot = data_dir / "autostart" / "1"
+    assert (code, out) == (3, "")
+    assert err == (
+        "safeclean: an unfinished autostart change cannot be closed: [Errno 13] Permission"
+        f" denied: '{stub}' -> '{slot}'; fix or move what is there, then run"
+        " 'safeclean autostart recover' again\n"
+    )
+    assert query(data_dir, "SELECT state, error FROM autostart_changes") == before
+    assert stub.read_bytes() == b""  # still in place, never deleted
 
 
 def test_an_unsafe_data_directory_is_refused_before_anything_is_created(

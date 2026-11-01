@@ -265,6 +265,15 @@ def test_unopenable_journal_exits_3(context: ScanContext, data_dir: Path) -> Non
     assert "cannot open the journal" in err
 
 
+def test_a_vault_that_cannot_be_created_is_named(context: ScanContext, data_dir: Path) -> None:
+    vault = write(data_dir / "quarantine")  # a file where the vault should be
+
+    code, out, err = run(["quarantine", "list"], context)
+
+    assert (code, out) == (3, "")
+    assert err == f"safeclean: cannot use the vault: [Errno 17] File exists: '{vault}'\n"
+
+
 def test_data_directory_inside_a_scan_zone_exits_3(tmp_path: Path, zone: Path) -> None:
     context = ctx(tmp_path, zone, zone / "safeclean")
 
