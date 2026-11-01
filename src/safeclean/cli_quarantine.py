@@ -26,13 +26,13 @@ from safeclean.analysis.score import Level
 from safeclean.analysis.size_age import Thresholds
 from safeclean.cli_journal import RECOVER, UNSAFE, unfinished, with_journal
 from safeclean.core.models import FileEntry
-from safeclean.core.preflight import Candidate, RefusalReason, Refused, UnreliableCheckerError
+from safeclean.core.preflight import Candidate, UnreliableCheckerError
 from safeclean.core.scanner import ScanContext
 from safeclean.quarantine.journal import ItemState
 from safeclean.quarantine.recovery import RecoveryReport
 from safeclean.quarantine.service import PurgeRefused, QuarantineService, RestoreRefused
 from safeclean.storage.pending import pending_domains
-from safeclean.text import count, format_size
+from safeclean.text import count, format_size, refusal_line, refusals
 
 # Levels a bulk add may take, each including the stricter ones before it; REVIEW never.
 BULK_LEVELS = {"safe": (Level.SAFE,), "likely_safe": (Level.SAFE, Level.LIKELY_SAFE)}
@@ -176,7 +176,7 @@ def _quarantine(service: QuarantineService, candidates: list[Candidate], out: Te
     lines += [f"  [{m.item_id}] {m.original}" for m in result.moved]
     if result.error:
         lines.append(f"Stopped: {result.error}; files that had moved were put back")
-    lines += _refusals([_path_refusal(r) for r in result.refused])
+    lines += refusals([refusal_line(r) for r in result.refused])
     _write(out, lines)
     return 1 if result.refused or result.error else 0
 
@@ -197,7 +197,7 @@ def _restore(session: Session, args: argparse.Namespace, out: TextIO) -> int:
     result = session.service.restore(args.ids)
     lines = [f"Restored {count(len(result.restored), 'file')}:"]
     lines += [f"  [{r.item_id}] {r.original}" for r in result.restored]
-    lines += _refusals([_item_refusal(r) for r in result.refused])
+    lines += refusals([_item_refusal(r) for r in result.refused])
     _write(out, lines)
     return 1 if result.refused else 0
 
@@ -205,19 +205,19 @@ def _restore(session: Session, args: argparse.Namespace, out: TextIO) -> int:
 def _purge(session: Session, args: argparse.Namespace, out: TextIO) -> int:
     plan = session.service.plan_purge(args.ids)
     if not plan.items:
-        _write(out, ["Nothing to delete.", *_refusals([_item_refusal(r) for r in plan.refused])])
+        _write(out, ["Nothing to delete.", *refusals([_item_refusal(r) for r in plan.refused])])
         return 1
     planned = [f"  [{i.item_id}] {i.original}  {format_size(i.size)}" for i in plan.items]
     if not args.yes:
         files = f"{count(len(plan.items), 'file')}, {format_size(plan.total_bytes)}"
         lines = [f"Would permanently delete {files}:", *planned]
         lines.append("Nothing was deleted. Re-run with --yes to delete these files permanently.")
-        _write(out, [*lines, *_refusals([_item_refusal(r) for r in plan.refused])])
+        _write(out, [*lines, *refusals([_item_refusal(r) for r in plan.refused])])
         return 1
     result = session.service.purge(plan)
     files = f"{count(len(result.purged), 'file')}, {format_size(result.freed_bytes)}"
     lines = [*planned, f"Permanently deleted {files}"]
-    _write(out, [*lines, *_refusals([_item_refusal(r) for r in result.refused])])
+    _write(out, [*lines, *refusals([_item_refusal(r) for r in result.refused])])
     return 1 if result.refused else 0
 
 
@@ -239,23 +239,9 @@ def report_recovery(report: RecoveryReport, out: TextIO, err: TextIO) -> bool:
     return bool(found)
 
 
-def _path_refusal(refused: Refused) -> str:
-    # Only a blacklist refusal says *which* rule blocked the path; for OPEN_FILE the policy
-    # verdict repeats the reason and adds nothing.
-    label = str(refused.reason)
-    if refused.reason is RefusalReason.BLOCKED:
-        label += f" ({refused.block_reason})"
-    detail = f" ({refused.detail})" if refused.detail else ""
-    return f"  {label}: {refused.path}{detail}"
-
-
 def _item_refusal(refused: RestoreRefused | PurgeRefused) -> str:
     detail = f": {refused.detail}" if refused.detail else ""
     return f"  [{refused.item_id}] {refused.reason}{detail}"
-
-
-def _refusals(lines: Sequence[str]) -> list[str]:
-    return [f"Refused {len(lines)}:", *lines] if lines else []
 
 
 def _write(out: TextIO, lines: Sequence[str]) -> None:

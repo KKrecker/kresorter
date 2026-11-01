@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from safeclean.core.models import Skipped
+from safeclean.core.preflight import RefusalReason, Refused
 
 OPEN_FILES_NOTE = (
     "Note: open-file check is not available yet; files will be re-checked before any action."
@@ -39,3 +41,17 @@ def skip_json(item: Skipped) -> dict[str, Any]:
         "block_reason": str(item.block_reason) if item.block_reason else None,
         "detail": item.detail,
     }
+
+
+def refusal_line(refused: Refused) -> str:
+    """A file refused at action time. Only a blacklist refusal says *which* rule blocked the
+    path; for OPEN_FILE the policy verdict repeats the reason and adds nothing."""
+    label = str(refused.reason)
+    if refused.reason is RefusalReason.BLOCKED:
+        label += f" ({refused.block_reason})"
+    detail = f" ({refused.detail})" if refused.detail else ""
+    return f"  {label}: {refused.path}{detail}"
+
+
+def refusals(lines: Sequence[str]) -> list[str]:
+    return [f"Refused {len(lines)}:", *lines] if lines else []

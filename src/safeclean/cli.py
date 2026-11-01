@@ -11,7 +11,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, TextIO
 
-from safeclean import cli_analyze, cli_autostart, cli_quarantine, cli_recover
+from safeclean import cli_analyze, cli_autostart, cli_organize, cli_quarantine, cli_recover
 from safeclean.autostart.listing import AutostartContext, default_autostart_context
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.open_files import checker_for_platform
@@ -61,6 +61,7 @@ def default_context(
         open_files=open_files,
         classifier=JunkClassifier(default_rules(), platform=current),
         open_files_checked=open_files.reliable,
+        platform=current,
     )
 
 
@@ -73,6 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan_cmd.add_argument("--no-hash", action="store_true", help="skip duplicate detection")
     cli_analyze.add_parser(commands)
     cli_quarantine.add_parser(commands)
+    cli_organize.add_parser(commands)
     cli_autostart.add_parser(commands)
     cli_recover.add_parser(commands)
     return parser
@@ -105,6 +107,8 @@ def main(
         return cli_analyze.run(args, context, out or sys.stdout)
     if args.command == "quarantine":
         return cli_quarantine.run(args, context, out or sys.stdout, err or sys.stderr)
+    if args.command == "organize":
+        return cli_organize.run(args, context, out or sys.stdout, err or sys.stderr)
     roots = [Path(p) for p in args.paths or context.policy.default_roots()]
     report = scan(roots, context, hash_duplicates=not args.no_hash)
     render = render_json if args.json else render_text

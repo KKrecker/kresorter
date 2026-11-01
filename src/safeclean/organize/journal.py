@@ -31,6 +31,7 @@ __all__ = [
     "Identity",
     "JournaledMove",
     "MoveState",
+    "Summary",
     "batch",
     "batch_state",
     "begin",
@@ -42,6 +43,7 @@ __all__ = [
     "set_move",
     "set_moves",
     "settle",
+    "summaries",
     "undoable",
 ]
 
@@ -94,6 +96,15 @@ class Batch:
     state: BatchState
     created_at_ns: int
     undoing: int | None  # the batch an undo batch reverses
+
+
+@dataclass(frozen=True)
+class Summary:
+    """A batch as ``organize list`` shows it."""
+
+    batch: Batch
+    moved: int  # its done moves
+    undone: int  # of those, the ones a done move undoes
 
 
 @dataclass(frozen=True)
@@ -209,6 +220,22 @@ def batch(conn: sqlite3.Connection, batch_id: int) -> Batch | None:
 def pending_batches(conn: sqlite3.Connection) -> list[Batch]:
     """The batches still ``pending``, oldest first."""
     return _batches(conn, "state = ?", (BatchState.PENDING,))
+
+
+def summaries(conn: sqlite3.Connection) -> list[Summary]:
+    """Every batch, newest first, with its done moves and how many of them are undone."""
+    counts = {
+        batch_id: (moved, undone)
+        for batch_id, moved, undone in conn.execute(
+            "SELECT m.batch_id, COUNT(*), COUNT(u.id) FROM moves m LEFT JOIN moves u"
+            " ON u.undoes = m.id AND u.state = ? WHERE m.state = ? GROUP BY m.batch_id",
+            (MoveState.DONE, MoveState.DONE),
+        )
+    }
+    return [
+        Summary(found, *counts.get(found.batch_id, (0, 0)))
+        for found in reversed(_batches(conn, "1", ()))
+    ]
 
 
 def _batches(conn: sqlite3.Connection, where: str, parameters: tuple[object, ...]) -> list[Batch]:

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from safeclean.core import hashing
-from safeclean.core.heuristics import JunkClassifier, JunkMatch
+from safeclean.core.heuristics import JunkClassifier, JunkMatch, Platform
 from safeclean.core.models import FileEntry, Skipped
 from safeclean.core.open_files import OpenFileChecker
 from safeclean.core.policy import PathPolicy
@@ -21,6 +21,7 @@ class ScanContext:
     open_files: OpenFileChecker
     classifier: JunkClassifier
     open_files_checked: bool  # False: no real open-file backend; must be disclosed
+    platform: Platform  # the system it was made for, no default (decision 0012, item 39)
 
 
 @dataclass(frozen=True)
