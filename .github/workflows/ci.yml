@@ -7,11 +7,12 @@ on:
 
 jobs:
   check:
-    # Step 1: Linux only. Windows and macOS are added once the repo is on GitHub.
+    # Linux only until the repository is on GitHub; then Windows and macOS
+    # (docs/reviews/pre-step5-audit.md, B11).
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.13"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,5 +26,5 @@ jobs:
         run: ruff format --check .
       - name: Mypy (strict)
         run: mypy
-      - name: Tests + coverage >= 80%
+      - name: Tests + coverage 100 % (lines and branches)
         run: pytest

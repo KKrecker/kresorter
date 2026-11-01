@@ -23,7 +23,7 @@ packages = ["src/safeclean"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
-addopts = "-ra --strict-markers --cov=safeclean --cov-branch --cov-report=term-missing --cov-fail-under=80"
+addopts = "-ra --strict-markers --cov=safeclean --cov-branch --cov-report=term-missing --cov-fail-under=100"
 
 [tool.coverage.run]
 source = ["safeclean"]
