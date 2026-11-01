@@ -3,7 +3,8 @@
 The data directory is checked before anything is created there, the single-instance lock is
 taken, and the journal is opened in it; quarantine and autostart changes share all three.
 
-Exit code 3: the data directory, the lock or the journal cannot be used safely.
+Exit code 3: the data directory, the lock or the journal cannot be used safely, or the body
+stopped on an ``OSError`` it did not handle; only the first two are named the data directory.
 """
 
 from __future__ import annotations
@@ -52,5 +53,8 @@ def _open(data_dir: Path, err: TextIO, body: Body) -> int:
         return UNSAFE
     try:
         return body(conn, data_dir)
+    except OSError as error:  # the body's own: not the data directory (item 112)
+        err.write(f"safeclean: stopped: {error}\n")
+        return UNSAFE
     finally:
         conn.close()

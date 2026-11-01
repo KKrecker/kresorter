@@ -60,6 +60,10 @@ _UNREADABLE = (
     "safeclean: an unfinished autostart change cannot be checked: {}; fix or move what is"
     " there, then run 'safeclean autostart recover' again\n"
 )
+_UNCLOSED = (
+    "safeclean: an unfinished autostart change cannot be closed: {}; fix or move what is"
+    " there, then run 'safeclean autostart recover' again\n"
+)
 
 _TITLES = {
     Source.XDG_AUTOSTART: "XDG autostart",
@@ -126,14 +130,22 @@ def _list(args: argparse.Namespace, context: AutostartContext, out: TextIO) -> i
 def _recover(
     context: AutostartContext, out: TextIO, err: TextIO, conn: sqlite3.Connection, data_dir: Path
 ) -> int:
-    changes = changes_for(context, conn, data_dir)
-    try:
-        report = ChangeRecovery() if changes is None else changes.recover()
-    except (BrokenEntryError, RegistryError) as error:
-        err.write(_UNREADABLE.format(error))
+    report = _recovered(changes_for(context, conn, data_dir), err)
+    if report is None:
         return UNSAFE
     out.write(render_recovery(report) or "Nothing to recover.\n")
     return 0
+
+
+def _recovered(changes: XdgChanges | RunKeyChanges | None, err: TextIO) -> ChangeRecovery | None:
+    """The autostart ``recover()``; ``None``, with the reason, if a change stays unfinished."""
+    try:
+        return ChangeRecovery() if changes is None else changes.recover()
+    except (BrokenEntryError, RegistryError) as error:
+        err.write(_UNREADABLE.format(error))
+    except OSError as error:  # what it has to move cannot be moved (items 96, 113)
+        err.write(_UNCLOSED.format(error))
+    return None
 
 
 def _change(
@@ -145,32 +157,38 @@ def _change(
     data_dir: Path,
 ) -> int:
     changes = changes_for(context, conn, data_dir)
+    report = _recovered(changes, err)
+    if report is None:
+        return UNSAFE
+    out.write(render_recovery(report))
+    matches = [
+        item
+        for item in list_autostart(context, include_machine=False).items
+        if item.digest.startswith(args.id)
+    ]
+    if len(matches) != 1:
+        out.write(_not_one(args.id, len(matches)))
+        return 1
+    (item,) = matches
+    if changes is None or not item.disableable:
+        out.write(f"Refused: {item.source} entries are read-only.\n")
+        return 1
+    if item.enabled is (args.action == "enable"):
+        out.write(f"{item.name} is already {args.action}d; nothing to do.\n")
+        return 1
+    if not args.yes:
+        out.write(_preview(args.action, item, context))
+        return 1
+    act = changes.disable if args.action == "disable" else changes.enable
     try:
-        if changes is not None:
-            out.write(render_recovery(changes.recover()))
-        matches = [
-            item
-            for item in list_autostart(context, include_machine=False).items
-            if item.digest.startswith(args.id)
-        ]
-        if len(matches) != 1:
-            out.write(_not_one(args.id, len(matches)))
-            return 1
-        (item,) = matches
-        if changes is None or not item.disableable:
-            out.write(f"Refused: {item.source} entries are read-only.\n")
-            return 1
-        if item.enabled is (args.action == "enable"):
-            out.write(f"{item.name} is already {args.action}d; nothing to do.\n")
-            return 1
-        if not args.yes:
-            out.write(_preview(args.action, item, context))
-            return 1
-        act = changes.disable if args.action == "disable" else changes.enable
-        return _outcome(act(item), item, args.action, out, err)
-    except (BrokenEntryError, RegistryError) as error:
+        result = act(item)
+    except (BrokenEntryError, RegistryError) as error:  # read back: left unfinished (item 90)
         err.write(_UNREADABLE.format(error))
         return UNSAFE
+    except OSError as error:  # a check before acting: nothing is journaled (items 111, 113)
+        err.write(f"safeclean: cannot {args.action} {item.name}: {error}; nothing was changed\n")
+        return UNSAFE
+    return _outcome(result, item, args.action, out, err)
 
 
 def _not_one(change_id: str, found: int) -> str:

@@ -55,6 +55,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Fixed
+- CLI: an `OSError` raised inside the journal session is no longer reported as `cannot use the data directory`: what the command did not handle is `stopped: <reason>`, the quarantine names its vault, and autostart commands say whether an unfinished change cannot be closed or a check before acting failed, with nothing changed (decision 0011, items 112 and 113).
 - `autostart.changes.XdgChanges`: an entry that exists but cannot be looked at (e.g. `EACCES`) raises `BrokenEntryError` with its reason in `recover()` on every Python version; on 3.14 it was taken for a missing one, so an interrupted disable whose stub was in place could be closed `rolled_back`; the store-device check no longer skips such a directory either (decision 0011, item 111).
 - An unopenable journal (`sqlite3.Error`) exits with 3 and a message instead of a traceback.
 - Quarantine rollback no longer loses track of a file whose rename completed just before an interrupt: rollback checks the vault slot on disk; `recover()` also reconciles quarantined items of an interrupted rollback (decision 0006, addendum).

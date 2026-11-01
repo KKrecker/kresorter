@@ -102,12 +102,9 @@ def _run_locked(
     data_dir: Path,
 ) -> int:
     try:
-        service = QuarantineService(
-            conn,
-            policy=context.policy,
-            open_files=context.open_files,
-            classifier=context.classifier,
-        )
+        service = _service(conn, context, err)
+        if service is None:
+            return UNSAFE
         _report_recovery(service.recover(), out, err)
         if args.action != "list" and has_pending(conn):  # what is left is an autostart change
             err.write(
@@ -119,6 +116,22 @@ def _run_locked(
     except UnreliableCheckerError:
         err.write("safeclean: no reliable open-file check on this system; nothing was changed\n")
         return UNSAFE
+
+
+def _service(
+    conn: sqlite3.Connection, context: ScanContext, err: TextIO
+) -> QuarantineService | None:
+    """The service and its vault; ``None``, with the reason, if the vault cannot be used."""
+    try:
+        return QuarantineService(
+            conn,
+            policy=context.policy,
+            open_files=context.open_files,
+            classifier=context.classifier,
+        )
+    except OSError as error:  # the vault is created and made private here (item 112)
+        err.write(f"safeclean: cannot use the vault: {error}\n")
+        return None
 
 
 def entry_for(path: Path) -> FileEntry:

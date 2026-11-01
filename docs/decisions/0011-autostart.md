@@ -593,3 +593,17 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `Path.is_symlink()` are not used for this: since Python 3.14 they are `False` for any
     error, which made a stub in place that cannot be read look missing and closed its change
     `rolled_back`.
+112. **`with_journal` names the data directory only for its own steps** (pre-step-5 audit,
+    A2): creating it and taking the lock are `cannot use the data directory`, opening the
+    journal is `cannot open the journal`. An `OSError` that the body of a command does not
+    handle is exit 3 as `safeclean: stopped: <reason>`: the reason names its path, a wrong place
+    is worse than none, and no command is suggested, since for an error nobody foresaw it could
+    fail the same way again. The quarantine names its vault when it cannot be created or made
+    private: `cannot use the vault: <reason>` (exit 3).
+113. **An autostart command says what it could not do** (A2), in two phases, both exit 3: an
+    `OSError` from `recover()` (a partial stub that cannot be moved to the store, item 96) is
+    `an unfinished autostart change cannot be closed: <reason>; fix or move what is there, then
+    run 'safeclean autostart recover' again`, in `recover`, `disable` and `enable` alike, and the
+    row stays as it was; an `OSError` from the checks before a disable or enable acts (the
+    device check, item 111) is `cannot <action> <name>: <reason>; nothing was changed`, and
+    nothing is journaled. Output written after these phases is not part of either.
