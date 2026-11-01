@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from safeclean.storage.transactions import StorageError
+
+Clock = Callable[[], int]
+"""Nanoseconds since the Unix epoch, as the journal keeps them (``*_at_ns``); ``time.time_ns``
+unless a test gives another. Given to a domain once, never picked by a journal helper (item
+121)."""
 
 
 def insert_row(conn: sqlite3.Connection, sql: str, params: Sequence[object]) -> int:

@@ -8,12 +8,11 @@ journal nothing (item 70). Moved out of ``autostart.changes`` (pre-step-5 audit,
 from __future__ import annotations
 
 import sqlite3
-import time
 from dataclasses import dataclass
 from enum import StrEnum
 
 from safeclean.autostart.models import Source
-from safeclean.storage.journal import insert_row
+from safeclean.storage.journal import Clock, insert_row
 from safeclean.storage.transactions import transaction
 
 
@@ -65,7 +64,7 @@ class Change:
     after: bytes | None
 
 
-def insert_change(conn: sqlite3.Connection, change: Change) -> int:
+def insert_change(conn: sqlite3.Connection, change: Change, *, now: Clock) -> int:
     """Journal ``change`` as ``pending``; the caller holds the transaction."""
     return insert_row(
         conn,
@@ -81,18 +80,18 @@ def insert_change(conn: sqlite3.Connection, change: Change) -> int:
             change.before,
             change.after,
             ChangeState.PENDING.value,
-            time.time_ns(),
+            now(),
         ),
     )
 
 
 def finish_change(
-    conn: sqlite3.Connection, change_id: int, state: ChangeState, error: str | None
+    conn: sqlite3.Connection, change_id: int, state: ChangeState, error: str | None, *, now: Clock
 ) -> None:
     with transaction(conn):
         conn.execute(
             "UPDATE autostart_changes SET state = ?, finished_at_ns = ?, error = ? WHERE id = ?",
-            (state.value, time.time_ns(), error, change_id),
+            (state.value, now(), error, change_id),
         )
 
 

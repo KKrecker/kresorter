@@ -17,6 +17,7 @@ import contextlib
 import functools
 import os
 import sqlite3
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,6 +37,7 @@ from safeclean.autostart.models import AutostartItem, Scope, Source, entry_diges
 from safeclean.autostart.xdg import parse_keys, read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
 from safeclean.storage.data_dir import PRIVATE
+from safeclean.storage.journal import Clock
 from safeclean.storage.pending import has_pending
 from safeclean.storage.transactions import transaction
 
@@ -95,11 +97,14 @@ class XdgChanges:
         store: AutostartStore,
         user_dir: Path,
         system_dirs: Sequence[Path],
+        *,
+        now: Clock = time.time_ns,
     ) -> None:
         self._conn = conn
         self._store = store
         self._user_dir = user_dir
         self._system_dirs = tuple(system_dirs)
+        self._now = now
 
     def disable(self, item: AutostartItem) -> ChangeResult:
         raw = self._check(item, enabled=True)
@@ -265,7 +270,7 @@ class XdgChanges:
             plan.after,
         )
         with transaction(self._conn):
-            change_id = insert_change(self._conn, change)
+            change_id = insert_change(self._conn, change, now=self._now)
             if plan.stores:
                 self._set_vault_path(change_id, self._store.slot(change_id))
         return change_id
@@ -276,7 +281,7 @@ class XdgChanges:
         )
 
     def _finish(self, change_id: int, state: ChangeState, error: str | None) -> None:
-        finish_change(self._conn, change_id, state, error)
+        finish_change(self._conn, change_id, state, error, now=self._now)
 
     def _disabled_here(self, location: Path) -> _Disabled | None:
         """The disable of an own entry, if it is the last change done at ``location``."""

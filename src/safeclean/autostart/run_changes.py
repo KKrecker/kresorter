@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from collections.abc import Callable
 
 from safeclean.autostart.journal import (
     Change,
@@ -35,6 +34,7 @@ from safeclean.autostart.registry import (
     value_digest,
 )
 from safeclean.autostart.run_keys import APPROVED, RUN, read_run_keys
+from safeclean.storage.journal import Clock
 from safeclean.storage.pending import has_pending
 from safeclean.storage.transactions import transaction
 
@@ -52,7 +52,7 @@ class RunKeyChanges:
         conn: sqlite3.Connection,
         registry: UserRegistry,
         *,
-        now: Callable[[], int] = time.time_ns,
+        now: Clock = time.time_ns,
     ) -> None:
         self._conn = conn
         self._registry = registry
@@ -82,18 +82,18 @@ class RunKeyChanges:
         location = rf"{Hive.HKCU}\{APPROVED}\{name}"  # exact: "" is not "(Default)"
         change = Change(action, item.source, item.location, location, item.digest, before, after)
         with transaction(self._conn):
-            change_id = insert_change(self._conn, change)
+            change_id = insert_change(self._conn, change, now=self._now)
         try:
             self._registry.set_user_value(APPROVED, RegValue(name, ValueKind.REG_BINARY, after))
         except BaseException as error:
             message = str(error) or type(error).__name__
             restored = self._flags().get(name.casefold()) == before
             state = ChangeState.ROLLED_BACK if restored else ChangeState.FAILED
-            finish_change(self._conn, change_id, state, message)
+            finish_change(self._conn, change_id, state, message, now=self._now)
             if not isinstance(error, RegistryError):
                 raise
             return ChangeResult(change_id, state, None, message)
-        finish_change(self._conn, change_id, ChangeState.DONE, None)
+        finish_change(self._conn, change_id, ChangeState.DONE, None, now=self._now)
         return ChangeResult(change_id, ChangeState.DONE)
 
     def recover(self) -> ChangeRecovery:
@@ -116,7 +116,7 @@ class RunKeyChanges:
                 state, error = ChangeState.ROLLED_BACK, _NOT_WRITTEN
             else:
                 state, error = ChangeState.FAILED, _NEITHER
-            finish_change(self._conn, change_id, state, error)
+            finish_change(self._conn, change_id, state, error, now=self._now)
             closed[state].append(change_id)
         return ChangeRecovery(
             tuple(closed[ChangeState.DONE]),

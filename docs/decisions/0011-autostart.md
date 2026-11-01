@@ -650,3 +650,10 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `INSERT` and returns the id of its row; it is the only place that handles a `lastrowid`
     of `None`, which sqlite3 never returns after a successful `INSERT`. The quarantine and the
     autostart journal use it, and organize will.
+121. **The journal's times come from a clock given to the domain** (pre-step-5 audit, B3):
+    `QuarantineService`, `XdgChanges` and `RunKeyChanges` take `now` (`storage.journal.Clock`,
+    `time.time_ns` by default) and pass it to every journal write; `insert_change` and
+    `finish_change` require it, so no journal helper picks a clock of its own and mypy names a
+    caller that forgets it. `RunKeyChanges` dates its rows with the clock that dates its flag
+    (item 82). A test checks `created_at_ns` and `finished_at_ns` exactly; organize will take
+    its clock the same way.

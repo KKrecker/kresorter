@@ -50,7 +50,7 @@ from safeclean.quarantine.preflight import Candidate, Cleared, Preflight, Refusa
 from safeclean.quarantine.purge import delete_from_vault
 from safeclean.quarantine.vault import Vault
 from safeclean.storage.data_dir import DataDirError, check_data_dir
-from safeclean.storage.journal import insert_row
+from safeclean.storage.journal import Clock, insert_row
 from safeclean.storage.pending import has_pending
 from safeclean.storage.transactions import transaction
 
@@ -216,6 +216,7 @@ class QuarantineService:
         move: Move = Path.replace,
         vault: Vault | None = None,
         delete: Delete = delete_from_vault,
+        now: Clock = time.time_ns,
     ) -> None:
         self._preflight = Preflight(policy, open_files)
         try:
@@ -225,6 +226,7 @@ class QuarantineService:
         self._conn = conn
         self._move = move
         self._delete = delete
+        self._now = now
         self._plans: dict[str, PurgePlan] = {}
         self._vault = vault or Vault(data_dir)
         self._vault.ensure()
@@ -282,7 +284,7 @@ class QuarantineService:
             operation_id = insert_row(
                 self._conn,
                 "INSERT INTO operations (kind, state, created_at_ns) VALUES ('quarantine', ?, ?)",
-                (OperationState.PENDING, time.time_ns()),
+                (OperationState.PENDING, self._now()),
             )
             for index, entry in enumerate(cleared):
                 original = entry.candidate.entry.path
@@ -400,7 +402,7 @@ class QuarantineService:
             operation_id = insert_row(
                 self._conn,
                 "INSERT INTO operations (kind, state, created_at_ns) VALUES (?, ?, ?)",
-                (kind, OperationState.PENDING, time.time_ns()),
+                (kind, OperationState.PENDING, self._now()),
             )
             self._conn.executemany(
                 f"UPDATE items SET {column} = ? WHERE id = ?",
@@ -620,7 +622,7 @@ class QuarantineService:
         with transaction(self._conn):
             self._conn.execute(
                 "UPDATE operations SET state = ?, finished_at_ns = ?, error = ? WHERE id = ?",
-                (state, time.time_ns(), error, operation_id),
+                (state, self._now(), error, operation_id),
             )
 
 
