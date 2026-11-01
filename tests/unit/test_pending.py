@@ -18,6 +18,9 @@ CHANGE = (
     "INSERT INTO autostart_changes (action, source, entry, location, digest, value_after, state,"
     " created_at_ns) VALUES ('disable', 'xdg_autostart', 'app', '/a.desktop', ?, x'01', ?, 1)"
 )
+BATCH = (
+    "INSERT INTO move_batches (kind, folder, state, created_at_ns) VALUES ('organize', '/d', ?, 1)"
+)
 
 
 @pytest.fixture
@@ -56,5 +59,22 @@ def test_each_domain_with_a_pending_row_is_named(
     assert pending_domains(conn) == domains
 
 
+@pytest.mark.parametrize("state", ["done", "rolled_back", "failed"])
+def test_a_finished_organize_batch_is_not_pending(conn: sqlite3.Connection, state: str) -> None:
+    # [0012.32]
+    conn.execute(BATCH, (state,))
+
+    assert pending_domains(conn) == set()
+
+
+def test_a_pending_organize_batch_is_unfinished_organize_work(conn: sqlite3.Connection) -> None:
+    # [0012.32] the batch, whatever its moves say: recovery settles every one of them
+    conn.execute(BATCH, ("pending",))
+    conn.execute(OPERATION, ("pending",))
+
+    assert pending_domains(conn) == {Domain.QUARANTINE, Domain.ORGANIZE}
+
+
 def test_a_domain_is_named_by_its_command() -> None:
-    assert [str(domain) for domain in Domain] == ["quarantine", "autostart"]
+    # [0012.32]
+    assert [str(domain) for domain in Domain] == ["quarantine", "autostart", "organize"]

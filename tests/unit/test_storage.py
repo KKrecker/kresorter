@@ -155,10 +155,29 @@ def test_v2_journal_gains_autostart_changes_and_keeps_its_rows(tmp_path: Path) -
 
     upgraded = connect(path)
 
-    assert SCHEMA_VERSION == 3
+    assert SCHEMA_VERSION >= 3
     assert pragma(upgraded, "user_version") == SCHEMA_VERSION
     assert upgraded.execute("SELECT size, atime_ns FROM items").fetchall() == [(3, 7)]
     assert count(upgraded, "autostart_changes") == 0
+    upgraded.close()
+
+
+def test_v3_journal_gains_moves_and_keeps_its_rows(tmp_path: Path) -> None:
+    # [0012.24] v4 adds move_batches and moves; the other domains' rows are untouched
+    path = tmp_path / "journal.db"
+    raw = sqlite3.connect(path, isolation_level=None)
+    migrate(raw, MIGRATIONS[:3])
+    add_item(raw, add_operation(raw), atime_ns=7)
+    add_change(raw)
+    raw.close()
+
+    upgraded = connect(path)
+
+    assert SCHEMA_VERSION == 4
+    assert pragma(upgraded, "user_version") == SCHEMA_VERSION
+    assert upgraded.execute("SELECT size, atime_ns FROM items").fetchall() == [(3, 7)]
+    assert count(upgraded, "autostart_changes") == 1
+    assert (count(upgraded, "move_batches"), count(upgraded, "moves")) == (0, 0)
     upgraded.close()
 
 
@@ -386,3 +405,160 @@ def test_both_actions_are_accepted(conn: sqlite3.Connection, action: str) -> Non
     add_change(conn, action=action)
 
     assert count(conn, "autostart_changes") == 1
+
+
+# --- organize moves (schema v4) ----------------------------------------------------------------
+
+
+def add_batch(conn: sqlite3.Connection, **overrides: object) -> int:
+    row: dict[str, object] = {
+        "kind": "organize",
+        "folder": "/home/a/Downloads",
+        "state": "pending",
+        "created_at_ns": 1,
+        **overrides,
+    }
+    columns = ", ".join(row)
+    marks = ", ".join("?" for _ in row)
+    cursor = conn.execute(
+        f"INSERT INTO move_batches ({columns}) VALUES ({marks})", tuple(row.values())
+    )
+    assert cursor.lastrowid is not None
+    return cursor.lastrowid
+
+
+def add_move(conn: sqlite3.Connection, batch_id: int, **overrides: object) -> int:
+    row: dict[str, object] = {
+        "batch_id": batch_id,
+        "source": "/home/a/Downloads/report.pdf",
+        "destination": "/home/a/Downloads/Documents/report.pdf",
+        "device": 2049,
+        "inode": 131,
+        "size": 3,
+        "mtime_ns": 42,
+        "state": "pending",
+        **overrides,
+    }
+    columns = ", ".join(row)
+    marks = ", ".join("?" for _ in row)
+    cursor = conn.execute(f"INSERT INTO moves ({columns}) VALUES ({marks})", tuple(row.values()))
+    assert cursor.lastrowid is not None
+    return cursor.lastrowid
+
+
+def test_a_move_is_recorded_with_the_identity_of_its_file(conn: sqlite3.Connection) -> None:
+    # [0012.24] device, inode, size and mtime_ns: what recovery asks the disk about
+    move = add_move(conn, add_batch(conn))
+
+    row = conn.execute(
+        "SELECT device, inode, size, mtime_ns, state, undoes FROM moves WHERE id = ?", (move,)
+    ).fetchone()
+    assert row == (2049, 131, 3, 42, "pending", None)
+
+
+def test_a_batch_is_recorded_with_its_folder_and_times(conn: sqlite3.Connection) -> None:
+    # [0012.24]
+    batch = add_batch(conn, created_at_ns=5)
+
+    row = conn.execute(
+        "SELECT kind, folder, state, created_at_ns, finished_at_ns, error FROM move_batches"
+        " WHERE id = ?",
+        (batch,),
+    ).fetchone()
+    assert row == ("organize", "/home/a/Downloads", "pending", 5, None, None)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        pytest.param({"kind": "quarantine"}, "CHECK", id="unknown-kind"),
+        pytest.param({"state": "lost"}, "CHECK", id="unknown-state"),
+        pytest.param({"folder": ""}, "CHECK", id="empty-folder"),
+        pytest.param({"folder": None}, "NOT NULL", id="no-folder"),
+        pytest.param({"created_at_ns": None}, "NOT NULL", id="no-created-at"),
+        pytest.param({"created_at_ns": "now"}, "cannot store TEXT", id="strict-types"),
+    ],
+)
+def test_batch_constraints(
+    conn: sqlite3.Connection, overrides: dict[str, object], message: str
+) -> None:
+    # [0012.24]
+    with pytest.raises(sqlite3.IntegrityError, match=message):
+        add_batch(conn, **overrides)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        pytest.param({"state": "quarantined"}, "CHECK", id="unknown-state"),
+        pytest.param({"source": ""}, "CHECK", id="empty-source"),
+        pytest.param({"destination": ""}, "CHECK", id="empty-destination"),
+        pytest.param({"destination": "/home/a/Downloads/report.pdf"}, "CHECK", id="no-move"),
+        pytest.param({"size": -1}, "CHECK", id="negative-size"),
+        pytest.param({"device": None}, "NOT NULL", id="no-device"),
+        pytest.param({"inode": None}, "NOT NULL", id="no-inode"),
+        pytest.param({"mtime_ns": None}, "NOT NULL", id="no-mtime"),
+        pytest.param({"inode": "one"}, "cannot store TEXT", id="strict-types"),
+        pytest.param({"undoes": 99}, "FOREIGN KEY", id="undoes-an-unknown-move"),
+    ],
+)
+def test_move_constraints(
+    conn: sqlite3.Connection, overrides: dict[str, object], message: str
+) -> None:
+    # [0012.24]
+    batch = add_batch(conn)
+    with pytest.raises(sqlite3.IntegrityError, match=message):
+        add_move(conn, batch, **overrides)
+
+
+def test_a_move_needs_its_batch(conn: sqlite3.Connection) -> None:
+    # [0012.24]
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        add_move(conn, 99)
+
+
+@pytest.mark.parametrize("state", ["pending", "done", "failed", "rolled_back"])
+def test_all_batch_states_are_accepted(conn: sqlite3.Connection, state: str) -> None:
+    # [0012.24]
+    add_batch(conn, state=state)
+
+    assert count(conn, "move_batches") == 1
+
+
+@pytest.mark.parametrize("state", ["pending", "done", "rolled_back", "failed"])
+def test_all_move_states_are_accepted(conn: sqlite3.Connection, state: str) -> None:
+    # [0012.24]
+    add_move(conn, add_batch(conn), state=state)
+
+    assert count(conn, "moves") == 1
+
+
+def test_a_move_of_an_undo_batch_names_the_move_it_reverses(conn: sqlite3.Connection) -> None:
+    # [0012.24]
+    move = add_move(conn, add_batch(conn, state="done"), state="done")
+    back = add_move(
+        conn,
+        add_batch(conn, kind="undo"),
+        source="/home/a/Downloads/Documents/report.pdf",
+        destination="/home/a/Downloads/report.pdf",
+        undoes=move,
+    )
+
+    assert conn.execute("SELECT undoes FROM moves WHERE id = ?", (back,)).fetchone() == (move,)
+
+
+def test_a_batch_with_moves_cannot_be_deleted(conn: sqlite3.Connection) -> None:
+    # [0012.24]
+    batch = add_batch(conn)
+    add_move(conn, batch)
+
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        conn.execute("DELETE FROM move_batches WHERE id = ?", (batch,))
+
+
+def test_the_quarantine_operations_do_not_take_moves(conn: sqlite3.Connection) -> None:
+    # [0012.24] operations is not touched: organize is not one of its kinds
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
+        conn.execute(
+            "INSERT INTO operations (kind, state, created_at_ns) VALUES ('organize', 'pending', 1)"
+        )

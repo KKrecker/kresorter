@@ -346,6 +346,43 @@ def test_quarantine_actions_wait_for_safeclean_recover(
     assert query(data_dir, "SELECT COUNT(*) FROM operations") == [(0,)]
 
 
+def pending_move_batch(data_dir: Path) -> None:
+    """An organize batch a crash left pending."""
+    data_dir.mkdir(parents=True)
+    conn = connect(data_dir / "journal.db")
+    try:
+        conn.execute(
+            "INSERT INTO move_batches (kind, folder, state, created_at_ns)"
+            " VALUES ('organize', '/home/a/Downloads', 'pending', 1)"
+        )
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [["add", "a.bin"], ["restore", "1"], ["purge", "1", "--yes"]],
+    ids=["add", "restore", "purge"],
+)
+def test_quarantine_actions_wait_for_an_unfinished_organize_batch(
+    tmp_path: Path, scan: ScanContext, data_dir: Path, zone: Path, args: list[str]
+) -> None:
+    # [0012.32]
+    pending_move_batch(data_dir)
+    target = write(zone / "a.bin", b"payload")
+    args = [str(target) if a == "a.bin" else a for a in args]
+
+    code, out, err = run(["quarantine", *args], scan, autostart_context("linux", tmp_path))
+
+    assert (code, out) == (3, "")
+    assert err == (
+        "safeclean: the journal has unfinished organize work; run 'safeclean recover' first;"
+        " nothing was changed\n"
+    )
+    assert target.read_bytes() == b"payload"
+    assert query(data_dir, "SELECT COUNT(*) FROM operations") == [(0,)]
+
+
 def test_quarantine_list_still_runs(tmp_path: Path, scan: ScanContext, data_dir: Path) -> None:
     pending_run_change(data_dir)
 

@@ -15,7 +15,7 @@ DECISION = ROOT / "docs" / "decisions" / "0012-organize.md"
 ITEM = re.compile(r"^(\d+)\. \*\*", re.MULTILINE)
 CITATION = re.compile(r"\[0012\.(\d+)\]")
 
-PENDING = frozenset(range(1, 41))
+PENDING = frozenset(range(1, 41)) - {24, 32}
 
 
 def items() -> list[int]:

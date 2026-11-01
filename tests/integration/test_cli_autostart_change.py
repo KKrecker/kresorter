@@ -293,6 +293,30 @@ def test_unfinished_quarantine_work_names_safeclean_recover(
     assert entry.read_bytes() == APP
 
 
+def test_unfinished_organize_work_names_safeclean_recover(
+    tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
+) -> None:
+    # [0012.32] a pending move batch blocks autostart changes too
+    entry = write(user / "app.desktop", APP)
+    auto = autostart_context("linux", tmp_path)
+    data_dir.mkdir(parents=True)
+    conn = connect(data_dir / "journal.db")
+    conn.execute(
+        "INSERT INTO move_batches (kind, folder, state, created_at_ns)"
+        " VALUES ('organize', '/home/a/Downloads', 'pending', 1)"
+    )
+    conn.close()
+
+    code, out, err = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
+
+    assert (code, out) == (3, "")
+    assert err == (
+        "safeclean: the journal has unfinished organize work; run 'safeclean recover' first;"
+        " nothing was changed\n"
+    )
+    assert entry.read_bytes() == APP
+
+
 def test_a_check_before_acting_that_fails_stops_with_the_reason(
     tmp_path: Path,
     scan: ScanContext,
