@@ -4,15 +4,25 @@
 adapter with a stand-in module, like ``MsvcrtBackend`` (decision 0009). Keys are opened for
 reading in the 64-bit view, so an explicit ``WOW6432Node`` path means exactly that key. A
 missing key reads as ``None``; any other failure is a ``RegistryError`` with the reason; the
-key is closed whatever happens. Sub-keys (step 4, commit 8) follow the same rules.
+key is closed whatever happens. Sub-keys (step 4, commit 8) follow the same rules. Writing
+(step 4, commit 12a4) is one value under ``HKCU`` only, in the 64-bit view, creating the key if
+it is missing; there is no way to write ``HKLM`` (decision 0011, item 8).
 """
 
+import inspect
 import sys
 
 import pytest
 
-from safeclean.autostart.registry import Hive, Registry, RegistryError, RegValue, ValueKind
-from safeclean.autostart.run_keys import RUN, RUN_32
+from safeclean.autostart.registry import (
+    Hive,
+    Registry,
+    RegistryError,
+    RegValue,
+    UserRegistry,
+    ValueKind,
+)
+from safeclean.autostart.run_keys import APPROVED, RUN, RUN_32
 from safeclean.autostart.winregistry import WinRegistry
 
 ERROR_NO_MORE_ITEMS = 259
@@ -44,6 +54,7 @@ class FakeWinreg:
     HKEY_CURRENT_USER = 0x80000001
     HKEY_LOCAL_MACHINE = 0x80000002
     KEY_READ = 0x20019
+    KEY_SET_VALUE = 0x0002
     KEY_WOW64_64KEY = 0x0100
 
     def __init__(
@@ -53,12 +64,18 @@ class FakeWinreg:
         *,
         open_error: OSError | None = None,
         enum_error: OSError | None = None,
+        create_error: OSError | None = None,
+        set_error: OSError | None = None,
     ) -> None:
         self._keys = keys
         self._subkeys = subkeys or {}
         self._open_error = open_error
         self._enum_error = enum_error
+        self._create_error = create_error
+        self._set_error = set_error
         self.opened: list[tuple[int, str, int, int]] = []
+        self.created: list[tuple[int, str, int, int]] = []
+        self.written: list[tuple[tuple[int, str], str, int, int, object]] = []
         self.closed: list[FakeKey] = []
 
     def OpenKey(self, key: int, sub_key: str, reserved: int = 0, access: int = 0) -> FakeKey:
@@ -86,6 +103,23 @@ class FakeWinreg:
             raise NoMoreItemsError(22, "No more data is available")
         return key.subkeys[index]
 
+    def CreateKeyEx(self, key: int, sub_key: str, reserved: int = 0, access: int = 0) -> FakeKey:
+        """Opens the key, creating it if it is missing, as ``winreg.CreateKeyEx`` does."""
+        self.created.append((key, sub_key, reserved, access))
+        if self._create_error is not None:
+            raise self._create_error
+        path = (key, sub_key)
+        values = self._keys.setdefault(path, [])
+        return FakeKey(path, values, self._subkeys.get(path, []))
+
+    def SetValueEx(self, key: object, name: str, reserved: int, kind: int, data: object) -> None:
+        assert isinstance(key, FakeKey)
+        self.written.append((key.path, name, reserved, kind, data))
+        if self._set_error is not None:
+            raise self._set_error
+        key.values[:] = [v for v in key.values if v[0].casefold() != name.casefold()]
+        key.values.append((name, data, kind))
+
     def CloseKey(self, key: object) -> None:
         assert isinstance(key, FakeKey)
         self.closed.append(key)
@@ -93,6 +127,8 @@ class FakeWinreg:
 
 HKCU, HKLM = FakeWinreg.HKEY_CURRENT_USER, FakeWinreg.HKEY_LOCAL_MACHINE
 READ_64 = FakeWinreg.KEY_READ | FakeWinreg.KEY_WOW64_64KEY
+SET_64 = FakeWinreg.KEY_SET_VALUE | FakeWinreg.KEY_WOW64_64KEY
+FLAG = RegValue("Sync", ValueKind.REG_BINARY, b"\x03" + bytes(11))
 SERVICES = r"SYSTEM\CurrentControlSet\Services"
 
 
@@ -231,3 +267,65 @@ def test_winreg_is_imported_lazily() -> None:
 
     with pytest.raises(ModuleNotFoundError, match="winreg"):
         registry.values(Hive.HKCU, RUN)
+
+
+# --- writing: one value under HKCU ---------------------------------------------------------------
+
+
+def test_it_is_a_user_registry() -> None:
+    registry: UserRegistry = WinRegistry(module=FakeWinreg({}))  # checked by mypy
+
+    assert registry.values(Hive.HKCU, APPROVED) is None
+
+
+def test_a_value_is_written_under_hkcu_in_the_64_bit_view_and_the_key_closed() -> None:
+    fake = FakeWinreg({(HKCU, APPROVED): [("Other", b"\x02", ValueKind.REG_BINARY)]})
+    registry = WinRegistry(module=fake)
+
+    registry.set_user_value(APPROVED, FLAG)
+
+    assert fake.created == [(HKCU, APPROVED, 0, SET_64)]
+    assert fake.written == [((HKCU, APPROVED), "Sync", 0, ValueKind.REG_BINARY, FLAG.data)]
+    assert [k.path for k in fake.closed] == [(HKCU, APPROVED)]
+    assert registry.values(Hive.HKCU, APPROVED) == [
+        RegValue("Other", ValueKind.REG_BINARY, b"\x02"),
+        FLAG,
+    ]
+
+
+def test_a_missing_key_is_created() -> None:
+    fake = FakeWinreg({})
+    registry = WinRegistry(module=fake)
+
+    registry.set_user_value(APPROVED, FLAG)
+
+    assert registry.values(Hive.HKCU, APPROVED) == [FLAG]
+
+
+def test_a_key_that_cannot_be_created_is_a_registry_error() -> None:
+    fake = FakeWinreg({}, create_error=PermissionError(5, "Access is denied"))
+
+    with pytest.raises(RegistryError, match="Access is denied"):
+        WinRegistry(module=fake).set_user_value(APPROVED, FLAG)
+
+    assert (fake.written, fake.closed) == ([], [])
+
+
+def test_a_value_that_cannot_be_written_is_an_error_and_the_key_is_still_closed() -> None:
+    fake = FakeWinreg({}, set_error=OSError(1450, "Insufficient system resources"))
+
+    with pytest.raises(RegistryError, match="Insufficient system resources"):
+        WinRegistry(module=fake).set_user_value(APPROVED, FLAG)
+
+    assert [k.path for k in fake.closed] == [(HKCU, APPROVED)]
+
+
+def test_there_is_no_way_to_write_the_machine_hive() -> None:
+    writers = [name for name in dir(WinRegistry) if name.startswith(("set", "delete", "create"))]
+
+    assert writers == ["set_user_value"]
+    assert list(inspect.signature(WinRegistry.set_user_value).parameters) == [
+        "self",
+        "key",
+        "value",
+    ]
