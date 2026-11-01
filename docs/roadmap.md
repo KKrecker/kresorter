@@ -9,7 +9,7 @@ its checks.
 | 2 | `quarantine`, `storage` | Quarantine with metadata, SQLite journal (WAL, FK, rollback), restore. "File changed between scan and action". Vault outside default scan zones and blacklisted (decision 0004). | MVP (iteration 1) |
 | 3 | `analysis` | Duplicates by hash, large/old files, cache patterns, "safe to delete" score. **MVP.** | MVP (iteration 1) |
 | 4 | `autostart` | Startup folders, Run/RunOnce (HKCU/HKLM, opt-in setting), task scheduler, auto services. Disable = keep record, never delete. Fake hive in tests. | Iteration 2 |
-| 5 | `organize` | File organizer: proposed category structure for a folder; "breaks when moved" detection (Steam libraries, system files, caches, relative dependencies); moves through quarantine with rollback. | Iteration 2 |
+| 5 | `organize` | File organizer: proposed category structure for a folder; "breaks when moved" detection (Steam libraries, system files, caches, relative dependencies); moves journaled before they happen, in a table of their own, with rollback and recovery; refused on macOS and Windows at first (pre-step-5 audit, decisions 3-4; decision 0012). | Iteration 2 |
 | 6 | `llm` | Ollama: local explanations for findings, autostart items and organizer proposals. | Iteration 2 |
 | 7 | `ui` | Scan, findings with filters, cleanup plan, organizer, autostart, quarantine/restore, settings (incl. registry opt-in). | Iteration 3 |
 | 8 | packaging | Installer, VM tests, README with screenshots. | Iteration 3 |
@@ -121,16 +121,41 @@ Scanner core and `safeclean scan` (read-only report).
 - **The autostart store is never purged** (item 66): originals, staged copies and removed stubs
   stay in `<data_dir>/autostart`.
 
+### Step 5.0: done (pre-step-5 audit)
+- The audit ([`docs/reviews/pre-step5-audit.md`](reviews/pre-step5-audit.md)) and its plan, in
+  order, every red test approved before it was committed.
+- Gate: 100 % of lines and branches, CI on Python 3.11 to 3.14 (A4).
+- Fixes: "missing" is decided by errno (A1); an `OSError` of a command's body is reported by
+  its domain, not as the data directory (A2); a journal failure in the middle of a command
+  exits with 3 and names the recover command (A3); XDG changes make the store with their first
+  change, journal a stub before it is renamed, and roll back when their place is taken (B9
+  a-c).
+- Refactors without behaviour change: `storage.data_dir` (B1), `autostart.journal` (B2),
+  `storage.journal.insert_row()` and a clock given to each domain (B3), `quarantine.journal`
+  and `quarantine.recovery`, which needs no open-file check (B7); tests share helpers in
+  `tests/support/` and fixtures in `tests/conftest.py` (B10).
+- `safeclean recover` closes the interrupted work of every domain, `autostart recover` is its
+  alias, and `storage.pending.pending_domains` names the domain whose work is left (B4).
+- README: every command, the data directory, recovery and exit codes (A5).
+- Decision 0011, items 110-127. 1063 tests, 100 % line and branch coverage.
+
+### Left for later
+- B8: one environment object for `cli.main` instead of a factory per parameter.
+- B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
+- B11: CI on Windows and macOS and live `WinRegistry` tests, once the repository is published.
+- B12: a user's own stub without `Exec` that `enable` moved to the store is not given back
+  (accepted limitation of step 5).
+
 ## Target package layout
 
 ```
 src/safeclean/
 ├── core/         # step 1: models, policy, walker, hashing, heuristics, open_files, scanner
-├── quarantine/   # step 2: move with metadata, restore (used by deletions AND organizer moves)
-├── storage/      # step 2: SQLite index and operations journal
+├── quarantine/   # step 2: move with metadata, restore, purge, recovery
+├── storage/      # step 2: SQLite journal, data directory, lock, unfinished work by domain
 ├── analysis/     # step 3: duplicates, size_age, score, report
 ├── autostart/    # step 4: readers, listing, XDG and HKCU Run changes, recover
-├── organize/     # step 5
+├── organize/     # step 5: moves journaled in their own table (decision 0012)
 ├── llm/          # step 6
 └── ui/           # step 7
 ```
