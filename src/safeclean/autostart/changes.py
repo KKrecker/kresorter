@@ -8,6 +8,7 @@ store) only if the journal shows safeclean disabled it; a stub is moved to the s
 change is a ``pending`` row of ``autostart_changes`` before the disk is touched; a failure
 rolls it back, and nothing is ever deleted. Refusals change nothing and journal nothing.
 """
+
 from __future__ import annotations
 
 import contextlib
