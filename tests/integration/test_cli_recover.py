@@ -1,12 +1,12 @@
 """`safeclean recover`, its alias `safeclean autostart recover`, and the commands naming it:
-end-to-end (commit 12c2a; decision 0011, items 125-127).
+end-to-end (commit 12c2a; decision 0011, items 125-127; decision 0012, items 31, 32).
 
 Autostart changes share the journal, the data directory and the lock with the quarantine
 (item 62), so recovery builds the scan context to find them. One command closes the
 interrupted work of every domain: the quarantine's first, which needs no open-file check
-(item 124), then the autostart changes of this platform. While work of another domain is
-unfinished, a command that would act refuses with exit 3 and names ``safeclean recover``;
-``quarantine list`` still runs. Real temporary trees and a fake registry.
+(item 124), then organize's moves, then the autostart changes of this platform. While work of
+another domain is unfinished, a command that would act refuses with exit 3 and names
+``safeclean recover``; ``quarantine list`` still runs. Real temporary trees and a fake registry.
 """
 
 import errno
@@ -28,6 +28,7 @@ from safeclean.storage.lock import InstanceLock
 from support.cli import autostart_context, run, scan_context
 from support.files import write
 from support.journal import query
+from support.moves import MOVED, A, B, C, Fault, crash, planned, three_files
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 DISABLE = b"\x03\x00\x00\x00" + (133_444_736_000_000_000).to_bytes(8, "little")
@@ -64,6 +65,15 @@ def left_pending(data_dir: Path) -> None:
     """The quarantine's operation as a crash right after the move would leave it."""
     query(data_dir, "UPDATE items SET state = 'pending'")
     query(data_dir, "UPDATE operations SET state = 'pending', finished_at_ns = NULL")
+
+
+def crashed_batch(zone: Path, data_dir: Path, faults: dict[str, Fault]) -> Path:
+    """An organize batch of ``three_files`` that crashed where ``faults`` say: its folder."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    folder = three_files(zone)
+    at = {folder / name: fault for name, fault in faults.items()}
+    crash(data_dir / "journal.db", folder, planned(folder), at)
+    return folder
 
 
 def no_space(*args: object, **kwargs: object) -> None:
@@ -138,6 +148,116 @@ def test_every_domain_is_recovered_the_quarantine_first(
     assert query(data_dir, "SELECT state FROM operations") == [("done",)]
     assert query(data_dir, "SELECT state FROM items") == [("quarantined",)]
     assert query(data_dir, "SELECT state FROM autostart_changes") == [("done",)]
+
+
+def test_the_moves_are_recovered_after_the_quarantine_and_before_autostart(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path
+) -> None:
+    # [0012.32]
+    quarantined(scan, zone)
+    interrupted_xdg_disable(tmp_path, data_dir)
+    left_pending(data_dir)
+    crashed_batch(zone, data_dir, {A: "exit-before"})
+
+    code, out, err = run(["recover"], scan, autostart_context("linux", tmp_path))
+
+    assert (code, err) == (0, "")
+    assert out == (
+        "Recovered an interrupted quarantine operation (1 file).\n"
+        "Recovered 1 interrupted organize batch:\n  [1] rolled_back\n"
+        "Recovered 1 interrupted autostart change:\n  [1] done\n"
+    )
+
+
+@RECOVER
+def test_an_interrupted_organize_batch_names_the_files_still_sorted(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path, command: list[str]
+) -> None:
+    # [0012.31] recovery completes nothing and rolls nothing back: undo is the user's choice
+    folder = crashed_batch(zone, data_dir, {B: "exit-after"})
+
+    code, out, err = run(command, scan, autostart_context("linux", tmp_path))
+
+    assert (code, err) == (0, "")
+    assert out == (
+        "Recovered 1 interrupted organize batch:\n"
+        "  [1] failed: 2 files still sorted; 'safeclean organize undo 1' moves them back\n"
+        f"    {folder / MOVED[A]}\n"
+        f"    {folder / MOVED[B]}\n"
+    )
+    assert query(data_dir, "SELECT state FROM moves ORDER BY id") == [
+        ("done",),
+        ("done",),
+        ("rolled_back",),
+    ]
+    assert query(data_dir, "SELECT state FROM move_batches") == [("failed",)]
+
+
+def test_one_file_still_sorted_is_named_alone(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path
+) -> None:
+    # [0012.31]
+    folder = crashed_batch(zone, data_dir, {A: "exit-after"})
+
+    code, out, _ = run(["recover"], scan, autostart_context("linux", tmp_path))
+
+    assert (code, out) == (
+        0,
+        "Recovered 1 interrupted organize batch:\n"
+        "  [1] failed: 1 file still sorted; 'safeclean organize undo 1' moves it back\n"
+        f"    {folder / MOVED[A]}\n",
+    )
+
+
+def test_two_interrupted_batches_are_counted(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path
+) -> None:
+    # [0012.31] oldest first, each with its own line
+    folder = crashed_batch(zone, data_dir, {A: "exit-after"})
+    desktop = zone / "Desktop"
+    write(desktop / "d.jpg")
+    moves = [(desktop / "d.jpg", desktop / "Images" / "d.jpg")]
+    crash(data_dir / "journal.db", desktop, moves, {desktop / "d.jpg": "exit-before"})
+
+    code, out, _ = run(["recover"], scan, autostart_context("linux", tmp_path))
+
+    assert (code, out) == (
+        0,
+        "Recovered 2 interrupted organize batches:\n"
+        "  [1] failed: 1 file still sorted; 'safeclean organize undo 1' moves it back\n"
+        f"    {folder / MOVED[A]}\n"
+        "  [2] rolled_back\n",
+    )
+
+
+def test_a_move_recovery_cannot_settle_is_warned_about_on_stderr(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path
+) -> None:
+    # [0012.31] the file at both paths: neither is touched, the user decides
+    folder = crashed_batch(zone, data_dir, {A: "exit-after"})
+    (folder / A).hardlink_to(folder / MOVED[A])
+
+    code, out, err = run(["recover"], scan, autostart_context("linux", tmp_path))
+
+    assert (code, out) == (0, "Recovered 1 interrupted organize batch:\n  [1] failed\n")
+    assert err == (
+        f"safeclean: FAILED: {folder / A} -> {folder / MOVED[A]}: at the source the file,"
+        " at the destination the file; neither was touched\n"
+    )
+    assert (folder / A).read_bytes() == (folder / MOVED[A]).read_bytes() == A.encode()
+
+
+def test_the_moves_are_recovered_where_organize_does_not_move(
+    tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0012.37] recovery moves nothing, so it runs everywhere
+    crashed_batch(zone, data_dir, {C: "exit-before"})
+    unchecked = scan_context(tmp_path, zone, data_dir, NoOpenFileCheck())
+
+    code, out, err = run(["recover"], unchecked, autostart_context("windows", tmp_path))
+
+    assert (code, err) == (0, "")
+    assert out.startswith("Recovered 1 interrupted organize batch:\n  [1] failed: 2 files")
 
 
 @RECOVER

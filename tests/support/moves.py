@@ -1,6 +1,6 @@
 """Organize's moves in tests: renames that fail where a test wants, crashes that are real exits
-(of a batch at a rename), and where the journal says each file is (decision 0012, items 27
-and 40).
+(of a batch at a rename, of a recovery at a statement to the journal), and where the journal
+says each file is (decision 0012, items 27, 31 and 40).
 
 Every file a test sorts holds its own name, so what a path holds tells which file is there.
 ``files`` is every regular file under a folder, foreign ones included: an overwrite or a
@@ -16,6 +16,7 @@ import sqlite3
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import closing
 from pathlib import Path
 from typing import Literal
 
@@ -97,6 +98,28 @@ def crash(journal: Path, folder: Path, moves: Moves, faults: Mapping[Path, Fault
     assert child.returncode == CRASHED, child.stderr
 
 
+def recovery_statements(journal: Path) -> int:
+    """How many statements a recovery sends to ``journal`` (after opening it), counted in a
+    child process that runs it to the end."""
+    child = _child(_RECOVER, {"journal": str(journal), "crash_at": 0})
+    assert child.returncode == 0, child.stderr
+    return int(child.stdout)
+
+
+def crash_recovery(journal: Path, statement: int) -> None:
+    """Recover in a child process that crashes right before its ``statement``-th statement to
+    ``journal`` (from 1, after opening it): that statement and every one after it never run."""
+    child = _child(_RECOVER, {"journal": str(journal), "crash_at": statement})
+    assert child.returncode == CRASHED, child.stderr
+
+
+def copy_journal(journal: Path, copy: Path) -> Path:
+    """``copy``, made a copy of ``journal`` as it stands, its write-ahead log included."""
+    with closing(sqlite3.connect(journal)) as original, closing(sqlite3.connect(copy)) as made:
+        original.backup(made)
+    return copy
+
+
 def _child(code: str, spec: object) -> subprocess.CompletedProcess[str]:
     env = {**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)}
     return subprocess.run(
@@ -118,6 +141,25 @@ spec = json.loads(sys.argv[1])
 faults = {Path(path): fault for path, fault in spec["faults"].items()}
 moves = [(Path(source), Path(destination)) for source, destination in spec["moves"]]
 carry_out(connect(Path(spec["journal"])), Path(spec["folder"]), moves, rename=FlakyRename(faults))
+"""
+
+
+_RECOVER = f"""
+import json, os, sys
+from pathlib import Path
+from safeclean.organize.recovery import recover
+from safeclean.storage.db import connect
+spec = json.loads(sys.argv[1])
+conn = connect(Path(spec["journal"]))
+sent = 0
+def traced(statement):
+    global sent
+    sent += 1
+    if sent == spec["crash_at"]:
+        os._exit({CRASHED})
+conn.set_trace_callback(traced)
+recover(conn)
+print(sent)
 """
 
 
