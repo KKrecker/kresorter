@@ -303,6 +303,48 @@ def test_unrecovered_journal_blocks_new_operations(
         service.quarantine([Candidate(entry=scanned(write(zone / "a.bin")))])
 
 
+def pending_autostart_change(conn: sqlite3.Connection) -> None:
+    """An autostart change journaled but not finished (decision 0011, item 62)."""
+    conn.execute(
+        "INSERT INTO autostart_changes (action, source, entry, location, digest, value_after,"
+        " state, created_at_ns) VALUES ('disable', 'xdg_autostart', '/e', '/l', ?, x'00',"
+        " 'pending', 1)",
+        ("0" * 32,),
+    )
+
+
+@pytest.mark.parametrize("call", ["quarantine", "restore", "plan_purge", "purge"])
+def test_an_unfinished_autostart_change_blocks_every_operation(
+    service: QuarantineService, conn: sqlite3.Connection, zone: Path, call: str
+) -> None:
+    (moved,) = service.quarantine([Candidate(entry=scanned(write(zone / "a.bin")))]).moved
+    plan = service.plan_purge([moved.item_id])  # planned before the change was journaled
+    pending_autostart_change(conn)
+    actions: dict[str, Callable[[], object]] = {
+        "quarantine": lambda: service.quarantine([Candidate(entry=scanned(write(zone / "b.bin")))]),
+        "restore": lambda: service.restore([moved.item_id]),
+        "plan_purge": lambda: service.plan_purge([moved.item_id]),
+        "purge": lambda: service.purge(plan),
+    }
+    journal = rows(conn, "SELECT id, state FROM operations")
+
+    with pytest.raises(QuarantineError, match="recover"):
+        actions[call]()
+
+    assert rows(conn, "SELECT id, state FROM operations") == journal
+    assert moved.vault_path.exists()
+
+
+def test_recover_leaves_unfinished_autostart_changes_to_autostart(
+    service: QuarantineService, conn: sqlite3.Connection
+) -> None:
+    pending_autostart_change(conn)
+
+    service.recover()
+
+    assert rows(conn, "SELECT state FROM autostart_changes") == [("pending",)]
+
+
 # --- quarantine: atomic batch ------------------------------------------------------------------
 
 
