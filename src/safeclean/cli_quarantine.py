@@ -90,7 +90,8 @@ def check_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> No
 
 
 def run(args: argparse.Namespace, context: ScanContext, out: TextIO, err: TextIO) -> int:
-    return with_journal(context, err, functools.partial(_run_locked, args, context, out, err))
+    session = functools.partial(_run_locked, args, context, out, err)
+    return with_journal(context, err, session, recover="safeclean quarantine list")
 
 
 def _run_locked(

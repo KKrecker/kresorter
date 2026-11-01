@@ -56,6 +56,7 @@ MACHINE_NOTE = (
 
 _ID = re.compile(r"[0-9a-fA-F]{1,32}")
 ID_LENGTH = 12  # shown by list; any unique beginning is accepted
+RECOVER = "safeclean autostart recover"
 _UNREADABLE = (
     "safeclean: an unfinished autostart change cannot be checked: {}; fix or move what is"
     " there, then run 'safeclean autostart recover' again\n"
@@ -113,8 +114,10 @@ def run(
     if args.action == "list":
         return _list(args, context, out)
     if args.action == "recover":
-        return with_journal(scan(), err, functools.partial(_recover, context, out, err))
-    return with_journal(scan(), err, functools.partial(_change, args, context, out, err))
+        session = functools.partial(_recover, context, out, err)
+    else:
+        session = functools.partial(_change, args, context, out, err)
+    return with_journal(scan(), err, session, recover=RECOVER)
 
 
 def _list(args: argparse.Namespace, context: AutostartContext, out: TextIO) -> int:

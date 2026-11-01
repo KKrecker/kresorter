@@ -607,3 +607,11 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     row stays as it was; an `OSError` from the checks before a disable or enable acts (the
     device check, item 111) is `cannot <action> <name>: <reason>; nothing was changed`, and
     nothing is journaled. Output written after these phases is not part of either.
+114. **A journal failure in the middle of a command is exit 3** (pre-step-5 audit, A3 and its
+    decision 1): a `sqlite3.Error` raised by the body (a full disk, an I/O error, the journal
+    held by another program past the busy timeout) is `safeclean: journal failed: <reason>; run
+    '<command>'`. The command is the one that recovers the domain, passed to `with_journal` by
+    it: `safeclean autostart recover`, `safeclean quarantine list`. Its end cannot be trusted,
+    as with the lock and a `failed` change; a new code would break the 0/1/2/3 contract for no
+    gain. A failed transaction is rolled back, and a change left `pending` in the journal is
+    closed by `recover()`.
