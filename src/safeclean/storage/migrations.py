@@ -71,7 +71,44 @@ _V3: Migration = (
     "CREATE INDEX autostart_changes_by_state ON autostart_changes (state)",
 )
 
-MIGRATIONS: tuple[Migration, ...] = (_V1, _V2, _V3)
+# v4: organize's moves, journaled before they are made (decision 0012, items 24-27). Tables of
+# their own, like the autostart changes: `operations` is the quarantine's. A batch is one
+# `organize move --yes` or `organize undo --yes`; a move carries what recovery asks the disk
+# about (device, inode, size, mtime_ns) and, in an undo batch, the move it reverses.
+_V4: Migration = (
+    """
+    CREATE TABLE move_batches (
+        id             INTEGER PRIMARY KEY,
+        kind           TEXT    NOT NULL CHECK (kind IN ('organize', 'undo')),
+        folder         TEXT    NOT NULL CHECK (folder <> ''),
+        state          TEXT    NOT NULL
+                       CHECK (state IN ('pending', 'done', 'failed', 'rolled_back')),
+        created_at_ns  INTEGER NOT NULL,
+        finished_at_ns INTEGER,
+        error          TEXT
+    ) STRICT
+    """,
+    """
+    CREATE TABLE moves (
+        id          INTEGER PRIMARY KEY,
+        batch_id    INTEGER NOT NULL REFERENCES move_batches (id) ON DELETE RESTRICT,
+        source      TEXT    NOT NULL CHECK (source <> ''),
+        destination TEXT    NOT NULL CHECK (destination <> '' AND destination <> source),
+        device      INTEGER NOT NULL,
+        inode       INTEGER NOT NULL,
+        size        INTEGER NOT NULL CHECK (size >= 0),
+        mtime_ns    INTEGER NOT NULL,
+        state       TEXT    NOT NULL
+                    CHECK (state IN ('pending', 'done', 'rolled_back', 'failed')),
+        undoes      INTEGER REFERENCES moves (id) ON DELETE RESTRICT
+    ) STRICT
+    """,
+    "CREATE INDEX move_batches_by_state ON move_batches (state)",
+    "CREATE INDEX moves_by_batch ON moves (batch_id)",
+    "CREATE INDEX moves_by_undoes ON moves (undoes)",
+)
+
+MIGRATIONS: tuple[Migration, ...] = (_V1, _V2, _V3, _V4)
 SCHEMA_VERSION = len(MIGRATIONS)
 
 

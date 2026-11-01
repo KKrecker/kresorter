@@ -1,4 +1,4 @@
-"""Unfinished work in the journal, by domain (decision 0011, items 62, 99, 125).
+"""Unfinished work in the journal, by domain (decision 0011, items 62, 99, 125; 0012 item 32).
 
 Each domain journals into a table of its own; a ``pending`` row there is its unfinished work.
 Any of it blocks new work of every domain until ``safeclean recover`` has run: all write to one
@@ -16,11 +16,14 @@ class Domain(StrEnum):
 
     QUARANTINE = "quarantine"
     AUTOSTART = "autostart"
+    ORGANIZE = "organize"
 
 
 _PENDING = {
     Domain.QUARANTINE: "SELECT EXISTS (SELECT 1 FROM operations WHERE state = 'pending')",
     Domain.AUTOSTART: "SELECT EXISTS (SELECT 1 FROM autostart_changes WHERE state = 'pending')",
+    # A batch, not a move: a batch is pending until recovery has settled every one of its moves.
+    Domain.ORGANIZE: "SELECT EXISTS (SELECT 1 FROM move_batches WHERE state = 'pending')",
 }
 
 
