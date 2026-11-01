@@ -1,0 +1,43 @@
+# Organize's categories (decision 0012, items 21-23), in the order plans list them.
+#
+#   name         the directory a file of this kind goes to, one level below the folder;
+#                English and fixed in step 5
+#   extensions   lower case, without the dot; one extension has one category, and a name is
+#                matched by its longest extension in the table first (backup.tar.gz: tar.gz)
+#
+# Every extension has an example in tests/unit/test_organize_categories.py. There is no
+# "Other": a file whose extension is not here stays where it is (unknown_kind). Web pages
+# (html, htm) are deliberately absent: a saved page loads what is beside it.
+
+[[category]]
+name = "Images"
+extensions = [
+    "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tif", "tiff", "svg",
+    "cr2", "nef", "arw", "dng",
+]
+
+[[category]]
+name = "Videos"
+extensions = ["mp4", "mkv", "avi", "mov", "webm", "m4v", "wmv", "mpg", "mpeg"]
+
+[[category]]
+name = "Audio"
+extensions = ["mp3", "flac", "wav", "ogg", "oga", "opus", "m4a", "aac", "wma"]
+
+[[category]]
+name = "Documents"
+extensions = [
+    "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "xls", "xlsx", "ods", "csv",
+    "ppt", "pptx", "odp", "epub",
+]
+
+[[category]]
+name = "Archives"
+extensions = [
+    "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst",
+    "tar.gz", "tar.bz2", "tar.xz", "tar.zst", "iso",
+]
+
+[[category]]
+name = "Installers"
+extensions = ["exe", "msi", "dmg", "pkg", "deb", "rpm", "appimage", "flatpakref"]
