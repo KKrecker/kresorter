@@ -628,3 +628,10 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     a row that names the slot, never a stub in the store that no row names. If the move then
     fails, `vault_path` names an empty slot; `recover()` reads it as holding nothing, which is
     what the change of a stub keeps, so the row is still closed by the entry in its place.
+117. **A step that finds its place taken rolls the change back** (pre-step-5 audit, B9c):
+    a `FileExistsError` comes only from `O_EXCL` (the stub, `<id>.new`) and from linking into
+    the slot, before the entry is written, so nothing of ours is at its location. A file that
+    appeared where the stub goes since the check (item 69) is kept as it is, never overwritten
+    (item 68), and the row is `rolled_back` with the error: refining item 72, the change left
+    the disk as it found it. It was `failed`, and `recover()` then took an empty or partial
+    file of the user's for a partial stub and moved it to the store (item 96).

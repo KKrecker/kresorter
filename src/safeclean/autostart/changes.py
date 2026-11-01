@@ -241,8 +241,9 @@ class XdgChanges:
             plan.steps(change_id, plan)
         except BaseException as error:
             message = str(error) or type(error).__name__
-            # Rolled back only if the disk is as it was; anything left is for recover().
-            restored = _read(plan.location) == plan.before
+            # Rolled back only if the disk is as it was, or if a step found its place taken:
+            # nothing of ours was written then (item 117). Anything left is for recover().
+            restored = isinstance(error, FileExistsError) or _read(plan.location) == plan.before
             state = ChangeState.ROLLED_BACK if restored else ChangeState.FAILED
             self._finish(change_id, state, message)
             if not isinstance(error, OSError):
