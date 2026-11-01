@@ -12,6 +12,7 @@ crash is injected by raising from ``os`` and from ``finish_change``.
 
 import os
 import sqlite3
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -368,8 +369,8 @@ def test_a_failed_change_is_reconciled_only_if_it_is_the_last_one_there(
     source, digest = Source.XDG_AUTOSTART, "0" * 32
     later = journal.Change("enable", source, str(stub), str(stub), digest, b"", None)
     with transaction(tree.conn):
-        journal.insert_change(tree.conn, later)
-    journal.finish_change(tree.conn, 2, ChangeState.DONE, None)
+        journal.insert_change(tree.conn, later, now=time.time_ns)
+    journal.finish_change(tree.conn, 2, ChangeState.DONE, None, now=time.time_ns)
     before = tree.states()
 
     report = tree.changes.recover()
@@ -386,7 +387,7 @@ def test_registry_rows_are_left_alone(tree: Tree) -> None:
     location = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run\App"
     change = journal.Change("disable", Source.RUN_KEY, "Run", location, "0" * 32, None, b"\x03")
     with transaction(tree.conn):
-        journal.insert_change(tree.conn, change)
+        journal.insert_change(tree.conn, change, now=time.time_ns)
 
     report = tree.changes.recover()
 

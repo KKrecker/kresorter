@@ -9,6 +9,8 @@ touched; a failure rolls it back and nothing is ever deleted. Refusals change no
 journal nothing. Real files in tmp_path; OS failures are injected by patching ``os``.
 """
 
+import functools
+import itertools
 import os
 import sqlite3
 import stat
@@ -186,6 +188,18 @@ def test_own_entry_change_is_journaled(tree: Tree) -> None:
             1,
         )
     ]
+
+
+def test_journal_times_come_from_the_given_clock(tree: Tree) -> None:
+    clock = functools.partial(next, itertools.count(1))
+    xdg = XdgChanges(tree.conn, tree.store, tree.user, (tree.system,), now=clock)
+    write(tree.user, "app", APP)
+
+    xdg.disable(tree.item())
+    xdg.enable(tree.item())
+
+    sql = "SELECT action, created_at_ns, finished_at_ns FROM autostart_changes ORDER BY id"
+    assert tree.conn.execute(sql).fetchall() == [("disable", 1, 2), ("enable", 3, 4)]  # item 121
 
 
 def test_own_entry_over_a_system_entry_is_disabled_by_its_copy(tree: Tree) -> None:

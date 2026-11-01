@@ -105,6 +105,15 @@ def test_disable_writes_the_flag_the_task_manager_writes(
     ]
 
 
+def test_journal_times_come_from_the_clock_of_the_flag(conn: sqlite3.Connection) -> None:
+    registry, changes = setup(conn, {(Hive.HKCU, RUN): [SYNC]})
+
+    changes.disable(only(registry))
+
+    times = conn.execute("SELECT created_at_ns, finished_at_ns FROM autostart_changes")
+    assert times.fetchall() == [(NOW, NOW)]  # item 121
+
+
 def test_the_journal_row_exists_before_the_registry_is_written(
     conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:

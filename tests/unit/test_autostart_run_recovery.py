@@ -9,6 +9,7 @@ Rows of other sources and finished rows are left as they are. The registry is a 
 """
 
 import sqlite3
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -63,7 +64,7 @@ def journal(
     """A ``pending`` row, as a change interrupted right after journaling leaves it."""
     change = Change(action, source, ENTRY, location, DIGEST, before, after)
     with transaction(conn):
-        return insert_change(conn, change)
+        return insert_change(conn, change, now=time.time_ns)
 
 
 def states(conn: sqlite3.Connection) -> list[tuple[object, ...]]:
@@ -141,7 +142,7 @@ def test_rows_of_other_sources_and_finished_rows_are_left_alone(
 ) -> None:
     journal(conn, "disable", b"[Desktop Entry]\n", b"x", source=Source.XDG_AUTOSTART)
     failed = journal(conn, "disable", None, DISABLE)
-    finish_change(conn, failed, ChangeState.FAILED, "earlier")
+    finish_change(conn, failed, ChangeState.FAILED, "earlier", now=time.time_ns)
     pending = journal(conn, "disable", None, DISABLE)
 
     _, report = recover(conn, {(Hive.HKCU, APPROVED): [flag(DISABLE)]})

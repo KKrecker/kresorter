@@ -5,6 +5,8 @@ simulated without touching real devices. ``recover()`` cases build journal and d
 directly, as a crash would leave them.
 """
 
+import functools
+import itertools
 import os
 import sqlite3
 import stat
@@ -203,6 +205,21 @@ def test_files_are_moved_into_the_vault_and_journaled(
         (str(a.path), 3, a.mtime_ns, modes[0], "quarantined"),
         (str(b.path), 4, b.mtime_ns, modes[1], "quarantined"),
     ]
+
+
+def test_journal_times_come_from_the_given_clock(
+    conn: sqlite3.Connection, policy: PathPolicy, zone: Path
+) -> None:
+    clock = functools.partial(next, itertools.count(1))
+    service = QuarantineService(
+        conn, policy=policy, open_files=FakeOpenFiles(), classifier=NO_RULES, now=clock
+    )
+    (moved,) = service.quarantine([Candidate(entry=scanned(write(zone / "a.bin")))]).moved
+
+    service.restore([moved.item_id])
+
+    sql = "SELECT kind, created_at_ns, finished_at_ns FROM operations ORDER BY id"
+    assert rows(conn, sql) == [("quarantine", 1, 2), ("restore", 3, 4)]  # item 121
 
 
 def test_duplicate_digest_is_journaled(
