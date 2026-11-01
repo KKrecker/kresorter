@@ -1,0 +1,34 @@
+# Folders organize refuses as a whole (decision 0012, item 8): their files break when moved.
+#
+# Every entry is compared with folded names (NFC, then casefold), as an fnmatch pattern where it
+# has one, and has an example in tests/unit/test_organize_folders.py. Refusing a folder that
+# needed none is the safe mistake: add a marker when in doubt.
+
+[game_library]
+# A name among the folder's path names: the folder is inside a game library.
+path_names = ["steamapps", "SteamLibrary", "GOG Games", "Epic Games"]
+# An entry of the folder that only a game library holds.
+files = ["libraryfolders.vdf"]
+
+[project]
+# A version-control directory in the folder or in any directory above it, looked for by name.
+version_control = [".git", ".hg", ".svn"]
+# A build or package file (or bundle) among the folder's entries.
+files = [
+    "pyproject.toml",
+    "setup.py",
+    "package.json",
+    "Cargo.toml",
+    "go.mod",
+    "CMakeLists.txt",
+    "Makefile",
+    "meson.build",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "Gemfile",
+    "composer.json",
+    "*.sln",
+    "*.csproj",
+    "*.xcodeproj",
+]

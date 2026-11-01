@@ -197,6 +197,12 @@ class PathPolicy:
             is_open = True
         return _blocked(BlockReason.OPEN_FILE) if is_open else ALLOWED
 
+    def holds_home(self, path: PurePath) -> bool:
+        """True for the user's home directory and every directory above it: their top level
+        holds what other programs expect (decision 0012, item 7). Raises ValueError for a
+        non-absolute path."""
+        return _is_under(self._profile.own_home, self._normalize(path))
+
     @property
     def app_data_dir(self) -> PurePath:
         """safeclean's own data directory (vault, journal). Always blocked as APP_DATA."""

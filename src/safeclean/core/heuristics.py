@@ -196,3 +196,17 @@ class JunkClassifier:
                 rule = compiled.rule
                 return JunkMatch(path, rule.id, rule.category, rule.description)
         return None
+
+    def classify_directory(self, path: PurePath) -> JunkMatch | None:
+        """Return the first rule whose directories match ``path`` (absolute) or a directory above
+        it, or None. Files are not looked at: a rule that names files too matches the directory
+        it looks in, and a rule of file names alone matches no directory (decision 0012, item 8)."""
+        pure = self._flavor(path)
+        if not pure.is_absolute():
+            raise ValueError(f"path must be absolute: {path}")
+        dirs = tuple(self._fold(p) for p in pure.parts[1:])
+        for compiled in self._rules:
+            if any(_dirs_match(dirs, pattern) for pattern in compiled.dirs):
+                rule = compiled.rule
+                return JunkMatch(path, rule.id, rule.category, rule.description)
+        return None

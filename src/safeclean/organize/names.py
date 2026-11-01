@@ -9,8 +9,16 @@ a wrong match only keeps a file in place, a missed one moves it away from what e
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Iterable
+from fnmatch import fnmatchcase
 
 
 def fold(name: str) -> str:
     """``name`` in NFC, then ``casefold``-ed."""
     return unicodedata.normalize("NFC", name).casefold()
+
+
+def first_match(name: str, patterns: Iterable[str]) -> str | None:
+    """The first of ``patterns`` (``fnmatch``, as written) that ``name`` matches, both folded."""
+    folded = fold(name)
+    return next((pattern for pattern in patterns if fnmatchcase(folded, fold(pattern))), None)
