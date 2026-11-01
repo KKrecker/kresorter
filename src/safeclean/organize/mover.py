@@ -96,15 +96,21 @@ def carry_out(
     *,
     rename: Rename = os.rename,
     now: Clock = time.time_ns,
+    undoes: Sequence[int] | None = None,
 ) -> BatchResult:
     """Move each source to its destination, journaled, all or nothing as far as the disk
-    allows. Raises OSError, before anything is journaled, when a source cannot be looked at."""
+    allows; an undo batch when ``undoes`` names the move each one reverses. Raises OSError,
+    before anything is journaled, when a source cannot be looked at."""
     if not moves:
         raise ValueError("a batch needs at least one move")
     device = folder.lstat().st_dev
     files = [identity(source) for source, _ in moves]
     batch, ids = begin(
-        conn, folder, [(*move, file) for move, file in zip(moves, files, strict=True)], now
+        conn,
+        folder,
+        [(*move, file) for move, file in zip(moves, files, strict=True)],
+        now,
+        undoes,
     )
     states = [MoveState.PENDING] * len(moves)
     error: str | None = None

@@ -41,7 +41,7 @@ class StayReason(StrEnum):
     PROGRAM = "program"
     CONFLICT = "conflict"  # the detail says why, when the destination cannot be looked at
     CATEGORY_BLOCKED = "category_blocked"  # likewise for the category path
-    MISSING = "missing"  # undo only: nothing at the destination (item 30)
+    MISSING = "missing"  # undo only: nothing at the destination, or nothing it can look at
 
 
 _RANK = {reason: rank for rank, reason in enumerate(StayReason)}

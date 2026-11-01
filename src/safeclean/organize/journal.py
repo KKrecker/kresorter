@@ -1,5 +1,6 @@
-"""Organize's journal (decision 0012, items 24, 25, 27 and 31): batches and their moves in the
-``move_batches`` and ``moves`` tables, and what the disk says of a move.
+"""Organize's journal (decision 0012, items 24, 25, 27, 29 and 31): batches and their moves in
+the ``move_batches`` and ``moves`` tables, and what the disk says of a move. An undo is a batch
+of kind ``undo`` whose moves name, in ``undoes``, the moves they reverse.
 
 A path holds *the file* of a move when it is a regular file with the journaled device, inode,
 size and ``mtime_ns``: a rename keeps all four; a copy, a newcomer, a save by replacement, the
@@ -23,24 +24,34 @@ from safeclean.storage.journal import Clock, insert_row
 from safeclean.storage.transactions import transaction
 
 __all__ = [
+    "Batch",
+    "BatchKind",
     "BatchState",
     "Held",
     "Identity",
     "JournaledMove",
     "MoveState",
+    "batch",
     "batch_state",
     "begin",
     "finish",
     "holds",
     "identity",
     "journaled",
+    "pending_batches",
     "set_move",
     "set_moves",
     "settle",
+    "undoable",
 ]
 
 _BIT_64 = 1 << 64
 _BIT_63 = 1 << 63
+
+
+class BatchKind(StrEnum):
+    ORGANIZE = "organize"
+    UNDO = "undo"  # its moves name the moves they reverse
 
 
 class BatchState(StrEnum):
@@ -73,6 +84,16 @@ class Identity:
     inode: int
     size: int
     mtime_ns: int
+
+
+@dataclass(frozen=True)
+class Batch:
+    batch_id: int
+    kind: BatchKind
+    folder: Path
+    state: BatchState
+    created_at_ns: int
+    undoing: int | None  # the batch an undo batch reverses
 
 
 @dataclass(frozen=True)
@@ -122,19 +143,23 @@ def begin(
     folder: Path,
     moves: Sequence[tuple[Path, Path, Identity]],
     now: Clock,
+    undoes: Sequence[int] | None = None,
 ) -> tuple[int, list[int]]:
-    """Journal a batch and every move ``pending``, in one transaction: its id and theirs."""
+    """Journal a batch and every move ``pending``, in one transaction: its id and theirs. With
+    ``undoes``, the batch is an undo and each move names the move it reverses."""
+    kind = BatchKind.ORGANIZE if undoes is None else BatchKind.UNDO
+    reversed_moves = [None] * len(moves) if undoes is None else list(undoes)
     with transaction(conn):
         batch = insert_row(
             conn,
             "INSERT INTO move_batches (kind, folder, state, created_at_ns) VALUES (?, ?, ?, ?)",
-            ("organize", str(folder), BatchState.PENDING, now()),
+            (kind, str(folder), BatchState.PENDING, now()),
         )
         ids = [
             insert_row(
                 conn,
                 "INSERT INTO moves (batch_id, source, destination, device, inode, size,"
-                " mtime_ns, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                " mtime_ns, state, undoes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     batch,
                     str(source),
@@ -144,9 +169,10 @@ def begin(
                     file.size,
                     file.mtime_ns,
                     MoveState.PENDING,
+                    undone,
                 ),
             )
-            for source, destination, file in moves
+            for (source, destination, file), undone in zip(moves, reversed_moves, strict=True)
         ]
     return batch, ids
 
@@ -174,13 +200,53 @@ def finish(
         )
 
 
+def batch(conn: sqlite3.Connection, batch_id: int) -> Batch | None:
+    """The batch ``batch_id`` as the journal keeps it, or None."""
+    found = _batches(conn, "id = ?", (batch_id,))
+    return found[0] if found else None
+
+
+def pending_batches(conn: sqlite3.Connection) -> list[Batch]:
+    """The batches still ``pending``, oldest first."""
+    return _batches(conn, "state = ?", (BatchState.PENDING,))
+
+
+def _batches(conn: sqlite3.Connection, where: str, parameters: tuple[object, ...]) -> list[Batch]:
+    rows = conn.execute(
+        "SELECT id, kind, folder, state, created_at_ns, (SELECT o.batch_id FROM moves u"
+        " JOIN moves o ON o.id = u.undoes WHERE u.batch_id = b.id LIMIT 1)"
+        f" FROM move_batches b WHERE {where} ORDER BY id",
+        parameters,
+    )
+    return [
+        Batch(batch_id, BatchKind(kind), Path(folder), BatchState(state), created, undoing)
+        for batch_id, kind, folder, state, created, undoing in rows
+    ]
+
+
 def journaled(conn: sqlite3.Connection, batch: int) -> list[JournaledMove]:
     """The moves of ``batch``, in the order they were journaled."""
-    rows = conn.execute(
+    return _moves(
+        conn,
         "SELECT id, source, destination, device, inode, size, mtime_ns, state FROM moves"
         " WHERE batch_id = ? ORDER BY id",
-        (batch,),
+        batch,
     )
+
+
+def undoable(conn: sqlite3.Connection, batch: int) -> list[JournaledMove]:
+    """The ``done`` moves of ``batch`` that no ``done`` move undoes yet, in journal order."""
+    return _moves(
+        conn,
+        "SELECT id, source, destination, device, inode, size, mtime_ns, state FROM moves m"
+        " WHERE batch_id = ? AND state = 'done' AND NOT EXISTS"
+        " (SELECT 1 FROM moves u WHERE u.undoes = m.id AND u.state = 'done') ORDER BY id",
+        batch,
+    )
+
+
+def _moves(conn: sqlite3.Connection, query: str, batch: int) -> list[JournaledMove]:
+    rows = conn.execute(query, (batch,))
     return [
         JournaledMove(
             move_id,
