@@ -483,3 +483,335 @@ def test_an_interrupt_is_rolled_back_and_raised(
     ((state, error),) = tree.conn.execute("SELECT state, error FROM autostart_changes")
     assert (state, error) == ("rolled_back", "KeyboardInterrupt")
     assert tree.listed() == (item,)
+
+
+# --- enable: an own entry disabled here gets its original back ----------------------------------
+
+
+def disabled(tree: Tree, scope: Scope = Scope.USER) -> AutostartItem:
+    """An entry disabled by safeclean (change 1), as listed now."""
+    write(tree.user if scope is Scope.USER else tree.system, "app", APP)
+    assert tree.changes.disable(tree.item()) == ChangeResult(1, ChangeState.DONE)
+    return tree.item()
+
+
+def test_own_entry_disabled_here_gets_its_original_back(tree: Tree) -> None:
+    path = write(tree.user, "app", APP)
+    inode = path.stat().st_ino
+    original = tree.item()
+    tree.changes.disable(original)
+
+    result = tree.changes.enable(tree.item())
+
+    assert result == ChangeResult(2, ChangeState.DONE)
+    assert path.read_bytes() == APP
+    assert path.stat().st_ino == inode  # the original itself, moved back from the store
+    assert tree.store.slot(2).read_bytes() == hidden_copy(APP)  # the copy is kept, not deleted
+    assert tree.stored() == ["2"]
+    assert tree.listed() == (original,)
+
+
+def test_own_entry_enable_is_journaled(tree: Tree) -> None:
+    item = disabled(tree)
+
+    tree.changes.enable(item)
+
+    path = str(tree.user / "app.desktop")
+    copy = hidden_copy(APP)
+    assert tree.rows()[1:] == [
+        (
+            "enable",
+            "xdg_autostart",
+            path,
+            path,
+            entry_digest(copy),
+            copy,
+            APP,
+            str(tree.store.slot(2)),
+            "done",
+            None,
+            1,
+        )
+    ]
+
+
+def test_disable_and_enable_can_be_repeated(tree: Tree) -> None:
+    path = write(tree.user, "app", APP)
+    inode = path.stat().st_ino
+
+    for _ in range(2):
+        assert tree.changes.disable(tree.item()).state is ChangeState.DONE
+        assert tree.changes.enable(tree.item()).state is ChangeState.DONE
+
+    assert (path.read_bytes(), path.stat().st_ino) == (APP, inode)
+    assert [(row[0], row[8]) for row in tree.rows()] == [
+        ("disable", "done"),
+        ("enable", "done"),
+        ("disable", "done"),
+        ("enable", "done"),
+    ]
+    assert tree.stored() == ["2", "4"]
+
+
+def test_the_enable_row_exists_before_the_entry_is_touched(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    item = disabled(tree)
+    seen: list[list[Row]] = []
+    link = os.link
+
+    def watching(source: str | os.PathLike[str], target: str | os.PathLike[str]) -> None:
+        seen.append(tree.conn.execute("SELECT action, state FROM autostart_changes").fetchall())
+        link(source, target)
+
+    monkeypatch.setattr(os, "link", watching)
+
+    tree.changes.enable(item)
+
+    assert seen == [[("disable", "done"), ("enable", "pending")]]
+
+
+# --- enable: a stub over a system entry is moved to the store ----------------------------------
+
+
+def test_stub_made_here_is_moved_to_the_store(tree: Tree) -> None:
+    shadowed = write(tree.system, "app", APP)
+    before = shadowed.read_bytes(), shadowed.stat().st_mtime_ns
+    system_item = tree.item()
+    tree.changes.disable(system_item)
+    stub = tree.user / "app.desktop"
+
+    result = tree.changes.enable(tree.item())
+
+    assert result == ChangeResult(2, ChangeState.DONE)
+    assert not stub.exists()
+    assert tree.store.slot(2).read_bytes() == STUB
+    assert (shadowed.read_bytes(), shadowed.stat().st_mtime_ns) == before
+    assert tree.listed() == (system_item,)
+    assert tree.rows()[1:] == [
+        (
+            "enable",
+            "xdg_autostart",
+            str(stub),
+            str(stub),
+            entry_digest(STUB),
+            STUB,
+            None,
+            str(tree.store.slot(2)),
+            "done",
+            None,
+            1,
+        )
+    ]
+
+
+def test_a_users_own_stub_is_moved_too(tree: Tree) -> None:
+    # Moving it edits nothing (item 74); a stub may carry other keys.
+    write(tree.system, "app", APP)
+    raw = b"[Desktop Entry]\nName=App\nHidden=true\n"
+    write(tree.user, "app", raw)
+
+    result = tree.changes.enable(tree.item())
+
+    assert result == ChangeResult(1, ChangeState.DONE)
+    assert tree.store.slot(1).read_bytes() == raw
+    (item,) = tree.listed()
+    assert (item.scope, item.enabled) == (Scope.SYSTEM, True)
+
+
+# --- enable: refusals change nothing -----------------------------------------------------------
+
+
+State = tuple[Snapshot, list[Row], list[str]]
+
+
+def state(tree: Tree) -> State:
+    return tree.files(), tree.rows(), tree.stored()
+
+
+def assert_unchanged(
+    tree: Tree, result: ChangeResult, refusal: ChangeRefusal, before: State
+) -> None:
+    assert (result.change_id, result.state, result.refusal) == (None, None, refusal)
+    assert result.detail
+    assert state(tree) == before
+
+
+def test_enabling_a_read_only_source_is_refused(tree: Tree) -> None:
+    unit = AutostartItem(
+        source=Source.SYSTEMD_USER,
+        scope=Scope.USER,
+        name="sync.service",
+        command="/usr/bin/sync",
+        location=str(tree.root / "sync.service"),
+        enabled=False,
+        digest=entry_digest(b"unit"),
+    )
+    before = state(tree)
+
+    assert_unchanged(tree, tree.changes.enable(unit), ChangeRefusal.READ_ONLY, before)
+
+
+@pytest.mark.parametrize("scope", [Scope.USER, Scope.SYSTEM])
+def test_enabling_an_enabled_entry_is_refused(tree: Tree, scope: Scope) -> None:
+    write(tree.user if scope is Scope.USER else tree.system, "app", APP)
+    before = state(tree)
+
+    assert_unchanged(tree, tree.changes.enable(tree.item()), ChangeRefusal.ALREADY, before)
+
+
+@pytest.mark.parametrize(
+    ("scope", "raw"),
+    [
+        pytest.param(
+            Scope.USER,
+            APP.replace(b"[Desktop Entry]\n", b"[Desktop Entry]\nHidden=true\n"),
+            id="own-hidden",
+        ),
+        pytest.param(Scope.USER, APP + b"X-GNOME-Autostart-enabled=false\n", id="own-gnome"),
+        pytest.param(
+            Scope.SYSTEM,
+            APP.replace(b"[Desktop Entry]\n", b"[Desktop Entry]\nHidden=true\n"),
+            id="system-hidden",
+        ),
+        pytest.param(Scope.SYSTEM, APP + b"X-GNOME-Autostart-enabled=false\n", id="system-gnome"),
+    ],
+)
+def test_an_entry_disabled_elsewhere_is_refused(tree: Tree, scope: Scope, raw: bytes) -> None:
+    # Enabling it would edit its content (item 74).
+    write(tree.user if scope is Scope.USER else tree.system, "app", raw)
+    before = state(tree)
+
+    assert_unchanged(tree, tree.changes.enable(tree.item()), ChangeRefusal.FOREIGN, before)
+
+
+def test_a_disabled_copy_edited_by_the_user_is_refused(tree: Tree) -> None:
+    disabled(tree)
+    path = tree.user / "app.desktop"
+    path.write_bytes(hidden_copy(APP).replace(b"Name=App", b"Name=Renamed"))
+    before = state(tree)
+
+    assert_unchanged(tree, tree.changes.enable(tree.item()), ChangeRefusal.FOREIGN, before)
+
+
+def test_an_entry_disabled_again_by_hand_is_refused(tree: Tree) -> None:
+    # The last change journaled for this file is an enable: this copy was not written here.
+    item = disabled(tree)
+    path = tree.user / "app.desktop"
+    tree.changes.enable(item)
+    path.write_bytes(hidden_copy(APP))
+    before = state(tree)
+
+    assert_unchanged(tree, tree.changes.enable(tree.item()), ChangeRefusal.FOREIGN, before)
+
+
+def test_enabling_an_entry_edited_since_it_was_listed_is_refused(tree: Tree) -> None:
+    item = disabled(tree)
+    (tree.user / "app.desktop").write_bytes(STUB)
+    before = state(tree)
+
+    assert_unchanged(tree, tree.changes.enable(item), ChangeRefusal.CHANGED, before)
+
+
+@pytest.mark.parametrize("scope", [Scope.USER, Scope.SYSTEM])
+def test_enabling_an_entry_changed_right_after_the_check_is_refused(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch, scope: Scope
+) -> None:
+    item = disabled(tree, scope)
+    path = tree.user / "app.desktop"
+    stale = AutostartListing((item,), ())
+
+    def read_before_the_edit(user: Path, system: tuple[Path, ...]) -> AutostartListing:
+        path.write_bytes(path.read_bytes() + b"# edited\n")
+        return stale
+
+    monkeypatch.setattr(changes, "read_xdg", read_before_the_edit)
+
+    result = tree.changes.enable(item)
+
+    assert (result.change_id, result.state, result.refusal) == (None, None, ChangeRefusal.CHANGED)
+    assert len(tree.rows()) == 1
+
+
+@pytest.mark.parametrize("damage", ["missing", "changed"])
+def test_an_original_missing_or_changed_in_the_store_is_refused(tree: Tree, damage: str) -> None:
+    item = disabled(tree)
+    slot = tree.store.slot(1)
+    if damage == "missing":
+        slot.rename(tree.store.root / "elsewhere")
+    else:
+        slot.write_bytes(b"[Desktop Entry]\nType=Application\nExec=/tmp/evil\n")
+    before = state(tree)
+
+    result = tree.changes.enable(item)
+
+    assert_unchanged(tree, result, ChangeRefusal.ORIGINAL_CHANGED, before)
+
+
+def test_enabling_with_unfinished_work_in_the_journal_is_refused(tree: Tree) -> None:
+    item = disabled(tree)
+    tree.conn.execute(
+        "INSERT INTO operations (kind, state, created_at_ns) VALUES ('quarantine', 'pending', 1)"
+    )
+    before = state(tree)
+
+    assert_unchanged(tree, tree.changes.enable(item), ChangeRefusal.PENDING, before)
+
+
+@pytest.mark.parametrize("scope", [Scope.USER, Scope.SYSTEM])
+def test_enabling_with_the_store_on_another_device_is_refused(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch, scope: Scope
+) -> None:
+    item = disabled(tree, scope)
+    monkeypatch.setattr(tree.store, "device", other_device)
+    before = state(tree)
+
+    assert_unchanged(tree, tree.changes.enable(item), ChangeRefusal.OTHER_DEVICE, before)
+
+
+# --- enable: failures are rolled back, nothing deleted -----------------------------------------
+
+
+def assert_enable_rolled_back(tree: Tree, result: ChangeResult, item: AutostartItem) -> None:
+    assert (result.change_id, result.state, result.refusal) == (2, ChangeState.ROLLED_BACK, None)
+    assert "No space left on device" in result.detail
+    assert tree.listed() == (item,)
+    rows = tree.conn.execute("SELECT state, error FROM autostart_changes ORDER BY id").fetchall()
+    assert rows == [("done", None), ("rolled_back", result.detail)]
+
+
+@pytest.mark.parametrize("step", ["link", "replace"])
+def test_own_entry_stays_disabled_when_a_step_fails(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch, step: str
+) -> None:
+    item = disabled(tree)
+    monkeypatch.setattr(os, step, fail)
+
+    result = tree.changes.enable(item)
+
+    assert_enable_rolled_back(tree, result, item)
+    assert tree.store.slot(1).read_bytes() == APP  # the original is still in the store
+
+
+def test_stub_stays_when_it_cannot_be_moved(tree: Tree, monkeypatch: pytest.MonkeyPatch) -> None:
+    item = disabled(tree, Scope.SYSTEM)
+    monkeypatch.setattr(os, "rename", fail)
+
+    result = tree.changes.enable(item)
+
+    assert_enable_rolled_back(tree, result, item)
+    assert (tree.user / "app.desktop").read_bytes() == STUB
+
+
+def test_an_interrupted_enable_is_rolled_back_and_raised(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    item = disabled(tree)
+    monkeypatch.setattr(os, "replace", interrupt)
+
+    with pytest.raises(KeyboardInterrupt):
+        tree.changes.enable(item)
+
+    rows = tree.conn.execute("SELECT state, error FROM autostart_changes ORDER BY id").fetchall()
+    assert rows == [("done", None), ("rolled_back", "KeyboardInterrupt")]
+    assert tree.listed() == (item,)
