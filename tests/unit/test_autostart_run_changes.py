@@ -124,15 +124,25 @@ def test_the_journal_row_exists_before_the_registry_is_written(
 
 
 def test_the_default_value_is_told_apart_from_one_named_default(conn: sqlite3.Connection) -> None:
-    # Both are listed as "(Default)"; the digest says which one was meant.
+    # Both are listed as "(Default)"; the digest says which one was meant, and the journal
+    # names the flag written exactly: the unnamed one ends with the key's backslash.
     named = RegValue("(Default)", ValueKind.REG_SZ, r"C:\named.exe")
     default = RegValue("", ValueKind.REG_SZ, r"C:\default.exe")
     registry, changes = setup(conn, {(Hive.HKCU, RUN): [named, default]})
     (item,) = [i for i in listed(registry) if i.command == r"C:\default.exe"]
 
     changes.disable(item)
+    (other,) = [i for i in listed(registry) if i.command == r"C:\named.exe"]
+    changes.disable(other)
 
-    assert registry.writes == [(APPROVED, flag(DISABLE, name=""))]
+    assert registry.writes == [
+        (APPROVED, flag(DISABLE, name="")),
+        (APPROVED, flag(DISABLE, name="(Default)")),
+    ]
+    assert [row[2:4] for row in rows(conn)] == [
+        (rf"HKCU\{RUN}\(Default)", rf"HKCU\{APPROVED}" + "\\"),  # as listed; as written
+        (rf"HKCU\{RUN}\(Default)", rf"HKCU\{APPROVED}\(Default)"),
+    ]
 
 
 # --- enable --------------------------------------------------------------------------------------
