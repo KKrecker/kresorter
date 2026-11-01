@@ -312,6 +312,30 @@ def test_a_partial_stub_moved_to_the_store_right_before_a_crash_is_named_by_its_
     assert tree.listed() == (item,)
 
 
+def test_a_file_that_took_the_place_of_the_stub_is_never_moved_to_the_store(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tree.system, "app", APP)
+    stub = tree.user / "app.desktop"
+    create = os.open
+
+    def taken_first(path: Path, flags: int, mode: int = 0o777) -> int:
+        if Path(path) == stub:
+            stub.write_bytes(b"")  # the user's empty file: the beginning of any stub
+        return create(path, flags, mode)
+
+    monkeypatch.setattr(os, "open", taken_first)
+    result = tree.changes.disable(tree.item())
+    monkeypatch.undo()
+
+    report = tree.changes.recover()
+
+    assert report == ChangeRecovery()  # closed by disable already (item 117)
+    assert tree.states() == [("rolled_back", result.detail, 1)]
+    assert stub.read_bytes() == b""  # where the user left it
+    assert tree.stored() == {}
+
+
 def double_fault(tree: Tree, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Change 1 failed, leaving an empty stub; returns the stub."""
     write(tree.system, "app", APP)

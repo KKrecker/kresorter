@@ -518,6 +518,32 @@ def test_stub_written_but_not_synced_goes_to_the_store(
     assert tree.listed() == (item,)
 
 
+def test_a_file_that_took_the_place_of_the_stub_is_kept_and_the_change_rolled_back(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tree.system, "app", APP)
+    item = tree.item()
+    stub = tree.user / "app.desktop"
+    mine = b"[Desktop Entry]\nType=Application\nName=Mine\nExec=/usr/bin/mine\n"
+    create = os.open
+
+    def taken_first(path: Path, flags: int, mode: int = 0o777) -> int:
+        if Path(path) == stub:
+            stub.write_bytes(mine)  # the user's own file, right after the check
+        return create(path, flags, mode)
+
+    monkeypatch.setattr(os, "open", taken_first)
+    result = tree.changes.disable(item)
+    monkeypatch.undo()
+
+    assert (result.change_id, result.state, result.refusal) == (1, ChangeState.ROLLED_BACK, None)
+    assert "File exists" in result.detail
+    ((state, error),) = tree.conn.execute("SELECT state, error FROM autostart_changes")
+    assert (state, error) == ("rolled_back", result.detail)  # nothing of ours is there (item 117)
+    assert stub.read_bytes() == mine  # never overwritten (item 68)
+    assert tree.stored() == []
+
+
 @pytest.mark.parametrize("scope", [Scope.USER, Scope.SYSTEM])
 def test_an_interrupt_is_rolled_back_and_raised(
     tree: Tree, monkeypatch: pytest.MonkeyPatch, scope: Scope
