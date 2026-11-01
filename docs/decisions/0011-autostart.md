@@ -575,3 +575,12 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     3 and names `safeclean autostart recover`; unfinished quarantine work is 3 and names
     `safeclean quarantine list` (items 62, 104); an entry or flag that cannot be checked is 3
     with its reason, as in `autostart recover` (item 103).
+
+## Addendum (step 5.0): after the pre-step-5 audit
+
+110. **A test of an entry that exists but cannot be read fakes the OS error, never `chmod`**:
+    it puts something unreadable in its place (a directory, as for item 97) or makes
+    `os.stat` and `os.lstat` raise `PermissionError` for that path. `chmod` denies nothing to
+    root, which CI containers often are, and a sandbox may not enforce it at all
+    (`docs/reviews/pre-step5-audit.md`, section 2): a test built on it can pass without
+    checking anything.
