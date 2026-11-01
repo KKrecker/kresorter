@@ -19,7 +19,7 @@ ITEM = re.compile(r"^(\d+)\. \*\*", re.MULTILINE)
 CITATION = re.compile(r"\[0013\.(\d+)\]")
 
 # Taken out by the commit that completes each item (the step 6 plan of 0013).
-COMPLETED: frozenset[int] = frozenset({2, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 19, 20, 23, 28, 29})
+COMPLETED: frozenset[int] = frozenset(range(1, 30)) - {16}  # all but the README's
 PENDING: frozenset[int] = frozenset(range(1, 30)) - COMPLETED
 
 
