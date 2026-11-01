@@ -7,7 +7,7 @@ entry is never missing. Disable, a system entry: a stub is created in the user d
 store) only if the journal shows safeclean disabled it; a stub is moved to the store. Each
 change is a ``pending`` row of ``autostart_changes`` before the disk is touched; a failure
 rolls it back, and nothing is ever deleted. Refusals change nothing and journal nothing.
-The journal functions here (``insert_change``, ``finish_change``, ``has_pending``, ``refused``)
+The journal functions here (``insert_change``, ``finish_change``, ``refused``)
 are shared with ``run_changes`` (item 81).
 ``recover()`` closes pending changes, and failed ones still last at their place, by the disk.
 """
@@ -28,6 +28,7 @@ from safeclean.autostart.entries import BrokenEntryError, decode, read_entry
 from safeclean.autostart.models import AutostartItem, Scope, Source, entry_digest
 from safeclean.autostart.xdg import parse_keys, read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
+from safeclean.storage.pending import has_pending
 from safeclean.storage.transactions import transaction
 
 PRIVATE = 0o700
@@ -360,15 +361,6 @@ def finish_change(
             "UPDATE autostart_changes SET state = ?, finished_at_ns = ?, error = ? WHERE id = ?",
             (state.value, time.time_ns(), error, change_id),
         )
-
-
-def has_pending(conn: sqlite3.Connection) -> bool:
-    """Unfinished autostart changes or quarantine operations block both (item 62)."""
-    row = conn.execute(
-        "SELECT EXISTS (SELECT 1 FROM autostart_changes WHERE state = 'pending')"
-        " OR EXISTS (SELECT 1 FROM operations WHERE state = 'pending')"
-    ).fetchone()
-    return bool(row[0])
 
 
 def _write_new(path: Path, data: bytes) -> None:

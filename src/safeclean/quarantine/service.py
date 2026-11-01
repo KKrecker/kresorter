@@ -49,6 +49,7 @@ from safeclean.core.policy import PathPolicy
 from safeclean.quarantine.preflight import Candidate, Cleared, Preflight, RefusalReason, Refused
 from safeclean.quarantine.purge import delete_from_vault
 from safeclean.quarantine.vault import Vault
+from safeclean.storage.pending import has_pending
 from safeclean.storage.transactions import transaction
 
 Move = Callable[[Path, Path], object]
@@ -601,13 +602,10 @@ class QuarantineService:
 
     def _require_no_pending(self) -> None:
         if self._has_pending():
-            raise QuarantineError("the journal has unfinished operations; run recover() first")
+            raise QuarantineError("the journal has unfinished work; run recover() first")
 
     def _has_pending(self) -> bool:
-        row = self._conn.execute(
-            "SELECT EXISTS (SELECT 1 FROM operations WHERE state = ?)", (OperationState.PENDING,)
-        ).fetchone()
-        return bool(row[0])
+        return has_pending(self._conn)  # autostart changes too (decision 0011, item 62)
 
     def _set_item(self, item_id: int, state: ItemState) -> None:
         with transaction(self._conn):

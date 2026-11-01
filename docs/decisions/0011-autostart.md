@@ -506,3 +506,16 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     file in place of an entry is not a case for guessing.
 98. **Only XDG rows are touched**: rows of `run_key` are recovered by `RunKeyChanges`
     (item 91), and the report is the same `ChangeRecovery` (item 92).
+
+## Addendum (step 4, commit 12b4): one rule for unfinished work
+
+99. **`storage.pending.has_pending` is the rule of item 62, once**: it is true while the
+    journal holds a pending quarantine operation or a pending autostart change, and both
+    `QuarantineService` (quarantine, restore, plan and purge) and the autostart changes
+    refuse new work while it is. It lives in `storage`, so the quarantine does not import
+    the autostart package. The quarantine error now says "unfinished work", since an
+    autostart change may be what blocks it.
+100. **Each `recover()` reconciles its own domain and is never blocked**: the quarantine's
+    `recover()` leaves autostart changes alone, and the autostart ones leave quarantine
+    operations alone (items 91, 98); a `recover()` refused because of the other domain
+    would leave no way out.

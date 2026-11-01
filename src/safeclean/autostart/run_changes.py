@@ -22,7 +22,6 @@ from safeclean.autostart.changes import (
     ChangeResult,
     ChangeState,
     finish_change,
-    has_pending,
     insert_change,
     refused,
 )
@@ -36,6 +35,7 @@ from safeclean.autostart.registry import (
     value_digest,
 )
 from safeclean.autostart.run_keys import APPROVED, RUN, read_run_keys
+from safeclean.storage.pending import has_pending
 from safeclean.storage.transactions import transaction
 
 ENABLED_FLAG = b"\x02" + bytes(11)

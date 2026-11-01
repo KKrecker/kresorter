@@ -103,10 +103,10 @@ Done: journal schema v3, `autostart_changes` (commit 11, decision 0011, items 57
 Done in commit 12: `xdg_changes` (12a1), XDG disable journaled (12a2, items 66-74), XDG
 enable (12a3, items 75-79), `UserRegistry` (12a4a, item 80), the `HKCU` Run `StartupApproved`
 flag (12a4b, items 81-87), the exact flag name in the journal (12b1, item 86), `recover()`
-for `HKCU` Run changes (12b2, items 88-92), `recover()` for XDG changes (12b3, items 93-98).
+for `HKCU` Run changes (12b2, items 88-92), `recover()` for XDG changes (12b3, items 93-98), unfinished work blocking both domains
+(12b4, items 99-100).
 
-Remaining: 12b4 pending autostart changes blocking the quarantine (item 62), 12c the CLI
-with `disableable`.
+Remaining: 12c the CLI with `disableable`.
 
 ## Target package layout
 
