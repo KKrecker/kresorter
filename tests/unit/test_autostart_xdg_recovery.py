@@ -285,6 +285,33 @@ def test_a_stub_left_by_a_double_fault_is_reconciled(
         assert tree.item().enabled is False
 
 
+def test_a_partial_stub_moved_to_the_store_right_before_a_crash_is_named_by_its_row(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tree.system, "app", APP)
+    item = tree.item()
+    move = os.rename
+
+    def move_then_die(source: Path, target: Path) -> None:
+        move(source, target)
+        raise Crash
+
+    monkeypatch.setattr(os, "write", fail)
+    monkeypatch.setattr(os, "rename", move_then_die)
+    monkeypatch.setattr(changes, "finish_change", crash)
+    with pytest.raises(Crash):
+        tree.changes.disable(item)
+    monkeypatch.undo()
+    assert tree.vault_path(1) == str(tree.store.slot(1))  # journaled before the move (item 116)
+
+    report = tree.changes.recover()
+
+    assert report == ChangeRecovery(rolled_back=(1,))
+    assert tree.states() == [("rolled_back", AS_BEFORE, 1)]
+    assert tree.stored() == {"1": b""}
+    assert tree.listed() == (item,)
+
+
 def double_fault(tree: Tree, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Change 1 failed, leaving an empty stub; returns the stub."""
     write(tree.system, "app", APP)
