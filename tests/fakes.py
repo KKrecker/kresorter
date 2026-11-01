@@ -54,16 +54,26 @@ def make_policy(
 
 
 class FakeRegistry:
-    """Read-only registry: keys by (hive, path); a denied key raises like a real one would.
+    """Registry: keys by (hive, path); a denied key raises like a real one would.
 
     The sub-keys of a key are the next path parts of the keys below it, in the order given, so
-    readers that need a sorted listing must sort it themselves.
+    readers that need a sorted listing must sort it themselves. ``set_user_value`` writes under
+    ``HKCU`` only, as ``UserRegistry`` does: every call is recorded in ``writes``, then
+    ``write_error`` is raised if set, else the value replaces one of the same name (any case).
     """
 
-    def __init__(self, keys: RegistryKeys, denied: Iterable[tuple[Hive, str]] = ()) -> None:
+    def __init__(
+        self,
+        keys: RegistryKeys,
+        denied: Iterable[tuple[Hive, str]] = (),
+        *,
+        write_error: BaseException | None = None,
+    ) -> None:
         self._keys = dict(keys)
         self._denied = set(denied)
+        self._write_error = write_error
         self.reads: list[tuple[Hive, str]] = []
+        self.writes: list[tuple[str, RegValue]] = []
 
     def values(self, hive: Hive, key: str) -> Sequence[RegValue] | None:
         self.reads.append((hive, key))
@@ -80,3 +90,11 @@ class FakeRegistry:
         if not below and (hive, key) not in self._keys:
             return None
         return list(dict.fromkeys(k.removeprefix(prefix).split("\\")[0] for k in below))
+
+    def set_user_value(self, key: str, value: RegValue) -> None:
+        self.writes.append((key, value))
+        if self._write_error is not None:
+            raise self._write_error
+        path, name = (Hive.HKCU, key), value.name.casefold()
+        kept = [v for v in self._keys.get(path, ()) if v.name.casefold() != name]
+        self._keys[path] = [*kept, value]
