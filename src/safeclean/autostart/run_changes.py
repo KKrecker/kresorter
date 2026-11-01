@@ -33,7 +33,7 @@ from safeclean.autostart.registry import (
     ValueKind,
     value_digest,
 )
-from safeclean.autostart.run_keys import APPROVED, DEFAULT_NAME, RUN, read_run_keys
+from safeclean.autostart.run_keys import APPROVED, RUN, read_run_keys
 from safeclean.storage.transactions import transaction
 
 ENABLED_FLAG = b"\x02" + bytes(11)
@@ -74,7 +74,7 @@ class RunKeyChanges:
             return refused(ChangeRefusal.CHANGED, "the value changed since it was listed")
         name, before = found
         after = self._disabled_flag() if action == "disable" else ENABLED_FLAG
-        location = rf"{Hive.HKCU}\{APPROVED}\{name or DEFAULT_NAME}"
+        location = rf"{Hive.HKCU}\{APPROVED}\{name}"  # exact: "" is not "(Default)"
         change = Change(action, item.source, item.location, location, item.digest, before, after)
         with transaction(self._conn):
             change_id = insert_change(self._conn, change)

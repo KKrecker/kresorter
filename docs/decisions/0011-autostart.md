@@ -447,9 +447,13 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `HKCU` Run value can change (`read_only` otherwise: `HKLM`, `RunOnce`, other sources).
     The window between the check and the write remains: the registry has no compare-and-swap,
     and the compensation is the same as in quarantine (journal first, state read back).
-86. **Journal fields**: source `run_key`, entry the Run key path with the value name,
-    location the `StartupApproved` path with the value name (or `(Default)`), `vault_path`
-    NULL: nothing is kept in the store, the previous bytes are in the row itself.
+86. **Journal fields**: source `run_key`, entry the Run key path with the value name as
+    listed (`(Default)` for the unnamed value), location the `StartupApproved` path with the
+    exact name of the flag written: the unnamed flag is the path ending with the key's
+    backslash, so it is never taken for a value literally named `(Default)`, which writes
+    another flag (commit 12b1). The name is what follows the fixed prefix, so a backslash
+    inside a value name does not matter. `vault_path` is NULL: nothing is kept in the
+    store, the previous bytes are in the row itself.
 87. **A failure is read back, not assumed**: a `RegistryError` from the write is a result,
     not an exception; the flag is then read again, and the row is `rolled_back` if the flag
     is still what it was, `failed` otherwise. If the flag cannot be read back, the row stays
