@@ -46,6 +46,10 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "PT", "RUF", "TID", "ANN", "PTH"]
 
+[tool.ruff.lint.isort]
+# A red test imports a module before it exists: it is still ours.
+known-first-party = ["safeclean"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN401"]
 
