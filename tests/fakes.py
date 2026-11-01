@@ -3,13 +3,16 @@
 import errno
 import functools
 import os
-from collections.abc import Callable, Iterable, Mapping, Sequence
+import sqlite3
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from pathlib import Path, PurePath
 
 import pytest
 
 from safeclean.autostart.registry import Hive, RegistryError, RegValue
 from safeclean.core.policy import BlockReason, PathPolicy
+from safeclean.storage import db
 
 RegistryKeys = Mapping[tuple[Hive, str], Sequence[RegValue]]
 
@@ -119,3 +122,17 @@ def _refuse(
     if str(path) == denied:
         raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), denied)
     return real(path, *args, **kwargs)
+
+
+@contextmanager
+def journal_held(monkeypatch: pytest.MonkeyPatch, data_dir: Path) -> Iterator[None]:
+    """Another program holds the journal for writing (a backup, the sqlite3 shell): safeclean's
+    lock does not cover it, so a write in the middle of a command fails, without the wait."""
+    db.connect(data_dir / "journal.db").close()  # created and migrated, as by a first command
+    monkeypatch.setattr(db, "BUSY_TIMEOUT_MS", 0)
+    other = sqlite3.connect(data_dir / "journal.db", isolation_level=None, timeout=0)
+    try:
+        other.execute("BEGIN IMMEDIATE")
+        yield
+    finally:
+        other.close()

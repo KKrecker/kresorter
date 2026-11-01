@@ -1,8 +1,10 @@
-"""The journal session shared by the commands that act (decision 0011, items 101 and 112).
+"""The journal session shared by the commands that act (decision 0011, items 101, 112, 114).
 
 ``with_journal`` names the data directory only for what it does there itself: creating it and
 taking the lock. An ``OSError`` raised by the body of a command is the body's own: it is
-reported with its reason, never as a data directory that could not be used.
+reported with its reason, never as a data directory that could not be used. A journal that
+fails in the middle of a command leaves an end that cannot be trusted: exit 3, naming the
+command that recovers the domain.
 """
 
 import errno
@@ -16,6 +18,8 @@ from fakes import FakeOpenFiles, make_policy
 from safeclean import cli_journal
 from safeclean.core.heuristics import JunkClassifier, default_rules
 from safeclean.core.scanner import ScanContext
+
+RECOVER = "safeclean thing recover"  # the domain's own command, passed in by it
 
 
 @pytest.fixture
@@ -32,6 +36,10 @@ def scan(tmp_path: Path, data_dir: Path) -> ScanContext:
     return ScanContext(policy, FakeOpenFiles(), JunkClassifier(rules, platform="linux"), True)
 
 
+def full(conn: sqlite3.Connection, data_dir: Path) -> int:
+    raise sqlite3.OperationalError("database or disk is full")
+
+
 def denied(conn: sqlite3.Connection, data_dir: Path) -> int:
     raise PermissionError(errno.EACCES, "Permission denied", "/elsewhere/app.desktop")
 
@@ -39,7 +47,7 @@ def denied(conn: sqlite3.Connection, data_dir: Path) -> int:
 def test_an_os_error_of_the_body_is_reported_with_its_reason_only(scan: ScanContext) -> None:
     err = io.StringIO()
 
-    code = cli_journal.with_journal(scan, err, denied)
+    code = cli_journal.with_journal(scan, err, denied, recover=RECOVER)
 
     assert code == 3
     assert err.getvalue() == (
@@ -63,7 +71,18 @@ def test_its_own_steps_name_the_data_directory(
 
     err = io.StringIO()
 
-    code = cli_journal.with_journal(scan, err, body)
+    code = cli_journal.with_journal(scan, err, body, recover=RECOVER)
 
     assert (code, ran) == (3, [])
     assert err.getvalue().startswith("safeclean: cannot use the data directory: ")
+
+
+def test_a_journal_failure_of_the_body_names_the_command_that_recovers(scan: ScanContext) -> None:
+    err = io.StringIO()
+
+    code = cli_journal.with_journal(scan, err, full, recover=RECOVER)
+
+    assert code == 3
+    assert err.getvalue() == (
+        "safeclean: journal failed: database or disk is full; run 'safeclean thing recover'\n"
+    )

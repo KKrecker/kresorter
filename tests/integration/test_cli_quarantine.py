@@ -13,7 +13,7 @@ from pathlib import Path, PurePath
 
 import pytest
 
-from fakes import FakeOpenFiles, make_policy
+from fakes import FakeOpenFiles, journal_held, make_policy
 from safeclean import cli, cli_quarantine
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.open_files import NoOpenFileCheck, OpenFileChecker, ProcFdChecker
@@ -272,6 +272,21 @@ def test_a_vault_that_cannot_be_created_is_named(context: ScanContext, data_dir:
 
     assert (code, out) == (3, "")
     assert err == f"safeclean: cannot use the vault: [Errno 17] File exists: '{vault}'\n"
+
+
+def test_a_journal_failure_stops_and_names_quarantine_list(
+    context: ScanContext, data_dir: Path, zone: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = write(zone / "a.bin")
+    data_dir.mkdir(parents=True)
+
+    with journal_held(monkeypatch, data_dir):
+        code, out, err = run(["quarantine", "add", str(path)], context)
+
+    assert (code, out) == (3, "")
+    assert err == "safeclean: journal failed: database is locked; run 'safeclean quarantine list'\n"
+    assert path.read_bytes() == b"payload"
+    assert query(data_dir, "SELECT COUNT(*) FROM operations") == [(0,)]
 
 
 def test_data_directory_inside_a_scan_zone_exits_3(tmp_path: Path, zone: Path) -> None:

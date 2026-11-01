@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from fakes import FakeOpenFiles, FakeRegistry, deny_stat, make_policy
+from fakes import FakeOpenFiles, FakeRegistry, deny_stat, journal_held, make_policy
 from safeclean import cli
 from safeclean.autostart.changes import ChangeResult, ChangeState
 from safeclean.autostart.listing import AutostartContext
@@ -358,6 +358,29 @@ def test_a_check_before_acting_that_fails_stops_with_the_reason(
     )
     assert rows(data_dir) == []
     assert list(user.iterdir()) == []
+
+
+def test_a_journal_failure_stops_and_names_autostart_recover(
+    tmp_path: Path,
+    scan: ScanContext,
+    data_dir: Path,
+    user: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entry = write(user / "app.desktop", APP)
+    auto = autostart("linux", tmp_path)
+    change_id = only_id(scan, auto)
+    data_dir.mkdir(parents=True)
+
+    with journal_held(monkeypatch, data_dir):
+        code, out, err = run(["autostart", "disable", change_id, "--yes"], scan, auto)
+
+    assert (code, out) == (3, "")
+    assert err == (
+        "safeclean: journal failed: database is locked; run 'safeclean autostart recover'\n"
+    )
+    assert rows(data_dir) == []
+    assert entry.read_bytes() == APP
 
 
 # --- Windows -------------------------------------------------------------------------------------
