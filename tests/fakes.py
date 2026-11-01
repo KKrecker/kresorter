@@ -124,6 +124,37 @@ def _refuse(
     return real(path, *args, **kwargs)
 
 
+def other_device(monkeypatch: pytest.MonkeyPatch, moved: Path) -> None:
+    """``os.stat`` and ``os.lstat`` of ``moved`` say it is on another device, as a mount point
+    would: a test cannot mount one. Everything else they say is true."""
+    for name in ("stat", "lstat"):
+        elsewhere = functools.partial(_elsewhere, getattr(os, name), str(moved))
+        monkeypatch.setattr(os, name, elsewhere)
+
+
+_NOT_IN_SEQUENCE = (
+    "st_atime",
+    "st_mtime",
+    "st_ctime",
+    "st_atime_ns",
+    "st_mtime_ns",
+    "st_ctime_ns",
+    "st_blksize",
+    "st_blocks",
+    "st_rdev",
+)
+
+
+def _elsewhere(
+    real: Callable[..., os.stat_result], moved: str, path: object, *args: object, **kwargs: object
+) -> os.stat_result:
+    info = real(path, *args, **kwargs)
+    if str(path) != moved:
+        return info
+    rest = {name: getattr(info, name) for name in _NOT_IN_SEQUENCE}
+    return os.stat_result((*info[:2], info.st_dev + 1, *info[3:10]), rest)
+
+
 def relist(
     monkeypatch: pytest.MonkeyPatch, directory: Path, change: Callable[[list[str]], list[str]]
 ) -> None:
