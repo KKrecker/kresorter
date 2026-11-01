@@ -37,6 +37,7 @@ _AS_BEFORE = "the entry is as it was before the change"
 _NEITHER = "the entry is neither as before nor as after the change"
 _NOT_KEPT = "the entry is as after the change, but the store does not hold what it kept"
 _PARTIAL = "a partial stub was moved to the store"
+_NOTHING_THERE = (FileNotFoundError, NotADirectoryError)  # every other error: something is there
 
 
 class ChangeState(StrEnum):
@@ -388,16 +389,31 @@ def _current(path: Path) -> bytes | None:
     try:
         return read_entry(path)
     except BrokenEntryError:
-        if path.exists() or path.is_symlink():
-            raise
-        return None
+        if _nothing_at(path):
+            return None
+        raise
+
+
+def _nothing_at(path: Path) -> bool:
+    """Only ``ENOENT`` and ``ENOTDIR`` say so (item 111): since Python 3.14 ``Path.exists()``
+    is ``False`` for any error, so a file that cannot be looked at would seem missing."""
+    try:
+        path.lstat()
+    except _NOTHING_THERE:
+        return True
+    except OSError:
+        return False
+    return False
 
 
 def _device(path: Path) -> int:
-    """``st_dev`` of ``path`` or of the nearest directory above it that exists."""
-    while not path.exists():
-        path = path.parent
-    return path.stat().st_dev
+    """``st_dev`` of ``path`` or of the nearest directory above it that exists; one that exists
+    but cannot be looked at raises, it is not skipped (item 111)."""
+    while True:
+        try:
+            return path.stat().st_dev
+        except _NOTHING_THERE:
+            path = path.parent
 
 
 def refused(refusal: ChangeRefusal, detail: str) -> ChangeResult:

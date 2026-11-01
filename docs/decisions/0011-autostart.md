@@ -584,3 +584,12 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     root, which CI containers often are, and a sandbox may not enforce it at all
     (`docs/reviews/pre-step5-audit.md`, section 2): a test built on it can pass without
     checking anything.
+111. **"Nothing is there" only for `ENOENT` and `ENOTDIR`** (pre-step-5 audit, A1):
+    `recover()` decides that an entry is missing by `lstat` of its location, and the device
+    check of item 66 walks up to the nearest directory that exists by `stat`, past these two
+    errors only. Any other error (`EACCES`, ...) means that something is there which cannot be
+    looked at: the entry raises `BrokenEntryError` with the reason of the read (item 97), the
+    device check raises its `OSError` before anything is journaled. `Path.exists()` and
+    `Path.is_symlink()` are not used for this: since Python 3.14 they are `False` for any
+    error, which made a stub in place that cannot be read look missing and closed its change
+    `rolled_back`.
