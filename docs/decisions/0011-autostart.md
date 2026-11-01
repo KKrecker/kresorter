@@ -549,3 +549,29 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
 105. **The registry of a listing context is a `UserRegistry`**: the same factory gives the
     registry the listing reads and the one a change writes; `WinRegistry` is both, and
     tests use one `FakeRegistry` for both.
+
+## Addendum (step 4, commit 12c2b): `safeclean autostart disable|enable ID [--yes]`
+
+106. **The id is the beginning of the digest**: `autostart list` shows its first 12
+    characters as the last line of each entry; the command takes any beginning of 1 to 32
+    hex digits, in any case (anything else is a usage error, exit 2). An entry changed since
+    it was listed has another digest, so its old id names nothing: "may have changed since
+    it was listed", exit 1. A beginning that names several entries is refused (exit 1) and
+    asks for more of it. Only the user's scope is listed for it: machine-wide entries are
+    read-only anyway (item 9).
+107. **The order inside the journal session (item 101)**: the autostart `recover()` first,
+    printed only if it closed something; then the listing, the id, read-only sources
+    (`Refused: <source> entries are read-only.`), an entry already in that state (nothing to
+    do); all of these exit with 1 and journal nothing.
+108. **Without `--yes`, what would be written is shown and nothing is changed** (exit 1, as
+    `purge` and `add --from-analysis`): the name, source, scope and location, then, for an
+    own XDG entry, the copy with `Hidden=true` and the original kept in the store; for a
+    system entry, the stub created in the user directory and the system file never written;
+    for enable, what safeclean changed put back, nothing deleted; for a Run value, its
+    `StartupApproved` flag set as the Task Manager does, the Run value never written. The
+    preview reads no journal: a refusal such as `foreign` comes only with `--yes` (item 56).
+109. **With `--yes`, exit codes as in quarantine**: `done` is 0 with the change id; a refusal
+    (`Refused: <refusal>: <detail>`) and a `rolled_back` change are 1; a `failed` change is
+    3 and names `safeclean autostart recover`; unfinished quarantine work is 3 and names
+    `safeclean quarantine list` (items 62, 104); an entry or flag that cannot be checked is 3
+    with its reason, as in `autostart recover` (item 103).

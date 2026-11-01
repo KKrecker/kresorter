@@ -5,8 +5,13 @@ Windows, machine-wide entries are read only with ``--include-machine``, and the 
 when they were not. It creates, changes and deletes nothing and opens no journal.
 
 ``recover`` opens the shared journal (data directory, lock) and reconciles the interrupted
-autostart changes of this platform. Exit codes: 0 done; 3 an unfinished change cannot be
-checked, or the data directory, the lock or the journal cannot be used.
+autostart changes of this platform; ``disable`` and ``enable`` do the same, then change one
+entry named by any unique beginning of its digest, only with ``--yes`` (without it they show
+what would be written).
+
+Exit codes: 0 done; 1 refused, rolled back, not confirmed or no such entry; 2 usage error
+(argparse); 3 failed, unfinished quarantine work, an unfinished change that cannot be
+checked, or a data directory, lock or journal that cannot be used.
 """
 
 from __future__ import annotations
@@ -14,15 +19,29 @@ from __future__ import annotations
 import argparse
 import functools
 import json
+import re
 import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TextIO
 
-from safeclean.autostart.changes import AutostartStore, ChangeRecovery, XdgChanges
+from safeclean.autostart.changes import (
+    AutostartStore,
+    ChangeRecovery,
+    ChangeRefusal,
+    ChangeResult,
+    ChangeState,
+    XdgChanges,
+)
 from safeclean.autostart.entries import BrokenEntryError
 from safeclean.autostart.listing import AutostartContext, list_autostart
-from safeclean.autostart.models import AutostartItem, AutostartListing, AutostartSkipped, Source
+from safeclean.autostart.models import (
+    AutostartItem,
+    AutostartListing,
+    AutostartSkipped,
+    Scope,
+    Source,
+)
 from safeclean.autostart.registry import RegistryError
 from safeclean.autostart.run_changes import RunKeyChanges
 from safeclean.autostart.xdg import autostart_dirs
@@ -33,6 +52,13 @@ from safeclean.text import count
 MACHINE_NOTE = (
     "Note: machine-wide entries (HKLM, services, scheduled tasks, the common startup folder)"
     " were not read; add --include-machine to read them."
+)
+
+_ID = re.compile(r"[0-9a-fA-F]{1,32}")
+ID_LENGTH = 12  # shown by list; any unique beginning is accepted
+_UNREADABLE = (
+    "safeclean: an unfinished autostart change cannot be checked: {}; fix or move what is"
+    " there, then run 'safeclean autostart recover' again\n"
 )
 
 _TITLES = {
@@ -58,6 +84,19 @@ def add_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) ->
         help="Windows: also read HKLM, services, scheduled tasks and the common startup folder",
     )
     actions.add_parser("recover", help="reconcile interrupted autostart changes with the system")
+    for action in ("disable", "enable"):
+        change = actions.add_parser(action, help=f"{action} one entry (reversible)")
+        change.add_argument(
+            "id", type=autostart_id, help="its id from 'autostart list' (any unique beginning)"
+        )
+        change.add_argument("--yes", action="store_true", help=f"confirm: {action} it")
+
+
+def autostart_id(text: str) -> str:
+    """The beginning of a digest, any case; anything else is a usage error."""
+    if _ID.fullmatch(text) is None:
+        raise argparse.ArgumentTypeError("not the beginning of an autostart id (1-32 hex digits)")
+    return text.lower()
 
 
 def run(
@@ -69,7 +108,9 @@ def run(
 ) -> int:
     if args.action == "list":
         return _list(args, context, out)
-    return with_journal(scan(), err, functools.partial(_recover, context, out, err))
+    if args.action == "recover":
+        return with_journal(scan(), err, functools.partial(_recover, context, out, err))
+    return with_journal(scan(), err, functools.partial(_change, args, context, out, err))
 
 
 def _list(args: argparse.Namespace, context: AutostartContext, out: TextIO) -> int:
@@ -89,13 +130,112 @@ def _recover(
     try:
         report = ChangeRecovery() if changes is None else changes.recover()
     except (BrokenEntryError, RegistryError) as error:
+        err.write(_UNREADABLE.format(error))
+        return UNSAFE
+    out.write(render_recovery(report) or "Nothing to recover.\n")
+    return 0
+
+
+def _change(
+    args: argparse.Namespace,
+    context: AutostartContext,
+    out: TextIO,
+    err: TextIO,
+    conn: sqlite3.Connection,
+    data_dir: Path,
+) -> int:
+    changes = changes_for(context, conn, data_dir)
+    try:
+        if changes is not None:
+            out.write(render_recovery(changes.recover()))
+        matches = [
+            item
+            for item in list_autostart(context, include_machine=False).items
+            if item.digest.startswith(args.id)
+        ]
+        if len(matches) != 1:
+            out.write(_not_one(args.id, len(matches)))
+            return 1
+        (item,) = matches
+        if changes is None or not item.disableable:
+            out.write(f"Refused: {item.source} entries are read-only.\n")
+            return 1
+        if item.enabled is (args.action == "enable"):
+            out.write(f"{item.name} is already {args.action}d; nothing to do.\n")
+            return 1
+        if not args.yes:
+            out.write(_preview(args.action, item, context))
+            return 1
+        act = changes.disable if args.action == "disable" else changes.enable
+        return _outcome(act(item), item, args.action, out, err)
+    except (BrokenEntryError, RegistryError) as error:
+        err.write(_UNREADABLE.format(error))
+        return UNSAFE
+
+
+def _not_one(change_id: str, found: int) -> str:
+    if found == 0:
+        return (
+            f"No autostart entry has id {change_id}; it may have changed since it was listed."
+            " Run 'safeclean autostart list'.\n"
+        )
+    return f"Id {change_id} matches {found} entries; give more of it.\n"
+
+
+def _preview(action: str, item: AutostartItem, context: AutostartContext) -> str:
+    lines = [
+        f"Would {action} {item.name} ({item.source}, {item.scope}):",
+        f"  location: {item.location}",
+        f"  {_how(action, item, context)}",
+        f"Nothing was changed. Re-run with --yes to {action} it.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _how(action: str, item: AutostartItem, context: AutostartContext) -> str:
+    """What the change writes, in the user's words (decision 0011, item 8)."""
+    if item.source is Source.RUN_KEY:
+        state = "disabled, as the Task Manager does" if action == "disable" else "enabled"
+        return f"its StartupApproved flag is set to {state}; the Run value is never written"
+    if action == "enable":
+        return (
+            "if safeclean disabled it, what it changed is put back (the original from the"
+            " store, or the stub moved to the store); nothing is deleted"
+        )
+    if item.scope is Scope.USER:
+        return (
+            "its file is replaced by a copy with Hidden=true; the original is kept in the"
+            " autostart store"
+        )
+    user, _ = autostart_dirs(context.env, context.home)
+    return f"a stub with Hidden=true is created in {user}; the system file is never written"
+
+
+def _outcome(
+    result: ChangeResult, item: AutostartItem, action: str, out: TextIO, err: TextIO
+) -> int:
+    if result.refusal is ChangeRefusal.PENDING:  # autostart work was recovered above
         err.write(
-            f"safeclean: an unfinished autostart change cannot be checked: {error}; fix or move"
-            " what is there, then run 'safeclean autostart recover' again\n"
+            "safeclean: a quarantine operation is unfinished; run 'safeclean quarantine list'"
+            " first; nothing was changed\n"
         )
         return UNSAFE
-    out.write(render_recovery(report))
-    return 0
+    if result.refusal is not None:
+        out.write(f"Refused: {result.refusal}: {result.detail}\n")
+        return 1
+    if result.state is ChangeState.DONE:
+        out.write(f"{action.capitalize()}d {item.name} (change {result.change_id}).\n")
+        return 0
+    if result.state is ChangeState.ROLLED_BACK:
+        out.write(
+            f"Not changed: {result.detail}; it was rolled back (change {result.change_id}).\n"
+        )
+        return 1
+    err.write(
+        f"safeclean: change {result.change_id} failed: {result.detail};"
+        " run 'safeclean autostart recover'\n"
+    )
+    return UNSAFE
 
 
 def changes_for(
@@ -115,7 +255,7 @@ def render_recovery(report: ChangeRecovery) -> str:
     closed += [(i, "rolled_back") for i in report.rolled_back]
     closed += [(i, "failed") for i in report.failed]
     if not closed:
-        return "Nothing to recover.\n"
+        return ""
     lines = [f"Recovered {count(len(closed), 'interrupted autostart change')}:"]
     lines += [f"  [{change_id}] {state}" for change_id, state in sorted(closed)]
     return "\n".join(lines) + "\n"
@@ -151,7 +291,8 @@ def _item_lines(item: AutostartItem) -> list[str]:
     ]
     if item.shadows is not None:
         lines.append(f"    shadows: {item.shadows}")
-    return lines + [f"    note: {note}" for note in item.notes]
+    lines += [f"    note: {note}" for note in item.notes]
+    return [*lines, f"    id: {item.digest[:ID_LENGTH]}"]
 
 
 def render_json(

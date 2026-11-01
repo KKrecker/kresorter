@@ -1,4 +1,4 @@
-"""Console interface. ``scan``, ``analyze`` and ``autostart list`` report; ``quarantine`` acts."""
+"""Console interface. ``scan``, ``analyze``, ``autostart list`` report; the others can act."""
 
 from __future__ import annotations
 
