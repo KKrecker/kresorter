@@ -34,8 +34,9 @@ NETWORK_MODULES = frozenset(
         "xmlrpc",
     }
 )
-# Step 3 of the step 6 plan makes it {"src/safeclean/llm/transport.py": http.client, socket}.
-ALLOWED: dict[str, frozenset[str]] = {}
+ALLOWED: dict[str, frozenset[str]] = {
+    "src/safeclean/llm/transport.py": frozenset({"http.client", "socket"}),
+}
 
 
 def _network(name: str) -> bool:
@@ -115,8 +116,9 @@ def test_only_the_allowlist_imports_the_network() -> None:
 
 
 def test_the_allowlist_is_pinned() -> None:
-    # Empty until step 3 of the step 6 plan. Growing it needs a decision, not a quiet edit.
-    assert ALLOWED == {}
+    # [0013.10] The transport, with http.client and socket: never urllib, whose opener reads
+    # proxy settings and follows redirects. Growing this needs a decision, not a quiet edit.
+    assert {"src/safeclean/llm/transport.py": frozenset({"http.client", "socket"})} == ALLOWED
 
 
 def test_what_is_allowed_is_really_imported() -> None:

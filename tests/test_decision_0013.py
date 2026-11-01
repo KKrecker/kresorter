@@ -19,7 +19,7 @@ ITEM = re.compile(r"^(\d+)\. \*\*", re.MULTILINE)
 CITATION = re.compile(r"\[0013\.(\d+)\]")
 
 # Taken out by the commit that completes each item (the step 6 plan of 0013).
-PENDING: frozenset[int] = frozenset(range(1, 30)) - {2, 7, 8, 9, 28}
+PENDING: frozenset[int] = frozenset(range(1, 30)) - {2, 7, 8, 9, 10, 12, 28, 29}
 
 
 def numbered(text: str) -> list[int]:
