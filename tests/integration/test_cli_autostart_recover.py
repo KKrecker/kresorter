@@ -9,81 +9,27 @@ fake registry.
 """
 
 import errno
-import io
 import os
 from pathlib import Path
 
 import pytest
 
 from fakes import FakeOpenFiles, FakeRegistry, make_policy
-from safeclean import cli
 from safeclean.autostart.changes import AutostartStore, XdgChanges
-from safeclean.autostart.listing import AutostartContext
-from safeclean.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
+from safeclean.autostart.registry import Hive, RegValue, ValueKind
 from safeclean.autostart.run_keys import APPROVED, RUN
 from safeclean.autostart.xdg import read_xdg
-from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
+from safeclean.core.heuristics import JunkClassifier, default_rules
 from safeclean.core.scanner import ScanContext
 from safeclean.storage.db import connect
 from safeclean.storage.lock import InstanceLock
+from support.cli import autostart_context, run
 from support.files import write
+from support.journal import query
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 DISABLE = b"\x03\x00\x00\x00" + (133_444_736_000_000_000).to_bytes(8, "little")
 FLAG = rf"HKCU\{APPROVED}\Sync"
-
-
-@pytest.fixture
-def zone(tmp_path: Path) -> Path:
-    path = tmp_path / "zone"
-    path.mkdir()
-    return path
-
-
-@pytest.fixture
-def data_dir(tmp_path: Path) -> Path:
-    return tmp_path / "data" / "safeclean"
-
-
-@pytest.fixture
-def scan(tmp_path: Path, zone: Path, data_dir: Path) -> ScanContext:
-    # As in test_cli_quarantine: tmp_path is under /tmp, which "posix-temp" marks as junk.
-    rules = [r for r in default_rules() if r.id != "posix-temp"]
-    policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=data_dir)
-    return ScanContext(
-        policy=policy,
-        open_files=FakeOpenFiles(),
-        classifier=JunkClassifier(rules, platform="linux"),
-        open_files_checked=True,
-    )
-
-
-def autostart(
-    platform: Platform, tmp_path: Path, registry: UserRegistry | None = None
-) -> AutostartContext:
-    env = {
-        "XDG_CONFIG_HOME": str(tmp_path / "config"),
-        "XDG_CONFIG_DIRS": str(tmp_path / "etc" / "xdg"),
-    }
-    return AutostartContext(
-        platform, env, home=tmp_path, root=tmp_path, registry=lambda: registry or FakeRegistry({})
-    )
-
-
-def run(args: list[str], scan: ScanContext, auto: AutostartContext) -> tuple[int, str, str]:
-    out, err = io.StringIO(), io.StringIO()
-    code = cli.main(
-        args, out=out, err=err, context_factory=lambda: scan, autostart_context=lambda: auto
-    )
-    return code, out.getvalue(), err.getvalue()
-
-
-def query(data_dir: Path, sql: str) -> list[tuple[object, ...]]:
-    conn = connect(data_dir / "journal.db")
-    try:
-        return conn.execute(sql).fetchall()
-    finally:
-        conn.close()
 
 
 def interrupted_xdg_disable(tmp_path: Path, data_dir: Path) -> Path:
@@ -145,7 +91,7 @@ def pending_run_change(data_dir: Path) -> None:
 
 
 def test_nothing_to_recover(tmp_path: Path, scan: ScanContext, data_dir: Path) -> None:
-    code, out, err = run(["autostart", "recover"], scan, autostart("linux", tmp_path))
+    code, out, err = run(["autostart", "recover"], scan, autostart_context("linux", tmp_path))
 
     assert (code, out, err) == (0, "Nothing to recover.\n", "")
     assert (data_dir / "journal.db").exists()  # the shared journal, in the data directory
@@ -157,7 +103,7 @@ def test_an_interrupted_xdg_change_is_closed_by_the_disk(
 ) -> None:
     interrupted_xdg_disable(tmp_path, data_dir)
 
-    code, out, err = run(["autostart", "recover"], scan, autostart("linux", tmp_path))
+    code, out, err = run(["autostart", "recover"], scan, autostart_context("linux", tmp_path))
 
     assert (code, out, err) == (0, "Recovered 1 interrupted autostart change:\n  [1] done\n", "")
     assert query(data_dir, "SELECT state FROM autostart_changes") == [("done",)]
@@ -170,7 +116,9 @@ def test_an_interrupted_run_change_is_closed_by_the_registry(
     flag = RegValue("Sync", ValueKind.REG_BINARY, b"\x02" + bytes(11))  # never written
     registry = FakeRegistry({(Hive.HKCU, APPROVED): [flag]})
 
-    code, out, _ = run(["autostart", "recover"], scan, autostart("windows", tmp_path, registry))
+    code, out, _ = run(
+        ["autostart", "recover"], scan, autostart_context("windows", tmp_path, registry)
+    )
 
     assert (code, out) == (0, "Recovered 1 interrupted autostart change:\n  [1] failed\n")
     assert registry.writes == []
@@ -179,7 +127,7 @@ def test_an_interrupted_run_change_is_closed_by_the_registry(
 def test_a_system_with_nothing_writable_has_nothing_to_recover(
     tmp_path: Path, scan: ScanContext
 ) -> None:
-    code, out, _ = run(["autostart", "recover"], scan, autostart("darwin", tmp_path))
+    code, out, _ = run(["autostart", "recover"], scan, autostart_context("darwin", tmp_path))
 
     assert (code, out) == (0, "Nothing to recover.\n")
 
@@ -191,7 +139,7 @@ def test_an_entry_that_cannot_be_read_stops_with_the_reason(
     entry.rename(tmp_path / "elsewhere")
     entry.mkdir()
 
-    code, out, err = run(["autostart", "recover"], scan, autostart("linux", tmp_path))
+    code, out, err = run(["autostart", "recover"], scan, autostart_context("linux", tmp_path))
 
     assert (code, out) == (3, "")
     assert err == (
@@ -215,7 +163,7 @@ def test_a_partial_stub_that_cannot_be_moved_stops_with_the_reason(
     before = query(data_dir, "SELECT state, error FROM autostart_changes")
     monkeypatch.setattr(os, "rename", denied_rename)
 
-    code, out, err = run(["autostart", *command], scan, autostart("linux", tmp_path))
+    code, out, err = run(["autostart", *command], scan, autostart_context("linux", tmp_path))
 
     monkeypatch.undo()
     slot = data_dir / "autostart" / "1"
@@ -236,7 +184,7 @@ def test_an_unsafe_data_directory_is_refused_before_anything_is_created(
     policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=zone)
     unsafe = ScanContext(policy, FakeOpenFiles(), JunkClassifier(rules, platform="linux"), True)
 
-    code, _, err = run(["autostart", "recover"], unsafe, autostart("linux", tmp_path))
+    code, _, err = run(["autostart", "recover"], unsafe, autostart_context("linux", tmp_path))
 
     assert code == 3
     assert "inside scan zone" in err
@@ -246,7 +194,7 @@ def test_an_unsafe_data_directory_is_refused_before_anything_is_created(
 def test_a_running_instance_locks_it_out(tmp_path: Path, scan: ScanContext, data_dir: Path) -> None:
     data_dir.mkdir(parents=True)
     with InstanceLock(data_dir / "safeclean.lock"):
-        code, _, err = run(["autostart", "recover"], scan, autostart("linux", tmp_path))
+        code, _, err = run(["autostart", "recover"], scan, autostart_context("linux", tmp_path))
 
     assert code == 3
     assert "safeclean:" in err
@@ -268,7 +216,7 @@ def test_quarantine_actions_wait_for_autostart_recover(
     target = write(zone / "a.bin", b"payload")
     args = [str(target) if a == "a.bin" else a for a in args]
 
-    code, out, err = run(["quarantine", *args], scan, autostart("linux", tmp_path))
+    code, out, err = run(["quarantine", *args], scan, autostart_context("linux", tmp_path))
 
     assert (code, out) == (3, "")
     assert err == (
@@ -282,6 +230,6 @@ def test_quarantine_actions_wait_for_autostart_recover(
 def test_quarantine_list_still_runs(tmp_path: Path, scan: ScanContext, data_dir: Path) -> None:
     pending_run_change(data_dir)
 
-    code, out, _ = run(["quarantine", "list"], scan, autostart("linux", tmp_path))
+    code, out, _ = run(["quarantine", "list"], scan, autostart_context("linux", tmp_path))
 
     assert (code, out) == (0, "Quarantine: 0 files, 0 B\n")

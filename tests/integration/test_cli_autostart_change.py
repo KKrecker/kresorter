@@ -8,44 +8,27 @@ names nothing. Without ``--yes`` the command shows what would be written and cha
 2 usage; 3 failed, unfinished quarantine work, or the journal cannot be used safely.
 """
 
-import io
 import json
 import plistlib
 from pathlib import Path
 
 import pytest
 
-from fakes import FakeOpenFiles, FakeRegistry, deny_stat, journal_held, make_policy
-from safeclean import cli
+from fakes import FakeRegistry, deny_stat, journal_held
 from safeclean.autostart.journal import ChangeResult, ChangeState
 from safeclean.autostart.listing import AutostartContext
 from safeclean.autostart.models import AutostartItem
-from safeclean.autostart.registry import Hive, RegistryError, RegValue, UserRegistry, ValueKind
+from safeclean.autostart.registry import Hive, RegistryError, RegValue, ValueKind
 from safeclean.autostart.run_changes import RunKeyChanges
 from safeclean.autostart.run_keys import APPROVED, RUN, RUN_ONCE
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
-from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.scanner import ScanContext
 from safeclean.storage.db import connect
+from support.cli import autostart_context, run
 from support.files import write
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 SYNC = RegValue("Sync", ValueKind.REG_SZ, r"C:\sync.exe")
-
-
-@pytest.fixture
-def data_dir(tmp_path: Path) -> Path:
-    return tmp_path / "data" / "safeclean"
-
-
-@pytest.fixture
-def scan(tmp_path: Path, data_dir: Path) -> ScanContext:
-    # As in test_cli_quarantine: tmp_path is under /tmp, which "posix-temp" marks as junk.
-    zone = tmp_path / "zone"
-    zone.mkdir()
-    rules = [r for r in default_rules() if r.id != "posix-temp"]
-    policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=data_dir)
-    return ScanContext(policy, FakeOpenFiles(), JunkClassifier(rules, platform="linux"), True)
 
 
 @pytest.fixture
@@ -56,26 +39,6 @@ def user(tmp_path: Path) -> Path:
 @pytest.fixture
 def system(tmp_path: Path) -> Path:
     return tmp_path / "etc" / "xdg" / "autostart"
-
-
-def autostart(
-    platform: Platform, tmp_path: Path, registry: UserRegistry | None = None
-) -> AutostartContext:
-    env = {
-        "XDG_CONFIG_HOME": str(tmp_path / "config"),
-        "XDG_CONFIG_DIRS": str(tmp_path / "etc" / "xdg"),
-    }
-    return AutostartContext(
-        platform, env, home=tmp_path, root=tmp_path, registry=lambda: registry or FakeRegistry({})
-    )
-
-
-def run(args: list[str], scan: ScanContext, auto: AutostartContext) -> tuple[int, str, str]:
-    out, err = io.StringIO(), io.StringIO()
-    code = cli.main(
-        args, out=out, err=err, context_factory=lambda: scan, autostart_context=lambda: auto
-    )
-    return code, out.getvalue(), err.getvalue()
 
 
 def listed(scan: ScanContext, auto: AutostartContext) -> list[dict[str, object]]:
@@ -104,7 +67,7 @@ def rows(data_dir: Path) -> list[tuple[object, ...]]:
 
 def test_list_shows_the_id_of_each_entry(tmp_path: Path, scan: ScanContext, user: Path) -> None:
     entry = write(user / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
 
     _, out, _ = run(["autostart", "list"], scan, auto)
 
@@ -115,7 +78,7 @@ def test_any_unique_beginning_of_the_digest_names_the_entry(
     tmp_path: Path, scan: ScanContext, user: Path
 ) -> None:
     write(user / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
 
     code, out, _ = run(
         ["autostart", "disable", only_id(scan, auto)[:3].upper(), "--yes"], scan, auto
@@ -128,7 +91,7 @@ def test_an_id_naming_nothing_says_the_entry_may_have_changed(
     tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
 ) -> None:
     entry = write(user / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
     old = only_id(scan, auto)
     entry.write_bytes(APP + b"Comment=edited\n")
 
@@ -147,7 +110,7 @@ def test_an_id_naming_several_entries_is_refused(
 ) -> None:
     for n in range(17):  # 17 digests: two of them begin with the same hex digit
         write(user / f"app{n}.desktop", APP.replace(b"Name=App", b"Name=App%d" % n))
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
     firsts = [str(item["digest"])[0] for item in listed(scan, auto)]
     shared = next(c for c in firsts if firsts.count(c) > 1)
 
@@ -165,7 +128,7 @@ def test_an_id_that_is_not_hex_is_a_usage_error(
     tmp_path: Path, scan: ScanContext, bad: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with pytest.raises(SystemExit) as exc:
-        run(["autostart", "disable", bad], scan, autostart("linux", tmp_path))
+        run(["autostart", "disable", bad], scan, autostart_context("linux", tmp_path))
 
     assert exc.value.code == 2
     assert "argument id: not the beginning of an autostart id" in capsys.readouterr().err
@@ -198,7 +161,7 @@ def test_without_yes_it_shows_what_would_be_written_and_changes_nothing(
     how: str,
 ) -> None:
     entry = write((user if scope == "user" else system) / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
 
     code, out, _ = run(["autostart", "disable", only_id(scan, auto)], scan, auto)
 
@@ -219,7 +182,7 @@ def test_enable_without_yes_says_nothing_is_deleted(
     tmp_path: Path, scan: ScanContext, user: Path
 ) -> None:
     entry = write(user / "app.desktop", hidden_copy(APP))
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
 
     code, out, _ = run(["autostart", "enable", only_id(scan, auto)], scan, auto)
 
@@ -240,7 +203,7 @@ def test_disable_then_enable_an_own_entry(
     tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
 ) -> None:
     entry = write(user / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
 
     disabled = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
     hidden = entry.read_bytes()
@@ -257,7 +220,7 @@ def test_disable_a_system_entry_creates_the_user_stub(
     tmp_path: Path, scan: ScanContext, user: Path, system: Path
 ) -> None:
     write(system / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
 
     code, _, _ = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
 
@@ -270,7 +233,7 @@ def test_an_entry_already_in_that_state_has_nothing_to_do(
     tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
 ) -> None:
     write(user / "app.desktop", hidden_copy(APP))
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
 
     code, out, _ = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
 
@@ -280,7 +243,7 @@ def test_an_entry_already_in_that_state_has_nothing_to_do(
 
 def test_a_refusal_of_the_change_is_shown(tmp_path: Path, scan: ScanContext, user: Path) -> None:
     write(user / "app.desktop", hidden_copy(APP))  # disabled, but not by safeclean
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
 
     code, out, _ = run(["autostart", "enable", only_id(scan, auto), "--yes"], scan, auto)
 
@@ -294,7 +257,7 @@ def test_an_interrupted_change_is_recovered_first(
     tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
 ) -> None:
     write(user / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
     run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
     conn = connect(data_dir / "journal.db")
     conn.execute("UPDATE autostart_changes SET state = 'pending', finished_at_ns = NULL")
@@ -312,7 +275,7 @@ def test_unfinished_quarantine_work_names_its_command(
     tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
 ) -> None:
     entry = write(user / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
     data_dir.mkdir(parents=True)
     conn = connect(data_dir / "journal.db")
     conn.execute(
@@ -340,7 +303,7 @@ def test_a_check_before_acting_that_fails_stops_with_the_reason(
 ) -> None:
     write(system / "app.desktop", APP)
     user.mkdir(parents=True)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
     change_id = only_id(scan, auto)
     deny_stat(monkeypatch, user)  # where the stub would go: its device cannot be known
 
@@ -364,7 +327,7 @@ def test_a_journal_failure_stops_and_names_autostart_recover(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     entry = write(user / "app.desktop", APP)
-    auto = autostart("linux", tmp_path)
+    auto = autostart_context("linux", tmp_path)
     change_id = only_id(scan, auto)
     data_dir.mkdir(parents=True)
 
@@ -384,7 +347,7 @@ def test_a_journal_failure_stops_and_names_autostart_recover(
 
 def test_disable_an_hkcu_run_value_writes_its_flag(tmp_path: Path, scan: ScanContext) -> None:
     registry = FakeRegistry({(Hive.HKCU, RUN): [SYNC]})
-    auto = autostart("windows", tmp_path, registry)
+    auto = autostart_context("windows", tmp_path, registry)
     value_id = only_id(scan, auto)
 
     preview = run(["autostart", "disable", value_id], scan, auto)
@@ -406,7 +369,7 @@ def test_disable_an_hkcu_run_value_writes_its_flag(tmp_path: Path, scan: ScanCon
 
 def test_enable_preview_of_a_run_value(tmp_path: Path, scan: ScanContext) -> None:
     flag = RegValue("Sync", ValueKind.REG_BINARY, b"\x03" + bytes(11))
-    auto = autostart(
+    auto = autostart_context(
         "windows", tmp_path, FakeRegistry({(Hive.HKCU, RUN): [SYNC], (Hive.HKCU, APPROVED): [flag]})
     )
 
@@ -417,7 +380,7 @@ def test_enable_preview_of_a_run_value(tmp_path: Path, scan: ScanContext) -> Non
 
 def test_a_read_only_entry_is_refused(tmp_path: Path, scan: ScanContext, data_dir: Path) -> None:
     once = RegValue("Setup", ValueKind.REG_SZ, r"C:\setup.exe")
-    auto = autostart("windows", tmp_path, FakeRegistry({(Hive.HKCU, RUN_ONCE): [once]}))
+    auto = autostart_context("windows", tmp_path, FakeRegistry({(Hive.HKCU, RUN_ONCE): [once]}))
 
     code, out, _ = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
 
@@ -433,7 +396,7 @@ def test_nothing_can_be_changed_on_macos(tmp_path: Path, scan: ScanContext, data
     }
     # home and root are both tmp_path here: a daemon is listed once, an agent twice
     write(tmp_path / "Library" / "LaunchDaemons" / "agent.plist", plistlib.dumps(agent))
-    auto = autostart("darwin", tmp_path)
+    auto = autostart_context("darwin", tmp_path)
 
     code, out, _ = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
 
@@ -444,7 +407,7 @@ def test_nothing_can_be_changed_on_macos(tmp_path: Path, scan: ScanContext, data
 def test_a_rolled_back_write_is_shown(tmp_path: Path, scan: ScanContext) -> None:
     error = RegistryError("Access is denied")
     registry = FakeRegistry({(Hive.HKCU, RUN): [SYNC]}, write_error=error)
-    auto = autostart("windows", tmp_path, registry)
+    auto = autostart_context("windows", tmp_path, registry)
 
     code, out, _ = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
 
@@ -458,7 +421,7 @@ def test_a_failed_change_says_how_to_recover(
         return ChangeResult(7, ChangeState.FAILED, None, "the flag is something else")
 
     monkeypatch.setattr(RunKeyChanges, "disable", failed)
-    auto = autostart("windows", tmp_path, FakeRegistry({(Hive.HKCU, RUN): [SYNC]}))
+    auto = autostart_context("windows", tmp_path, FakeRegistry({(Hive.HKCU, RUN): [SYNC]}))
 
     code, out, err = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
 
@@ -476,7 +439,7 @@ def test_a_flag_that_cannot_be_read_back_stops_with_the_reason(
         raise RegistryError("access denied")
 
     monkeypatch.setattr(RunKeyChanges, "disable", unreadable)
-    auto = autostart("windows", tmp_path, FakeRegistry({(Hive.HKCU, RUN): [SYNC]}))
+    auto = autostart_context("windows", tmp_path, FakeRegistry({(Hive.HKCU, RUN): [SYNC]}))
 
     code, _, err = run(["autostart", "disable", only_id(scan, auto), "--yes"], scan, auto)
 

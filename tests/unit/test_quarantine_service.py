@@ -31,6 +31,7 @@ from safeclean.quarantine.service import (
 from safeclean.quarantine.vault import Vault
 from safeclean.storage.db import connect
 from support.files import write
+from support.journal import rows
 
 NO_RULES = JunkClassifier([], platform="linux")
 
@@ -44,10 +45,6 @@ def scanned(path: Path) -> FileEntry:
 
 def mode_bits(path: Path) -> int:
     return stat.S_IMODE(path.stat().st_mode)
-
-
-def rows(conn: sqlite3.Connection, sql: str, *params: object) -> list[tuple[object, ...]]:
-    return conn.execute(sql, params).fetchall()
 
 
 Move = Callable[[Path, Path], object]
@@ -66,18 +63,6 @@ def failing_on(call: int, error: BaseException, before: Callable[[], None] = lam
         return source.replace(target)
 
     return move
-
-
-@pytest.fixture
-def data_dir(tmp_path: Path) -> Path:
-    return tmp_path / "data" / "safeclean"
-
-
-@pytest.fixture
-def zone(tmp_path: Path) -> Path:
-    path = tmp_path / "zone"
-    path.mkdir()
-    return path
 
 
 @pytest.fixture

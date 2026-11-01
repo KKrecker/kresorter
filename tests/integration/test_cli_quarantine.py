@@ -6,72 +6,29 @@ first. Purge deletes only with ``--yes``; without it the plan is shown and nothi
 """
 
 import functools
-import io
 import os
 import time
 from pathlib import Path, PurePath
 
 import pytest
 
-from fakes import FakeOpenFiles, journal_held, make_policy
+from fakes import FakeOpenFiles, journal_held
 from safeclean import cli, cli_quarantine
-from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
-from safeclean.core.open_files import NoOpenFileCheck, OpenFileChecker, ProcFdChecker
+from safeclean.core.heuristics import Platform
+from safeclean.core.open_files import NoOpenFileCheck, ProcFdChecker
 from safeclean.core.scanner import ScanContext
 from safeclean.quarantine.service import QuarantineService
-from safeclean.storage.db import connect
 from safeclean.storage.lock import InstanceLock
+from support.cli import run, scan_context
 from support.files import write
+from support.journal import query
 
 # --- helpers -----------------------------------------------------------------------------------
 
 
 @pytest.fixture
-def zone(tmp_path: Path) -> Path:
-    path = tmp_path / "zone"
-    path.mkdir()
-    return path
-
-
-@pytest.fixture
-def data_dir(tmp_path: Path) -> Path:
-    return tmp_path / "data" / "safeclean"
-
-
-def ctx(
-    tmp_path: Path, zone: Path, data_dir: Path, open_files: OpenFileChecker | None = None
-) -> ScanContext:
-    # tmp_path lives under /tmp, which the "posix-temp" rule marks as junk: drop it, as in
-    # test_cli_scan, or the data directory itself would look like junk and be refused.
-    rules = [r for r in default_rules() if r.id != "posix-temp"]
-    checker = open_files or FakeOpenFiles()
-    policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=data_dir)
-    return ScanContext(
-        policy=policy,
-        open_files=checker,
-        classifier=JunkClassifier(rules, platform="linux"),
-        open_files_checked=checker.reliable,
-    )
-
-
-@pytest.fixture
 def context(tmp_path: Path, zone: Path, data_dir: Path) -> ScanContext:
-    return ctx(tmp_path, zone, data_dir)
-
-
-def run(args: list[str], context: ScanContext) -> tuple[int, str, str]:
-    out, err = io.StringIO(), io.StringIO()
-    code = cli.main(args, out=out, err=err, context_factory=lambda: context)
-    return code, out.getvalue(), err.getvalue()
-
-
-def query(data_dir: Path, sql: str, *params: object) -> list[tuple[object, ...]]:
-    """Read the CLI's journal after the commands under test have run."""
-    conn = connect(data_dir / "journal.db")
-    try:
-        return conn.execute(sql, params).fetchall()
-    finally:
-        conn.close()
+    return scan_context(tmp_path, zone, data_dir)
 
 
 def states(data_dir: Path) -> list[tuple[object, ...]]:
@@ -186,7 +143,7 @@ def test_add_reports_refusals_and_exits_1(tmp_path: Path, context: ScanContext, 
 
 def test_add_refuses_an_open_file(tmp_path: Path, zone: Path, data_dir: Path) -> None:
     write(zone / "a.bin")
-    context = ctx(tmp_path, zone, data_dir, FakeOpenFiles([zone / "a.bin"]))
+    context = scan_context(tmp_path, zone, data_dir, FakeOpenFiles([zone / "a.bin"]))
 
     code, out, _ = run(["quarantine", "add", str(zone / "a.bin")], context)
 
@@ -211,7 +168,7 @@ def test_without_a_reliable_open_file_check_nothing_moves(
     tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
     write(zone / "a.bin")
-    context = ctx(tmp_path, zone, data_dir, NoOpenFileCheck())
+    context = scan_context(tmp_path, zone, data_dir, NoOpenFileCheck())
 
     code, out, err = run(["quarantine", "add", str(zone / "a.bin")], context)
 
@@ -241,7 +198,7 @@ def test_a_failed_move_is_rolled_back_and_reported(
 
 def test_unusable_data_directory_exits_3(tmp_path: Path, zone: Path) -> None:
     write(tmp_path / "data")  # a file where the data directory's parent should be
-    context = ctx(tmp_path, zone, tmp_path / "data" / "safeclean")
+    context = scan_context(tmp_path, zone, tmp_path / "data" / "safeclean")
 
     code, out, err = run(["quarantine", "list"], context)
 
@@ -285,7 +242,7 @@ def test_a_journal_failure_stops_and_names_quarantine_list(
 
 
 def test_data_directory_inside_a_scan_zone_exits_3(tmp_path: Path, zone: Path) -> None:
-    context = ctx(tmp_path, zone, zone / "safeclean")
+    context = scan_context(tmp_path, zone, zone / "safeclean")
 
     code, _, err = run(["quarantine", "list"], context)
 
@@ -534,7 +491,7 @@ class OpenedAfterTheScan:
 def test_bulk_add_rechecks_each_file_and_moves_the_rest(
     tmp_path: Path, zone: Path, data_dir: Path, junk: dict[str, Path]
 ) -> None:
-    context = ctx(tmp_path, zone, data_dir, OpenedAfterTheScan(junk["pyc"]))
+    context = scan_context(tmp_path, zone, data_dir, OpenedAfterTheScan(junk["pyc"]))
 
     args = ["quarantine", "add", "--from-analysis", "--level", "likely_safe", "--yes"]
     code, out, _ = run(args, context)
@@ -559,7 +516,7 @@ def test_bulk_add_with_nothing_to_quarantine_exits_1(context: ScanContext, zone:
 def test_bulk_add_without_a_reliable_open_file_check_exits_3(
     tmp_path: Path, zone: Path, data_dir: Path, junk: dict[str, Path], confirm: list[str]
 ) -> None:
-    context = ctx(tmp_path, zone, data_dir, NoOpenFileCheck())
+    context = scan_context(tmp_path, zone, data_dir, NoOpenFileCheck())
 
     args = ["quarantine", "add", "--from-analysis", "--level", "safe", *confirm]
     code, out, err = run(args, context)

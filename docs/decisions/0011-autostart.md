@@ -663,3 +663,9 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `write` that also sets a time or writes text, the walker's one-byte default, a snapshot
     with inodes. Boundary fakes stay in `tests/fakes.py`. Organize's tests start from these
     instead of adding a seventh copy.
+123. **Fixtures used by several files live in `tests/conftest.py`** (B10): `data_dir`, `zone`
+    and the CLI's `scan` context, beside `support.journal` (`rows`, `query`) and `support.cli`
+    (`scan_context`, `autostart_context`, `run`). pytest finds a fixture by its name, so it is
+    not imported: an imported fixture reads as an unused import, and the parameter that
+    requests it shadows it. Fixtures that share a name but not a setup stay in their files
+    (`conn`: one keeps the journal apart from the tree under test).

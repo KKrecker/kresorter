@@ -14,26 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from fakes import FakeOpenFiles, make_policy
 from safeclean import cli_journal
-from safeclean.core.heuristics import JunkClassifier, default_rules
 from safeclean.core.scanner import ScanContext
 
 RECOVER = "safeclean thing recover"  # the domain's own command, passed in by it
-
-
-@pytest.fixture
-def data_dir(tmp_path: Path) -> Path:
-    return tmp_path / "data" / "safeclean"
-
-
-@pytest.fixture
-def scan(tmp_path: Path, data_dir: Path) -> ScanContext:
-    # As in test_cli_quarantine: tmp_path is under /tmp, which "posix-temp" marks as junk.
-    rules = [r for r in default_rules() if r.id != "posix-temp"]
-    zone = tmp_path / "zone"
-    policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=data_dir)
-    return ScanContext(policy, FakeOpenFiles(), JunkClassifier(rules, platform="linux"), True)
 
 
 def full(conn: sqlite3.Connection, data_dir: Path) -> int:

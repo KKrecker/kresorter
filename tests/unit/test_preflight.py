@@ -39,13 +39,6 @@ def refusal(result: Cleared | Refused) -> RefusalReason:
 
 
 @pytest.fixture
-def zone(tmp_path: Path) -> Path:
-    path = tmp_path / "zone"
-    path.mkdir()
-    return path
-
-
-@pytest.fixture
 def policy(tmp_path: Path) -> PathPolicy:
     return make_policy(tmp_path, tmp_path / "system")
 
