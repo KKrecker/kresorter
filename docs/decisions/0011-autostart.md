@@ -42,7 +42,7 @@
    - XDG, the user's own entry: the original goes to the vault, then a copy with `Hidden=true`
      is written in its place; enable puts the original back.
    - XDG, a system entry: a user stub with `Hidden=true` is created; `/etc` is never written.
-     Enable sends the stub through the quarantine; the system file was never touched.
+     Enable moves the stub to the autostart store (item 66); the system file was never touched.
    - `HKCU` Run: the `StartupApproved\Run` flag, as the Task Manager does; the `Run` value
      itself is never touched. `StartupApproved` is also the source of the listed state.
 9. **Read-only in step 4, each needing its own risk analysis:** systemd user units, services,
@@ -346,3 +346,44 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
 65. **A system entry is hidden by `STUB`**, `[Desktop Entry]` and `Hidden=true` only, in the
     user directory under the same file name; it reads back as the system entry, disabled, with
     the system file in `shadows`.
+
+## Addendum (step 4, commit 12a2): disabling an XDG entry
+
+66. **The autostart store, `<data_dir>/autostart/<change id>`, mode 0700**, is apart from the
+    quarantine vault: it holds the originals of disabled entries and the stubs removed on
+    enable (refining item 8, "through the quarantine"), both journaled in `autostart_changes`.
+    Originals are needed for enable at any time, so the store is never purged:
+    `delete_from_vault` refuses anything outside `<vault>/<operation>/<item>`.
+67. **A user's own entry is never missing**: the copy is written to `<id>.new` in the store
+    and synced, the original is hard-linked into the slot `<id>` (the same inode, not a copy),
+    and `os.replace` puts the copy in its place atomically. The copy is made of the bytes read
+    once and journaled as `value_before`, never read again while writing.
+68. **A system entry gets a stub created with `O_CREAT | O_EXCL`**, so a file that appeared
+    meanwhile is never overwritten. A missing user directory is created with mode 0700 (XDG
+    Base Directory); an existing one keeps its mode. A directory created for a change that is
+    rolled back stays: removing it would be a deletion, and an empty directory is harmless.
+69. **Checked again right before acting, as a whole**: the item must still be in a fresh
+    `read_xdg` listing, equal field by field, which also catches a user entry or stub that
+    appeared over a listed system entry; the bytes of a user entry are compared with the
+    listed digest once more. The window between this check and `os.replace`/`O_EXCL` remains,
+    as in the quarantine, with the same compensations.
+70. **Refusals are results, not exceptions, and change nothing**: no row, no file, nothing in
+    the store. `read_only` (item 9), `changed`, `already` (disabled by `Hidden=true`,
+    `X-GNOME-Autostart-enabled=false` or a stub), `pending` (unfinished autostart change or
+    quarantine operation, item 62), `other_device` (the store cannot hold the original by a
+    link), `too_large` (the copy would be skipped by the reader, item 64).
+71. **Journal before change**: the `pending` row with both values exists before the disk is
+    touched, and becomes `done` after the last step.
+72. **A failure is rolled back without deleting anything**: when a step fails the entry is as
+    it was; a stub created but not written or synced is moved into its slot (`vault_path`).
+    The row is `rolled_back` only if the location holds what it held before (`value_before`,
+    or nothing); otherwise it is `failed` and left for `recover()`. An OS error is returned as
+    the result; any other exception (`KeyboardInterrupt`) is journaled the same way, then
+    raised.
+73. **Leftovers stay in the store**: a partial `<id>.new` after a failed write, or the slot of
+    an original linked before `os.replace` failed. The store is ours and nothing deletes;
+    `recover()` reconciles them (commit 12b).
+74. **Enabling an entry not disabled by safeclean is refused in step 4** (commit 12a3): a
+    user's own entry with `Hidden=true` or `X-GNOME-Autostart-enabled=false` and no journal
+    row would need its content edited. A user stub over a system entry can be enabled: it is
+    moved, not edited.
