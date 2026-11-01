@@ -86,13 +86,21 @@ def planned(folder: Path) -> list[tuple[Path, Path]]:
     return [(folder / name, folder / MOVED[name]) for name in (A, B, C)]
 
 
-def crash(journal: Path, folder: Path, moves: Moves, faults: Mapping[Path, Fault]) -> None:
-    """Carry the batch out in a child process that crashes at its first ``exit-*`` fault."""
+def crash(
+    journal: Path,
+    folder: Path,
+    moves: Moves,
+    faults: Mapping[Path, Fault],
+    undoes: Sequence[int] | None = None,
+) -> None:
+    """Carry the batch out in a child process that crashes at its first ``exit-*`` fault; an
+    undo batch when ``undoes`` names the moves it reverses."""
     spec = {
         "journal": str(journal),
         "folder": str(folder),
         "moves": [[str(source), str(destination)] for source, destination in moves],
         "faults": {str(path): fault for path, fault in faults.items()},
+        "undoes": undoes,
     }
     child = _child(_CARRY_OUT, spec)
     assert child.returncode == CRASHED, child.stderr
@@ -140,7 +148,8 @@ from support.moves import FlakyRename
 spec = json.loads(sys.argv[1])
 faults = {Path(path): fault for path, fault in spec["faults"].items()}
 moves = [(Path(source), Path(destination)) for source, destination in spec["moves"]]
-carry_out(connect(Path(spec["journal"])), Path(spec["folder"]), moves, rename=FlakyRename(faults))
+conn = connect(Path(spec["journal"]))
+carry_out(conn, Path(spec["folder"]), moves, rename=FlakyRename(faults), undoes=spec["undoes"])
 """
 
 

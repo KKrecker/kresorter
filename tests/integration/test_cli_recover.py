@@ -11,6 +11,7 @@ another domain is unfinished, a command that would act refuses with exit 3 and n
 
 import errno
 import os
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,8 @@ from safeclean.autostart.xdg import read_xdg
 from safeclean.core.heuristics import JunkClassifier, default_rules
 from safeclean.core.open_files import NoOpenFileCheck
 from safeclean.core.scanner import ScanContext
+from safeclean.organize.mover import carry_out
+from safeclean.organize.undo import plan_undo
 from safeclean.storage.db import connect
 from safeclean.storage.lock import InstanceLock
 from support.cli import autostart_context, run, scan_context
@@ -73,6 +76,19 @@ def crashed_batch(zone: Path, data_dir: Path, faults: dict[str, Fault]) -> Path:
     folder = three_files(zone)
     at = {folder / name: fault for name, fault in faults.items()}
     crash(data_dir / "journal.db", folder, planned(folder), at)
+    return folder
+
+
+def crashed_undo(zone: Path, data_dir: Path, faults: dict[str, Fault]) -> Path:
+    """Batch 1 sorted ``three_files``; its undo, batch 2, crashed where ``faults`` say."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    folder = three_files(zone)
+    with closing(connect(data_dir / "journal.db")) as conn:
+        carry_out(conn, folder, planned(folder))
+        undo = plan_undo(conn, 1)
+    moves = [(move.source, move.destination) for move in undo.moves]
+    at = {folder / MOVED[name]: fault for name, fault in faults.items()}
+    crash(data_dir / "journal.db", folder, moves, at, [move.undoes for move in undo.moves])
     return folder
 
 
@@ -245,6 +261,43 @@ def test_a_move_recovery_cannot_settle_is_warned_about_on_stderr(
         " at the destination the file; neither was touched\n"
     )
     assert (folder / A).read_bytes() == (folder / MOVED[A]).read_bytes() == A.encode()
+
+
+@pytest.mark.parametrize(
+    ("faults", "state"),
+    [({B: "exit-after"}, "failed"), ({A: "exit-before"}, "rolled_back")],
+    ids=["failed", "rolled-back"],
+)
+def test_an_interrupted_undo_names_the_batch_it_undoes(
+    tmp_path: Path,
+    scan: ScanContext,
+    zone: Path,
+    data_dir: Path,
+    faults: dict[str, Fault],
+    state: str,
+) -> None:
+    # [0012.29] [0012.31] an undo cannot be undone: undoing its batch again takes the rest
+    crashed_undo(zone, data_dir, faults)
+
+    code, out, err = run(["recover"], scan, autostart_context("linux", tmp_path))
+
+    assert (code, err) == (0, "")
+    assert out == (
+        "Recovered 1 interrupted organize batch:\n"
+        f"  [2] {state}: the undo of batch 1 stopped;"
+        " 'safeclean organize undo 1' moves back the files still sorted\n"
+    )
+
+
+def test_an_interrupted_undo_that_finished_is_done(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path
+) -> None:
+    # [0012.31] the crash came after the last move back
+    crashed_undo(zone, data_dir, {C: "exit-after"})
+
+    code, out, _ = run(["recover"], scan, autostart_context("linux", tmp_path))
+
+    assert (code, out) == (0, "Recovered 1 interrupted organize batch:\n  [2] done\n")
 
 
 def test_the_moves_are_recovered_where_organize_does_not_move(
