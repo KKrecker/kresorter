@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from fakes import deny_stat
 from safeclean.autostart import changes
 from safeclean.autostart.changes import (
     AutostartStore,
@@ -397,6 +398,22 @@ def test_a_store_on_another_device_is_refused(
     result = tree.changes.disable(tree.item())
 
     assert_refused(tree, result, ChangeRefusal.OTHER_DEVICE, files)
+
+
+def test_a_user_directory_the_system_denies_is_not_taken_for_a_missing_one(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tree.system, "app", APP)
+    tree.user.mkdir(parents=True)
+    item = tree.item()
+    files = tree.files()
+    deny_stat(monkeypatch, tree.user)  # its device is unknown; the one above it is not its own
+
+    with pytest.raises(PermissionError, match="Permission denied"):
+        tree.changes.disable(item)
+
+    monkeypatch.undo()
+    assert (tree.files(), tree.rows(), tree.stored()) == (files, [], [])
 
 
 def test_an_own_entry_whose_copy_would_be_too_large_is_refused(tree: Tree) -> None:

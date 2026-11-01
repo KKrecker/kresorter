@@ -1,7 +1,12 @@
 """Fakes for OS boundaries. Tests never touch the live system state they describe."""
 
-from collections.abc import Iterable, Mapping, Sequence
+import errno
+import functools
+import os
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path, PurePath
+
+import pytest
 
 from safeclean.autostart.registry import Hive, RegistryError, RegValue
 from safeclean.core.policy import BlockReason, PathPolicy
@@ -98,3 +103,19 @@ class FakeRegistry:
         path, name = (Hive.HKCU, key), value.name.casefold()
         kept = [v for v in self._keys.get(path, ()) if v.name.casefold() != name]
         self._keys[path] = [*kept, value]
+
+
+def deny_stat(monkeypatch: pytest.MonkeyPatch, denied: Path) -> None:
+    """``os.stat`` and ``os.lstat`` of ``denied`` fail with ``EACCES``, as when a directory above
+    it cannot be searched; ``chmod`` would deny nothing to root (decision 0011, item 110)."""
+    for name in ("stat", "lstat"):
+        refuse = functools.partial(_refuse, getattr(os, name), str(denied))
+        monkeypatch.setattr(os, name, refuse)
+
+
+def _refuse(
+    real: Callable[..., os.stat_result], denied: str, path: object, *args: object, **kwargs: object
+) -> os.stat_result:
+    if str(path) == denied:
+        raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), denied)
+    return real(path, *args, **kwargs)

@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from fakes import deny_stat
 from safeclean.autostart import changes
 from safeclean.autostart.changes import AutostartStore, ChangeRecovery, ChangeState, XdgChanges
 from safeclean.autostart.entries import BrokenEntryError
@@ -224,6 +225,23 @@ def test_an_unreadable_entry_leaves_the_row_pending_and_raises(
         tree.changes.recover()
 
     assert tree.states() == [("pending", None, 0)]
+
+
+@pytest.mark.parametrize(("system", "there"), [(False, COPY), (True, STUB)], ids=["own", "stub"])
+def test_an_entry_the_system_denies_is_not_taken_for_a_missing_one(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch, system: bool, there: bytes
+) -> None:
+    write(tree.system if system else tree.user, "app", APP)
+    interrupted(tree, monkeypatch, "disable", None)  # written, but not journaled as done
+    entry = tree.user / "app.desktop"  # the copy, or the stub, is there
+    deny_stat(monkeypatch, entry)
+
+    with pytest.raises(BrokenEntryError, match="cannot read: Permission denied"):
+        tree.changes.recover()
+
+    monkeypatch.undo()
+    assert tree.states() == [("pending", None, 0)]
+    assert entry.read_bytes() == there
 
 
 # --- failed changes ------------------------------------------------------------------------------
