@@ -271,7 +271,7 @@ def test_an_interrupted_change_is_recovered_first(
     )
 
 
-def test_unfinished_quarantine_work_names_its_command(
+def test_unfinished_quarantine_work_names_safeclean_recover(
     tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
 ) -> None:
     entry = write(user / "app.desktop", APP)
@@ -287,8 +287,8 @@ def test_unfinished_quarantine_work_names_its_command(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: a quarantine operation is unfinished; run 'safeclean quarantine list'"
-        " first; nothing was changed\n"
+        "safeclean: the journal has unfinished quarantine work; run 'safeclean recover' first;"
+        " nothing was changed\n"
     )
     assert entry.read_bytes() == APP
 

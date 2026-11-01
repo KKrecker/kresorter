@@ -1,11 +1,12 @@
-"""`safeclean autostart recover`, and the quarantine naming it: end-to-end (commit 12c2a).
+"""`safeclean recover`, its alias `safeclean autostart recover`, and the commands naming it:
+end-to-end (commit 12c2a; decision 0011, items 125-127).
 
 Autostart changes share the journal, the data directory and the lock with the quarantine
-(decision 0011, item 62), so ``autostart recover`` builds the scan context to find them, as
-the quarantine does. It reconciles the autostart changes of this platform only (item 100).
-While one is unfinished, quarantine commands that would act refuse with exit 3 and name
-``safeclean autostart recover``; ``quarantine list`` still runs. Real temporary trees and a
-fake registry.
+(item 62), so recovery builds the scan context to find them. One command closes the
+interrupted work of every domain: the quarantine's first, which needs no open-file check
+(item 124), then the autostart changes of this platform. While work of another domain is
+unfinished, a command that would act refuses with exit 3 and names ``safeclean recover``;
+``quarantine list`` still runs. Real temporary trees and a fake registry.
 """
 
 import errno
@@ -14,29 +15,33 @@ from pathlib import Path
 
 import pytest
 
-from fakes import FakeOpenFiles, FakeRegistry, make_policy
+from fakes import FakeOpenFiles, FakeRegistry, journal_held, make_policy
 from safeclean.autostart.changes import AutostartStore, XdgChanges
 from safeclean.autostart.registry import Hive, RegValue, ValueKind
 from safeclean.autostart.run_keys import APPROVED, RUN
 from safeclean.autostart.xdg import read_xdg
 from safeclean.core.heuristics import JunkClassifier, default_rules
+from safeclean.core.open_files import NoOpenFileCheck
 from safeclean.core.scanner import ScanContext
 from safeclean.storage.db import connect
 from safeclean.storage.lock import InstanceLock
-from support.cli import autostart_context, run
+from support.cli import autostart_context, run, scan_context
 from support.files import write
 from support.journal import query
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 DISABLE = b"\x03\x00\x00\x00" + (133_444_736_000_000_000).to_bytes(8, "little")
 FLAG = rf"HKCU\{APPROVED}\Sync"
+RECOVER = pytest.mark.parametrize(
+    "command", [["recover"], ["autostart", "recover"]], ids=["recover", "alias"]
+)
 
 
 def interrupted_xdg_disable(tmp_path: Path, data_dir: Path) -> Path:
     """A user entry disabled for real, its row left pending as a crash before the end would."""
     user, system = tmp_path / "config" / "autostart", tmp_path / "etc" / "xdg" / "autostart"
     entry = write(user / "app.desktop", APP)
-    data_dir.mkdir(parents=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
     conn = connect(data_dir / "journal.db")
     try:
         changes = XdgChanges(conn, AutostartStore(data_dir), user, (system,))
@@ -46,6 +51,19 @@ def interrupted_xdg_disable(tmp_path: Path, data_dir: Path) -> Path:
     finally:
         conn.close()
     return entry
+
+
+def quarantined(scan: ScanContext, zone: Path) -> Path:
+    """A file moved into the quarantine for real; the operation is done."""
+    path = write(zone / "a.bin")
+    assert run(["quarantine", "add", str(path)], scan)[0] == 0
+    return path
+
+
+def left_pending(data_dir: Path) -> None:
+    """The quarantine's operation as a crash right after the move would leave it."""
+    query(data_dir, "UPDATE items SET state = 'pending'")
+    query(data_dir, "UPDATE operations SET state = 'pending', finished_at_ns = NULL")
 
 
 def no_space(*args: object, **kwargs: object) -> None:
@@ -87,15 +105,116 @@ def pending_run_change(data_dir: Path) -> None:
         conn.close()
 
 
-# --- autostart recover ---------------------------------------------------------------------------
+# --- every domain ---------------------------------------------------------------------------------
 
 
-def test_nothing_to_recover(tmp_path: Path, scan: ScanContext, data_dir: Path) -> None:
-    code, out, err = run(["autostart", "recover"], scan, autostart_context("linux", tmp_path))
+@RECOVER
+def test_nothing_to_recover(
+    tmp_path: Path, scan: ScanContext, data_dir: Path, command: list[str]
+) -> None:
+    code, out, err = run(command, scan, autostart_context("linux", tmp_path))
 
     assert (code, out, err) == (0, "Nothing to recover.\n", "")
     assert (data_dir / "journal.db").exists()  # the shared journal, in the data directory
     assert not (data_dir / "autostart").exists()  # the store is made by the first change only
+    assert not (data_dir / "quarantine").exists()  # the vault, by the first quarantine only
+
+
+@RECOVER
+def test_every_domain_is_recovered_the_quarantine_first(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path, command: list[str]
+) -> None:
+    quarantined(scan, zone)
+    interrupted_xdg_disable(tmp_path, data_dir)
+    left_pending(data_dir)
+
+    code, out, err = run(command, scan, autostart_context("linux", tmp_path))
+
+    assert (code, err) == (0, "")
+    assert out == (
+        "Recovered an interrupted quarantine operation (1 file).\n"
+        "Recovered 1 interrupted autostart change:\n  [1] done\n"
+    )
+    assert query(data_dir, "SELECT state FROM operations") == [("done",)]
+    assert query(data_dir, "SELECT state FROM items") == [("quarantined",)]
+    assert query(data_dir, "SELECT state FROM autostart_changes") == [("done",)]
+
+
+@RECOVER
+def test_the_quarantine_is_recovered_without_an_open_file_check(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path, command: list[str]
+) -> None:
+    """Where the quarantine refuses to act (macOS, Windows), its work is still closed (B7)."""
+    quarantined(scan, zone)
+    left_pending(data_dir)
+    unchecked = scan_context(tmp_path, zone, data_dir, NoOpenFileCheck())
+
+    code, out, err = run(command, unchecked, autostart_context("darwin", tmp_path))
+
+    assert (code, out, err) == (0, "Recovered an interrupted quarantine operation (1 file).\n", "")
+    assert query(data_dir, "SELECT state FROM operations") == [("done",)]
+    assert query(data_dir, "SELECT state FROM items") == [("quarantined",)]
+
+
+def test_a_lost_file_is_warned_about_on_stderr(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path
+) -> None:
+    path = quarantined(scan, zone)
+    left_pending(data_dir)
+    copy = data_dir / "quarantine" / "1" / "1"
+    copy.write_bytes(b"tampered")
+
+    code, out, err = run(["recover"], scan, autostart_context("linux", tmp_path))
+
+    assert (code, out) == (0, "Recovered an interrupted quarantine operation (1 file).\n")
+    assert err == (
+        f"safeclean: LOST: the vault copy of {path} changed after the move ({copy});"
+        " it will not be restored or purged\n"
+    )
+    assert query(data_dir, "SELECT state FROM items") == [("lost",)]
+
+
+def test_an_autostart_change_that_cannot_be_checked_leaves_the_quarantine_recovered(
+    tmp_path: Path, scan: ScanContext, zone: Path, data_dir: Path
+) -> None:
+    quarantined(scan, zone)
+    entry = interrupted_xdg_disable(tmp_path, data_dir)
+    left_pending(data_dir)
+    entry.rename(tmp_path / "elsewhere")
+    entry.mkdir()
+
+    code, out, err = run(["recover"], scan, autostart_context("linux", tmp_path))
+
+    assert (code, out) == (3, "Recovered an interrupted quarantine operation (1 file).\n")
+    assert err == (
+        "safeclean: an unfinished autostart change cannot be checked: not a regular file;"
+        " fix or move what is there, then run 'safeclean autostart recover' again\n"
+    )
+    assert query(data_dir, "SELECT state FROM operations") == [("done",)]
+    assert query(data_dir, "SELECT state FROM autostart_changes") == [("pending",)]
+
+
+@RECOVER
+def test_a_journal_failure_names_safeclean_recover(
+    tmp_path: Path,
+    scan: ScanContext,
+    zone: Path,
+    data_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    command: list[str],
+) -> None:
+    quarantined(scan, zone)
+    left_pending(data_dir)
+
+    with journal_held(monkeypatch, data_dir):
+        code, out, err = run(command, scan, autostart_context("linux", tmp_path))
+
+    assert (code, out) == (3, "")
+    assert err == "safeclean: journal failed: database is locked; run 'safeclean recover'\n"
+    assert query(data_dir, "SELECT state FROM operations") == [("pending",)]
+
+
+# --- autostart changes ---------------------------------------------------------------------------
 
 
 def test_an_interrupted_xdg_change_is_closed_by_the_disk(
@@ -201,7 +320,7 @@ def test_a_running_instance_locks_it_out(tmp_path: Path, scan: ScanContext, data
     assert not (data_dir / "journal.db").exists()
 
 
-# --- the quarantine names the command that recovers the other domain -----------------------------
+# --- a command of another domain names it --------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -209,7 +328,7 @@ def test_a_running_instance_locks_it_out(tmp_path: Path, scan: ScanContext, data
     [["add", "a.bin"], ["restore", "1"], ["purge", "1", "--yes"]],
     ids=["add", "restore", "purge"],
 )
-def test_quarantine_actions_wait_for_autostart_recover(
+def test_quarantine_actions_wait_for_safeclean_recover(
     tmp_path: Path, scan: ScanContext, data_dir: Path, zone: Path, args: list[str]
 ) -> None:
     pending_run_change(data_dir)
@@ -220,8 +339,8 @@ def test_quarantine_actions_wait_for_autostart_recover(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: an autostart change is unfinished; run 'safeclean autostart recover'"
-        " first; nothing was changed\n"
+        "safeclean: the journal has unfinished autostart work; run 'safeclean recover' first;"
+        " nothing was changed\n"
     )
     assert target.read_bytes() == b"payload"
     assert query(data_dir, "SELECT COUNT(*) FROM operations") == [(0,)]

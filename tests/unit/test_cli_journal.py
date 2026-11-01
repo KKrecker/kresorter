@@ -16,6 +16,7 @@ import pytest
 
 from safeclean import cli_journal
 from safeclean.core.scanner import ScanContext
+from safeclean.storage.pending import Domain
 
 RECOVER = "safeclean thing recover"  # the domain's own command, passed in by it
 
@@ -69,4 +70,21 @@ def test_a_journal_failure_of_the_body_names_the_command_that_recovers(scan: Sca
     assert code == 3
     assert err.getvalue() == (
         "safeclean: journal failed: database or disk is full; run 'safeclean thing recover'\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("domains", "work"),
+    [
+        ({Domain.QUARANTINE}, "quarantine"),
+        ({Domain.QUARANTINE, Domain.AUTOSTART}, "autostart and quarantine"),
+    ],
+    ids=["one", "two"],
+)
+def test_work_of_other_domains_names_the_one_recover_command(
+    domains: set[Domain], work: str
+) -> None:
+    assert cli_journal.unfinished(domains) == (
+        f"safeclean: the journal has unfinished {work} work; run 'safeclean recover' first;"
+        " nothing was changed\n"
     )

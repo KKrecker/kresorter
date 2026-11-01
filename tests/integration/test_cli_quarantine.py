@@ -226,7 +226,7 @@ def test_a_vault_that_cannot_be_created_is_named(context: ScanContext, data_dir:
     assert err == f"safeclean: cannot use the vault: [Errno 17] File exists: '{vault}'\n"
 
 
-def test_a_journal_failure_stops_and_names_quarantine_list(
+def test_a_journal_failure_stops_and_names_safeclean_recover(
     context: ScanContext, data_dir: Path, zone: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = write(zone / "a.bin")
@@ -236,7 +236,7 @@ def test_a_journal_failure_stops_and_names_quarantine_list(
         code, out, err = run(["quarantine", "add", str(path)], context)
 
     assert (code, out) == (3, "")
-    assert err == "safeclean: journal failed: database is locked; run 'safeclean quarantine list'\n"
+    assert err == "safeclean: journal failed: database is locked; run 'safeclean recover'\n"
     assert path.read_bytes() == b"payload"
     assert query(data_dir, "SELECT COUNT(*) FROM operations") == [(0,)]
 
@@ -311,7 +311,7 @@ def test_every_quarantine_command_recovers_first(
     code, out, _ = run(["quarantine", "list"], context)
 
     assert code == 0
-    assert "Recovered an interrupted operation (1 file)" in out
+    assert "Recovered an interrupted quarantine operation (1 file)" in out
     assert f"[1] {zone / 'a.bin'}" in out
     assert states(data_dir) == [(1, "quarantined")]
 
