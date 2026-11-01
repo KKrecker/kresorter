@@ -64,6 +64,7 @@ def run(tmp_path: Path, root: Path) -> AnalysisReport:
         open_files=FakeOpenFiles(),
         classifier=CLASSIFIER,
         open_files_checked=True,
+        platform="linux",
     )
     return analyze(
         scan([root], context),

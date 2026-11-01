@@ -217,6 +217,7 @@ def test_a_scanned_group_feeds_the_decision(tmp_path: Path) -> None:
         open_files=FakeOpenFiles(),
         classifier=CLASSIFIER,
         open_files_checked=True,
+        platform="linux",
     )
     (group,) = scan([root], context).duplicates
 

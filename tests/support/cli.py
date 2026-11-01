@@ -16,11 +16,17 @@ from safeclean.core.scanner import ScanContext
 
 
 def scan_context(
-    tmp_path: Path, zone: Path, data_dir: Path, open_files: OpenFileChecker | None = None
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    open_files: OpenFileChecker | None = None,
+    *,
+    platform: Platform = "linux",
 ) -> ScanContext:
     """``zone`` the one default root, ``data_dir`` the data directory, every default rule but
     ``posix-temp``: tmp_path lives under /tmp, which it marks as junk, so the data directory
-    itself would look like junk and be refused."""
+    itself would look like junk and be refused. ``platform`` is the system the context says it
+    was made for; its rules stay Linux's, which read the temporary paths of the tests."""
     rules = [r for r in default_rules() if r.id != "posix-temp"]
     checker = open_files or FakeOpenFiles()
     policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=data_dir)
@@ -29,6 +35,7 @@ def scan_context(
         open_files=checker,
         classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checker.reliable,
+        platform=platform,
     )
 
 

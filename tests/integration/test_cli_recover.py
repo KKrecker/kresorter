@@ -474,7 +474,8 @@ def test_an_unsafe_data_directory_is_refused_before_anything_is_created(
 ) -> None:
     rules = [r for r in default_rules() if r.id != "posix-temp"]
     policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=zone)
-    unsafe = ScanContext(policy, FakeOpenFiles(), JunkClassifier(rules, platform="linux"), True)
+    classifier = JunkClassifier(rules, platform="linux")
+    unsafe = ScanContext(policy, FakeOpenFiles(), classifier, True, "linux")
 
     code, _, err = run(["autostart", "recover"], unsafe, autostart_context("linux", tmp_path))
 

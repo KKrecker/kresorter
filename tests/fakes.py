@@ -31,6 +31,13 @@ class FakeOpenFiles:
         return str(path) in self._open
 
 
+class UnreliableOpenFiles(FakeOpenFiles):
+    """``FakeOpenFiles`` that says it cannot be trusted, as ``NoOpenFileCheck`` does; it still
+    records every question, so a test can show that it is never asked."""
+
+    reliable = False
+
+
 class BrokenOpenFiles:
     """Open-file checker whose backend fails (e.g. access denied to the process list)."""
 

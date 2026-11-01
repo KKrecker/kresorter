@@ -35,6 +35,7 @@ def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
         open_files=FakeOpenFiles(),
         classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checked,
+        platform="linux",
     )
 
 
@@ -167,6 +168,7 @@ def test_explicit_scan_never_lists_the_app_data_dir(tmp_path: Path, tree: Path) 
         open_files=base.open_files,
         classifier=base.classifier,
         open_files_checked=True,
+        platform="linux",
     )
     _, out = run(["scan", "--json", str(tree)], context)
     data = json.loads(out)

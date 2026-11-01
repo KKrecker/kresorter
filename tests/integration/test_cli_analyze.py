@@ -48,6 +48,7 @@ def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
         open_files=FakeOpenFiles(),
         classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checked,
+        platform="linux",
     )
 
 

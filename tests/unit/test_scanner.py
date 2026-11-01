@@ -28,6 +28,7 @@ def context(tmp_path: Path, *blocked: Path) -> ScanContext:
         open_files=FakeOpenFiles(),
         classifier=JunkClassifier(load_rules(RULES), platform="linux"),
         open_files_checked=True,
+        platform="linux",
     )
 
 
