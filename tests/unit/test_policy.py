@@ -318,3 +318,42 @@ def test_windows_default_roots_exclude_temp(win: PathPolicy) -> None:
         PureWindowsPath(r"C:\Users\Alice\.cache"),
         PureWindowsPath(r"C:\Users\Alice\Downloads"),
     )
+
+
+# --- the home directory and above it (decision 0012, item 7) -----------------------------------
+
+
+@pytest.mark.parametrize(
+    ("policy_name", "path", "holds"),
+    [
+        ("linux", PurePosixPath("/home/alice"), True),
+        ("linux", PurePosixPath("/home"), True),
+        ("linux", PurePosixPath("/"), True),
+        ("linux", PurePosixPath("/home/alice/Downloads/../.."), True),
+        ("linux", PurePosixPath("/home/alice/Downloads"), False),
+        ("linux", PurePosixPath("/home/alicia"), False),
+        ("linux", PurePosixPath("/home/Alice"), False),  # another home on Linux
+        ("linux", PurePosixPath("/srv"), False),
+        ("mac", PurePosixPath("/users/ALICE"), True),  # APFS ignores case
+        ("mac", PurePosixPath("/Users/alice/Desktop"), False),
+        ("win", PureWindowsPath(r"c:\users\alice"), True),
+        ("win", PureWindowsPath("C:\\"), True),
+        ("win", PureWindowsPath(r"C:\Users\Alice\Desktop"), False),
+        ("win", PureWindowsPath("D:\\"), False),
+    ],
+)
+def test_the_home_directory_and_every_directory_above_it_hold_home(
+    win: PathPolicy,
+    linux: PathPolicy,
+    mac: PathPolicy,
+    policy_name: str,
+    path: PurePath,
+    holds: bool,
+) -> None:
+    policy = {"win": win, "linux": linux, "mac": mac}[policy_name]
+    assert policy.holds_home(path) is holds
+
+
+def test_holds_home_rejects_a_relative_path(linux: PathPolicy) -> None:
+    with pytest.raises(ValueError, match="absolute"):
+        linux.holds_home(PurePosixPath("alice"))

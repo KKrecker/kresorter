@@ -124,6 +124,33 @@ def _refuse(
     return real(path, *args, **kwargs)
 
 
+def relist(
+    monkeypatch: pytest.MonkeyPatch, directory: Path, change: Callable[[list[str]], list[str]]
+) -> None:
+    """``directory.iterdir()`` gives ``change`` of what it really lists: the same names in another
+    order, a name gone by the time it is looked at, or the error ``change`` raises."""
+    real = Path.iterdir
+
+    def iterdir(self: Path) -> Iterator[Path]:
+        if self != directory:
+            yield from real(self)
+            return
+        for name in change([path.name for path in real(self)]):
+            yield self / name
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+
+
+def deny_listing(monkeypatch: pytest.MonkeyPatch, denied: Path) -> None:
+    """``denied.iterdir()`` fails with ``EACCES``, as for a directory the user cannot read;
+    ``chmod`` would deny nothing to root (decision 0011, item 110)."""
+
+    def refuse(names: list[str]) -> list[str]:
+        raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(denied))
+
+    relist(monkeypatch, denied, refuse)
+
+
 @contextmanager
 def journal_held(monkeypatch: pytest.MonkeyPatch, data_dir: Path) -> Iterator[None]:
     """Another program holds the journal for writing (a backup, the sqlite3 shell): safeclean's

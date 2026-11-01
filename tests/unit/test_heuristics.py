@@ -210,3 +210,38 @@ def test_every_default_rule_has_an_example() -> None:
     covered = {expected for _, _, expected in DEFAULT_EXAMPLES}
 
     assert {rule.id for rule in default_rules()} <= covered
+
+
+# --- a directory: the folder organize is asked to sort (decision 0012, item 8) -----------------
+
+DIRECTORY_EXAMPLES: list[tuple[Platform, str, str | None]] = [
+    ("linux", "/home/a/.cache", "user-cache-dir"),  # the directory a rule names
+    ("linux", "/home/a/.cache/thumbnails/large", "user-cache-dir"),  # and below it
+    ("linux", "/home/a/proj/__pycache__", "python-bytecode"),
+    ("linux", "/var/tmp/build", "posix-temp"),  # anchored at the root
+    ("windows", LOCAL + r"\TEMP\setup", "windows-user-temp"),  # any case on Windows
+    # A rule that names files too matches the directory it looks in: the folder holds them.
+    ("windows", LOCAL + r"\Microsoft\Windows\Explorer", "windows-thumbcache"),
+    # File rules alone never match a directory, whatever it is called.
+    ("linux", "/home/a/Downloads", None),
+    ("linux", "/home/a/backup.tmp", None),
+    ("linux", "/home/a/Thumbs.db", None),
+    ("linux", "/home/a/proj/tmp", None),
+    ("linux", "/", None),
+]
+
+
+@pytest.mark.parametrize(("platform", "path", "expected"), DIRECTORY_EXAMPLES)
+def test_a_directory_is_classified_by_the_directories_of_the_rules(
+    platform: Platform, path: str, expected: str | None
+) -> None:
+    classifier = JunkClassifier(default_rules(), platform=platform)
+    match = classifier.classify_directory(flavor(platform)(path))
+
+    assert (match.rule_id if match else None) == expected
+
+
+def test_a_relative_directory_is_rejected() -> None:
+    classifier = JunkClassifier(default_rules(), platform="linux")
+    with pytest.raises(ValueError, match="absolute"):
+        classifier.classify_directory(PurePosixPath("proj/__pycache__"))
