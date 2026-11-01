@@ -1,18 +1,34 @@
-"""``safeclean autostart list``: every autostart entry of this system; report only (0011).
+"""``safeclean autostart list | recover`` (decision 0011).
 
-Entries are grouped by source in reader order. On Windows, machine-wide entries are read only
-with ``--include-machine``, and the report says when they were not. Nothing is created,
-changed or deleted.
+``list`` reports every autostart entry of this system: grouped by source in reader order; on
+Windows, machine-wide entries are read only with ``--include-machine``, and the report says
+when they were not. It creates, changes and deletes nothing and opens no journal.
+
+``recover`` opens the shared journal (data directory, lock) and reconciles the interrupted
+autostart changes of this platform. Exit codes: 0 done; 3 an unfinished change cannot be
+checked, or the data directory, the lock or the journal cannot be used.
 """
 
 from __future__ import annotations
 
 import argparse
+import functools
 import json
+import sqlite3
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any, TextIO
 
+from safeclean.autostart.changes import AutostartStore, ChangeRecovery, XdgChanges
+from safeclean.autostart.entries import BrokenEntryError
 from safeclean.autostart.listing import AutostartContext, list_autostart
 from safeclean.autostart.models import AutostartItem, AutostartListing, AutostartSkipped, Source
+from safeclean.autostart.registry import RegistryError
+from safeclean.autostart.run_changes import RunKeyChanges
+from safeclean.autostart.xdg import autostart_dirs
+from safeclean.cli_journal import UNSAFE, with_journal
+from safeclean.core.scanner import ScanContext
+from safeclean.text import count
 
 MACHINE_NOTE = (
     "Note: machine-wide entries (HKLM, services, scheduled tasks, the common startup folder)"
@@ -41,9 +57,22 @@ def add_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) ->
         action="store_true",
         help="Windows: also read HKLM, services, scheduled tasks and the common startup folder",
     )
+    actions.add_parser("recover", help="reconcile interrupted autostart changes with the system")
 
 
-def run(args: argparse.Namespace, context: AutostartContext, out: TextIO) -> int:
+def run(
+    args: argparse.Namespace,
+    context: AutostartContext,
+    scan: Callable[[], ScanContext],
+    out: TextIO,
+    err: TextIO,
+) -> int:
+    if args.action == "list":
+        return _list(args, context, out)
+    return with_journal(scan(), err, functools.partial(_recover, context, out, err))
+
+
+def _list(args: argparse.Namespace, context: AutostartContext, out: TextIO) -> int:
     listing = list_autostart(context, include_machine=args.include_machine)
     if args.json:
         out.write(render_json(listing, context, include_machine=args.include_machine))
@@ -51,6 +80,45 @@ def run(args: argparse.Namespace, context: AutostartContext, out: TextIO) -> int
         note = context.platform == "windows" and not args.include_machine
         out.write(render_text(listing, machine_note=note))
     return 0
+
+
+def _recover(
+    context: AutostartContext, out: TextIO, err: TextIO, conn: sqlite3.Connection, data_dir: Path
+) -> int:
+    changes = changes_for(context, conn, data_dir)
+    try:
+        report = ChangeRecovery() if changes is None else changes.recover()
+    except (BrokenEntryError, RegistryError) as error:
+        err.write(
+            f"safeclean: an unfinished autostart change cannot be checked: {error}; fix or move"
+            " what is there, then run 'safeclean autostart recover' again\n"
+        )
+        return UNSAFE
+    out.write(render_recovery(report))
+    return 0
+
+
+def changes_for(
+    context: AutostartContext, conn: sqlite3.Connection, data_dir: Path
+) -> XdgChanges | RunKeyChanges | None:
+    """What can change autostart entries here: XDG on Linux, HKCU Run on Windows, else none."""
+    if context.platform == "linux":
+        user, system = autostart_dirs(context.env, context.home)
+        return XdgChanges(conn, AutostartStore(data_dir), user, system)
+    if context.platform == "windows":
+        return RunKeyChanges(conn, context.registry())
+    return None
+
+
+def render_recovery(report: ChangeRecovery) -> str:
+    closed = [(i, "done") for i in report.done]
+    closed += [(i, "rolled_back") for i in report.rolled_back]
+    closed += [(i, "failed") for i in report.failed]
+    if not closed:
+        return "Nothing to recover.\n"
+    lines = [f"Recovered {count(len(closed), 'interrupted autostart change')}:"]
+    lines += [f"  [{change_id}] {state}" for change_id, state in sorted(closed)]
+    return "\n".join(lines) + "\n"
 
 
 def render_text(listing: AutostartListing, *, machine_note: bool) -> str:

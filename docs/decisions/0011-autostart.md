@@ -523,3 +523,29 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `recover()` leaves autostart changes alone, and the autostart ones leave quarantine
     operations alone (items 91, 98); a `recover()` refused because of the other domain
     would leave no way out.
+
+## Addendum (step 4, commit 12c2a): `safeclean autostart recover`
+
+101. **One journal session for every command that acts**: `cli_journal.with_journal` checks
+    the data directory before creating anything (decision 0009), takes the single-instance
+    lock and opens the journal there; the quarantine commands and the autostart commands
+    that act share it, so both domains write one journal (item 62). These autostart commands
+    build the scan context to find the data directory; `autostart list` still does not and
+    opens no journal (item 55).
+102. **`safeclean autostart recover` reconciles the autostart changes of this platform**:
+    XDG on Linux, `HKCU` Run on Windows, nothing on macOS, where nothing can be written. It
+    prints `Nothing to recover.` or each closed change as `[id] done|rolled_back|failed`
+    and exits with 0. It is a command of its own because each domain recovers its own
+    (items 100, and decision 3(b) of 12c): the autostart domain needs a command that opens
+    the journal without changing an entry.
+103. **An unfinished change that cannot be checked stops it with exit 3**: the reason
+    (`BrokenEntryError` or `RegistryError`, items 90, 97) is printed with what to do (fix or
+    move what is there, then run `safeclean autostart recover` again); the row stays as it
+    is. A data directory, lock or journal that cannot be used is exit 3, as in quarantine.
+104. **Quarantine actions wait for it, by name**: after its own `recover()`, a quarantine
+    command that would act (`add`, `restore`, `purge`) and finds unfinished work, which can
+    then only be an autostart change, exits with 3 and names `safeclean autostart recover`;
+    nothing is changed. `quarantine list` reads only and still runs.
+105. **The registry of a listing context is a `UserRegistry`**: the same factory gives the
+    registry the listing reads and the one a change writes; `WinRegistry` is both, and
+    tests use one `FakeRegistry` for both.

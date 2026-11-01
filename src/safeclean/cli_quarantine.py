@@ -13,6 +13,7 @@ was nothing to do; 2 usage error (argparse); 3 the quarantine cannot run safely 
 from __future__ import annotations
 
 import argparse
+import functools
 import sqlite3
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -22,26 +23,19 @@ from typing import TextIO
 from safeclean import cli_analyze
 from safeclean.analysis.score import Level
 from safeclean.analysis.size_age import Thresholds
+from safeclean.cli_journal import UNSAFE, with_journal
 from safeclean.core.models import FileEntry
 from safeclean.core.scanner import ScanContext
 from safeclean.quarantine.preflight import Candidate, RefusalReason, Refused, UnreliableCheckerError
 from safeclean.quarantine.service import (
     ItemState,
     PurgeRefused,
-    QuarantineError,
     QuarantineService,
     RecoveryReport,
     RestoreRefused,
-    check_data_dir,
 )
-from safeclean.quarantine.vault import PRIVATE
-from safeclean.storage.db import StorageError, connect
-from safeclean.storage.lock import InstanceLock, LockedError
+from safeclean.storage.pending import has_pending
 from safeclean.text import count, format_size
-
-JOURNAL_NAME = "journal.db"
-LOCK_NAME = "safeclean.lock"
-UNSAFE = 3
 
 # Levels a bulk add may take, each including the stricter ones before it; REVIEW never.
 BULK_LEVELS = {"safe": (Level.SAFE,), "likely_safe": (Level.SAFE, Level.LIKELY_SAFE)}
@@ -96,31 +90,17 @@ def check_usage(parser: argparse.ArgumentParser, args: argparse.Namespace) -> No
 
 
 def run(args: argparse.Namespace, context: ScanContext, out: TextIO, err: TextIO) -> int:
-    try:
-        data_dir = check_data_dir(context.policy, context.classifier)
-    except QuarantineError as error:
-        err.write(f"safeclean: {error}\n")
-        return UNSAFE
-    try:
-        data_dir.mkdir(mode=PRIVATE, parents=True, exist_ok=True)
-        with InstanceLock(data_dir / LOCK_NAME):
-            return _run_locked(args, context, data_dir, out, err)
-    except LockedError as error:
-        err.write(f"safeclean: {error}\n")
-        return UNSAFE
-    except OSError as error:
-        err.write(f"safeclean: cannot use the data directory: {error}\n")
-        return UNSAFE
+    return with_journal(context, err, functools.partial(_run_locked, args, context, out, err))
 
 
 def _run_locked(
-    args: argparse.Namespace, context: ScanContext, data_dir: Path, out: TextIO, err: TextIO
+    args: argparse.Namespace,
+    context: ScanContext,
+    out: TextIO,
+    err: TextIO,
+    conn: sqlite3.Connection,
+    data_dir: Path,
 ) -> int:
-    try:
-        conn = connect(data_dir / JOURNAL_NAME)
-    except (OSError, sqlite3.Error, StorageError) as error:
-        err.write(f"safeclean: cannot open the journal: {error}\n")
-        return UNSAFE
     try:
         service = QuarantineService(
             conn,
@@ -129,12 +109,16 @@ def _run_locked(
             classifier=context.classifier,
         )
         _report_recovery(service.recover(), out, err)
+        if args.action != "list" and has_pending(conn):  # what is left is an autostart change
+            err.write(
+                "safeclean: an autostart change is unfinished; run 'safeclean autostart recover'"
+                " first; nothing was changed\n"
+            )
+            return UNSAFE
         return _ACTIONS[args.action](Session(service, conn, context), args, out)
     except UnreliableCheckerError:
         err.write("safeclean: no reliable open-file check on this system; nothing was changed\n")
         return UNSAFE
-    finally:
-        conn.close()
 
 
 def entry_for(path: Path) -> FileEntry:

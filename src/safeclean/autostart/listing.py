@@ -14,7 +14,7 @@ from pathlib import Path
 
 from safeclean.autostart.launchd import launchd_dirs, read_launchd
 from safeclean.autostart.models import AutostartListing
-from safeclean.autostart.registry import Registry
+from safeclean.autostart.registry import UserRegistry
 from safeclean.autostart.run_keys import read_run_keys
 from safeclean.autostart.services import read_services
 from safeclean.autostart.startup_folders import read_startup_folders, startup_dirs
@@ -24,7 +24,7 @@ from safeclean.autostart.winregistry import WinRegistry
 from safeclean.autostart.xdg import autostart_dirs, read_xdg
 from safeclean.core.heuristics import Platform
 
-RegistryFactory = Callable[[], Registry]
+RegistryFactory = Callable[[], UserRegistry]  # read by listings, written by changes
 
 
 @dataclass(frozen=True)

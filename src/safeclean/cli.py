@@ -92,7 +92,10 @@ def main(
             listing_context = default_autostart_context(detect_platform())
         else:
             listing_context = autostart_context()
-        return cli_autostart.run(args, listing_context, out or sys.stdout)
+        factory = context_factory or default_context  # built only by the commands that act
+        return cli_autostart.run(
+            args, listing_context, factory, out or sys.stdout, err or sys.stderr
+        )
     cli_quarantine.check_usage(parser, args)
     context = (context_factory or default_context)()
     if args.command == "analyze":

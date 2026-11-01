@@ -104,9 +104,10 @@ Done in commit 12: `xdg_changes` (12a1), XDG disable journaled (12a2, items 66-7
 enable (12a3, items 75-79), `UserRegistry` (12a4a, item 80), the `HKCU` Run `StartupApproved`
 flag (12a4b, items 81-87), the exact flag name in the journal (12b1, item 86), `recover()`
 for `HKCU` Run changes (12b2, items 88-92), `recover()` for XDG changes (12b3, items 93-98), unfinished work blocking both domains
-(12b4, items 99-100).
+(12b4, items 99-100), `disableable` in `autostart list` (12c1, item 56), `autostart recover`
+(12c2a, items 101-105).
 
-Remaining: 12c the CLI with `disableable`.
+Remaining: 12c2b `autostart disable|enable ID [--yes]`.
 
 ## Target package layout
 
