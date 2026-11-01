@@ -78,37 +78,48 @@ Scanner core and `safeclean scan` (read-only report).
 - **`REVIEW` is never moved in bulk**; large/old files go to the quarantine only when named by
   hand (`safeclean quarantine add PATH`).
 
-### Step 4: in progress
-Accepted limitations so far (decision 0011, item 19), to revisit after the first live run on
-Linux:
-- systemd drop-ins (`<unit>.d/*.conf`) are not read: an overridden `ExecStart` is shown as in
-  the main unit file;
-- `<target>.requires/` is not read;
-- units enabled for all users (`/etc/systemd/user`) are not read.
+### Step 4: done
+- `autostart` readers, one listing per platform (`autostart.listing`): XDG autostart and
+  systemd user units (Linux); Run and RunOnce keys with their `StartupApproved` state, startup
+  folders, services and scheduled tasks (Windows, machine-wide only with `--include-machine`);
+  launchd agents and daemons (macOS). Every entry has a digest of what was read; unreadable
+  entries are skips with a reason, never silence.
+- Changes, XDG and `HKCU` Run only (item 8), each journaled in `autostart_changes` (schema v3)
+  before anything is written: an own XDG entry is replaced atomically by its `Hidden=true`
+  copy with the original kept in the private autostart store; a system entry gets a user
+  stub, `/etc` is never written; a Run value gets the Task Manager's `StartupApproved` flag,
+  the Run value is never written. Nothing is ever deleted; failures are rolled back and read
+  back from the disk or the registry.
+- `recover()` per domain closes interrupted changes by what is on disk or in the registry,
+  never redoing or undoing; unfinished work in either domain blocks both (`storage.pending`),
+  and each domain's `recover()` is never blocked.
+- CLI: `safeclean autostart list [--json] [--include-machine]` (read-only, shows `id` and
+  `disableable`), `safeclean autostart recover`, `safeclean autostart disable|enable ID
+  [--yes]` (preview without `--yes`), sharing the journal session with the quarantine
+  (`cli_journal`); exit codes 0/1/2/3 as in the quarantine.
+- Decision 0011 with its addenda (items 1-109). 1024 tests, 100 % line and branch coverage.
 
-Deferred on Windows (decision 0011, item 29): shortcut (`.lnk`) targets in startup folders are
-not resolved; the item's command is the shortcut file itself.
-
-Services (decision 0011, item 39): trigger-start services are not shown; for a shared
-`svchost` service `Parameters\ServiceDll` is not read (the user sees the `svchost` entry, not
-what it runs); `Group` and `DependOnService` are not taken into account.
-
-Scheduled tasks and launchd (decision 0011, item 40): task `StartBoundary`/`EndBoundary` and
-delays are not taken into account and `TaskCache` is not compared with the XML; the launchd
-state comes from the file only (`/var/db/com.apple.xpc.launchd/` overrides are root-only and not
-read), `LimitLoadToSessionType` is ignored, `/System/Library` is not read.
-
-Done: journal schema v3, `autostart_changes` (commit 11, decision 0011, items 57-62).
-
-Done in commit 12: `xdg_changes` (12a1), XDG disable journaled (12a2, items 66-74), XDG
-enable (12a3, items 75-79), `UserRegistry` (12a4a, item 80), the `HKCU` Run `StartupApproved`
-flag (12a4b, items 81-87), the exact flag name in the journal (12b1, item 86), `recover()`
-for `HKCU` Run changes (12b2, items 88-92), `recover()` for XDG changes (12b3, items 93-98),
-unfinished work blocking both domains (12b4, items 99-100), `disableable` in `autostart list`
-(12c1, item 56), `autostart recover` (12c2a, items 101-105), `autostart disable|enable ID
-[--yes]` (12c2b, items 106-109).
-
-Step 4 is complete once these checks pass.
+### Accepted limitations carried into step 5
+- Everything from steps 2 and 3 still holds; the open-file check is still Linux-only, which
+  blocks the quarantine on macOS and Windows but not autostart changes, which do not need it.
+- **Read-only sources** (item 9): systemd user units, RunOnce, startup folders, `HKLM` Run,
+  services, scheduled tasks and launchd are listed, never changed; each needs its own risk
+  analysis before it can be written.
+- **Readers, to revisit after the first live runs** (items 19, 29, 39, 40): systemd drop-ins
+  (`<unit>.d/*.conf`), `<target>.requires/` and `/etc/systemd/user` are not read; startup
+  folder shortcuts (`.lnk`) are not resolved; trigger-start services are not shown and a shared
+  `svchost` service's `ServiceDll` is not read; task boundaries and delays, `TaskCache`,
+  launchd overrides, `LimitLoadToSessionType` and `/System/Library` are not taken into account.
+- **The registry is tested on a fake only**: `WinRegistry` (read and `set_user_value`) has not
+  run on a live Windows yet.
+- **No compare-and-swap** (items 69, 85): between the last check and the write an entry can
+  still change; the compensation is the same as in the quarantine (journal first, state read
+  back, `recover()`).
+- **An entry disabled elsewhere cannot be enabled by safeclean** (item 74, `foreign`), and an
+  entry that exists but cannot be read blocks autostart changes until the user fixes or moves
+  it (item 97).
+- **The autostart store is never purged** (item 66): originals, staged copies and removed stubs
+  stay in `<data_dir>/autostart`.
 
 ## Target package layout
 
@@ -118,7 +129,7 @@ src/safeclean/
 ├── quarantine/   # step 2: move with metadata, restore (used by deletions AND organizer moves)
 ├── storage/      # step 2: SQLite index and operations journal
 ├── analysis/     # step 3: duplicates, size_age, score, report
-├── autostart/    # step 4
+├── autostart/    # step 4: readers, listing, XDG and HKCU Run changes, recover
 ├── organize/     # step 5
 ├── llm/          # step 6
 └── ui/           # step 7
