@@ -615,3 +615,11 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     as with the lock and a `failed` change; a new code would break the 0/1/2/3 contract for no
     gain. A failed transaction is rolled back, and a change left `pending` in the journal is
     closed by `recover()`.
+115. **The autostart store is made by the first change** (pre-step-5 audit, B9a), after the
+    device check and before the change is journaled, not by `XdgChanges` itself: a preview, a
+    refusal or a `recover()` with nothing to close leaves no `<data_dir>/autostart` (item 70:
+    nothing in the store, not even the store). Until it is made, the device check of item 66
+    compares with the nearest directory above it that exists (item 111), where `mkdir` puts
+    it. A store that cannot be made raises its `OSError` before anything is journaled, as a
+    check before acting (item 113). So every journaled XDG change has its store, and
+    `recover()` never makes it.

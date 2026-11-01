@@ -76,7 +76,8 @@ class ChangeRecovery:
 
 
 class AutostartStore:
-    """``<data_dir>/autostart/<change id>``: originals and removed stubs, never purged."""
+    """``<data_dir>/autostart/<change id>``: originals and removed stubs, never purged; made by
+    the first change, right before it is journaled (item 115)."""
 
     def __init__(self, data_dir: Path) -> None:
         self.data_dir = data_dir
@@ -87,7 +88,8 @@ class AutostartStore:
         self.root.chmod(PRIVATE)
 
     def device(self) -> int:
-        return self.root.stat().st_dev
+        """Of the store, or of the directory above it where it will be made."""
+        return _device(self.root)
 
     def slot(self, change_id: int) -> Path:
         return self.root / str(change_id)
@@ -126,7 +128,6 @@ class XdgChanges:
         self._store = store
         self._user_dir = user_dir
         self._system_dirs = tuple(system_dirs)
-        store.ensure()
 
     def disable(self, item: AutostartItem) -> ChangeResult:
         raw = self._check(item, enabled=True)
@@ -234,6 +235,7 @@ class XdgChanges:
     def _apply(self, item: AutostartItem, plan: _Plan) -> ChangeResult:
         if _device(plan.location.parent) != self._store.device():
             return refused(ChangeRefusal.OTHER_DEVICE, "the store is on another device")
+        self._store.ensure()  # every journaled change has its store
         change_id = self._journal(item, plan)
         try:
             plan.steps(change_id, plan)
