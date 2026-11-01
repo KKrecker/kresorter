@@ -2,7 +2,8 @@
 
 ``list`` reports every autostart entry of this system: grouped by source in reader order; on
 Windows, machine-wide entries are read only with ``--include-machine``, and the report says
-when they were not. It creates, changes and deletes nothing and opens no journal.
+when they were not. It creates, changes and deletes nothing and opens no journal. With
+``--explain`` the entries are explained after the report (``cli_llm``, decision 0013).
 
 ``disable`` and ``enable`` open the shared journal (data directory, lock), reconcile the
 interrupted autostart changes of this platform, then change one entry named by any unique
@@ -21,10 +22,11 @@ import functools
 import json
 import re
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
+from safeclean import cli_llm
 from safeclean.autostart.changes import AutostartStore, XdgChanges
 from safeclean.autostart.entries import BrokenEntryError
 from safeclean.autostart.journal import ChangeRecovery, ChangeRefusal, ChangeResult, ChangeState
@@ -41,6 +43,7 @@ from safeclean.autostart.run_changes import RunKeyChanges
 from safeclean.autostart.xdg import autostart_dirs
 from safeclean.cli_journal import UNSAFE, unfinished, with_journal
 from safeclean.core.scanner import ScanContext
+from safeclean.llm.explain import Explanations
 from safeclean.storage.pending import pending_domains
 from safeclean.text import count
 
@@ -83,6 +86,7 @@ def add_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) ->
         action="store_true",
         help="Windows: also read HKLM, services, scheduled tasks and the common startup folder",
     )
+    cli_llm.add_explain(list_cmd)
     actions.add_parser("recover", help="the same as 'safeclean recover'")
     for action in ("disable", "enable"):
         change = actions.add_parser(action, help=f"{action} one entry (reversible)")
@@ -105,21 +109,32 @@ def run(
     scan: Callable[[], ScanContext],
     out: TextIO,
     err: TextIO,
+    explainer: cli_llm.Explainer | None = None,
 ) -> int:
     """``list``, ``disable`` or ``enable``; ``recover`` is ``cli_recover``'s."""
     if args.action == "list":
-        return _list(args, context, out)
+        return _list(args, context, out, err, explainer)
     session = functools.partial(_change, args, context, out, err)
     return with_journal(scan(), err, session, recover=RECOVER)
 
 
-def _list(args: argparse.Namespace, context: AutostartContext, out: TextIO) -> int:
+def _list(
+    args: argparse.Namespace,
+    context: AutostartContext,
+    out: TextIO,
+    err: TextIO,
+    explainer: cli_llm.Explainer | None,
+) -> int:
     listing = list_autostart(context, include_machine=args.include_machine)
     if args.json:
-        out.write(render_json(listing, context, include_machine=args.include_machine))
+        explained = cli_llm.ask(explainer, listing.items)
+        machine = args.include_machine
+        out.write(render_json(listing, context, include_machine=machine, explained=explained))
     else:
+        explained = cli_llm.ask(explainer, _shown(listing.items))  # grouped, as shown
         note = context.platform == "windows" and not args.include_machine
-        out.write(render_text(listing, machine_note=note))
+        out.write(render_text(listing, machine_note=note) + cli_llm.section(explained))
+    cli_llm.notify(explained, err)
     return 0
 
 
@@ -270,15 +285,25 @@ def render_text(listing: AutostartListing, *, machine_note: bool) -> str:
     ]
     if machine_note:
         lines.append(MACHINE_NOTE)
-    by_source: dict[Source, list[AutostartItem]] = {}
-    for item in listing.items:
-        by_source.setdefault(item.source, []).append(item)
-    for source, items in by_source.items():
+    for source, items in _by_source(listing.items).items():
         lines += ["", f"{_TITLES[source]}: {len(items)}"]
         lines += [line for item in items for line in _item_lines(item)]
     lines += ["", f"Skipped: {len(listing.skipped)}"]
     lines += [f"  {s.source}: {s.location} ({s.detail})" for s in listing.skipped]
     return "\n".join(lines) + "\n"
+
+
+def _by_source(items: Sequence[AutostartItem]) -> dict[Source, list[AutostartItem]]:
+    """The items of each source, sources in the order they first appear."""
+    by_source: dict[Source, list[AutostartItem]] = {}
+    for item in items:
+        by_source.setdefault(item.source, []).append(item)
+    return by_source
+
+
+def _shown(items: Sequence[AutostartItem]) -> list[AutostartItem]:
+    """The items in the order the text output shows them."""
+    return [item for group in _by_source(items).values() for item in group]
 
 
 def _item_lines(item: AutostartItem) -> list[str]:
@@ -297,13 +322,18 @@ def _item_lines(item: AutostartItem) -> list[str]:
 
 
 def render_json(
-    listing: AutostartListing, context: AutostartContext, *, include_machine: bool
+    listing: AutostartListing,
+    context: AutostartContext,
+    *,
+    include_machine: bool,
+    explained: Explanations | None = None,
 ) -> str:
     data: dict[str, Any] = {
         "platform": context.platform,
         "include_machine": include_machine,
         "items": [_item_json(item) for item in listing.items],
         "skipped": [_skip_json(skip) for skip in listing.skipped],
+        **cli_llm.json_keys(explained),
     }
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 

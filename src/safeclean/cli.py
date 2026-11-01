@@ -1,4 +1,5 @@
-"""Console interface. ``scan``, ``analyze``, ``autostart list`` report; the others can act."""
+"""Console interface. ``scan``, ``analyze``, ``autostart list`` report; ``llm status`` checks;
+the others can act."""
 
 from __future__ import annotations
 
@@ -11,12 +12,20 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, TextIO
 
-from safeclean import cli_analyze, cli_autostart, cli_organize, cli_quarantine, cli_recover
+from safeclean import (
+    cli_analyze,
+    cli_autostart,
+    cli_llm,
+    cli_organize,
+    cli_quarantine,
+    cli_recover,
+)
 from safeclean.autostart.listing import AutostartContext, default_autostart_context
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.open_files import checker_for_platform
 from safeclean.core.policy import PathPolicy
 from safeclean.core.scanner import JunkFinding, ScanContext, ScanReport, scan
+from safeclean.llm.transport import LIMITS, Limits
 from safeclean.text import OPEN_FILES_NOTE, count, format_size, skip_json, skip_line
 
 __all__ = [
@@ -77,6 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
     cli_organize.add_parser(commands)
     cli_autostart.add_parser(commands)
     cli_recover.add_parser(commands)
+    cli_llm.add_parser(commands)
     return parser
 
 
@@ -87,9 +97,15 @@ def main(
     err: TextIO | None = None,
     context_factory: Callable[[], ScanContext] | None = None,
     autostart_context: Callable[[], AutostartContext] | None = None,
+    llm_env: Mapping[str, str] | None = None,
+    llm_limits: Limits = LIMITS,
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    env = os.environ if llm_env is None else llm_env  # read only by llm status and --explain
+    if args.command == "llm":
+        return cli_llm.run_status(env, out or sys.stdout, llm_limits)
+    explainer = cli_llm.Explainer(env, llm_limits) if getattr(args, "explain", False) else None
     if args.command in ("autostart", "recover"):  # autostart list needs no scan context
         if autostart_context is None:
             listing_context = default_autostart_context(detect_platform())
@@ -99,16 +115,16 @@ def main(
         if args.command == "recover" or args.action == "recover":  # one command, an alias
             return cli_recover.run(listing_context, factory(), out or sys.stdout, err or sys.stderr)
         return cli_autostart.run(
-            args, listing_context, factory, out or sys.stdout, err or sys.stderr
+            args, listing_context, factory, out or sys.stdout, err or sys.stderr, explainer
         )
     cli_quarantine.check_usage(parser, args)
     context = (context_factory or default_context)()
     if args.command == "analyze":
-        return cli_analyze.run(args, context, out or sys.stdout)
+        return cli_analyze.run(args, context, out or sys.stdout, err or sys.stderr, explainer)
     if args.command == "quarantine":
         return cli_quarantine.run(args, context, out or sys.stdout, err or sys.stderr)
     if args.command == "organize":
-        return cli_organize.run(args, context, out or sys.stdout, err or sys.stderr)
+        return cli_organize.run(args, context, out or sys.stdout, err or sys.stderr, explainer)
     roots = [Path(p) for p in args.paths or context.policy.default_roots()]
     report = scan(roots, context, hash_duplicates=not args.no_hash)
     render = render_json if args.json else render_text

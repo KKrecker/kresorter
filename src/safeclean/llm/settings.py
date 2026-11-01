@@ -9,7 +9,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from ipaddress import AddressValueError, IPv4Address, IPv4Network
 
-from safeclean.llm.failure import ExplanationUnavailable, Unavailable
+from safeclean.llm.failure import SettingRefused
 
 URL_VARIABLE = "SAFECLEAN_OLLAMA_URL"
 MODEL_VARIABLE = "SAFECLEAN_OLLAMA_MODEL"
@@ -44,20 +44,16 @@ class Address:
 DEFAULT_ADDRESS = Address("127.0.0.1", DEFAULT_PORT)
 
 
-def _refused(name: str, value: str, why: str) -> ExplanationUnavailable:
-    return ExplanationUnavailable(Unavailable.CONFIG, f"{name}={value!r}: {why}")
-
-
 def address_from(env: Mapping[str, str]) -> Address:
     value = env.get(URL_VARIABLE)
     if value is None:
         return DEFAULT_ADDRESS
     match = _URL.fullmatch(value)
     if match is None:
-        raise _refused(URL_VARIABLE, value, "not http://HOST[:PORT] with a loopback HOST")
+        raise SettingRefused(URL_VARIABLE, value, "not http://HOST[:PORT] with a loopback HOST")
     port = int(match["port"] or DEFAULT_PORT)
     if not 1 <= port <= 65535:
-        raise _refused(URL_VARIABLE, value, "the port is not 1-65535")
+        raise SettingRefused(URL_VARIABLE, value, "the port is not 1-65535")
     host = match["host"]
     if host == "localhost":
         return Address("127.0.0.1", port)
@@ -66,16 +62,16 @@ def address_from(env: Mapping[str, str]) -> Address:
     try:
         ip = IPv4Address(host)
     except AddressValueError:
-        raise _refused(URL_VARIABLE, value, "not an IPv4 address") from None
+        raise SettingRefused(URL_VARIABLE, value, "not an IPv4 address") from None
     if ip not in _LOOPBACK:
-        raise _refused(URL_VARIABLE, value, "not a loopback address")
+        raise SettingRefused(URL_VARIABLE, value, "not a loopback address")
     return Address(str(ip), port)
 
 
 def model_from(env: Mapping[str, str]) -> str:
     value = env.get(MODEL_VARIABLE, DEFAULT_MODEL)
     if _MODEL.fullmatch(value) is None:
-        raise _refused(MODEL_VARIABLE, value, "not a model name")
+        raise SettingRefused(MODEL_VARIABLE, value, "not a model name")
     return value
 
 

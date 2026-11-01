@@ -23,3 +23,13 @@ class ExplanationUnavailable(Exception):
         super().__init__(f"{reason}: {detail}")
         self.reason = reason
         self.detail = detail
+
+
+class SettingRefused(ExplanationUnavailable):
+    """A setting that is not used, always ``config``: its name, its value and why."""
+
+    def __init__(self, name: str, value: str, why: str) -> None:
+        super().__init__(Unavailable.CONFIG, f"{name}={value!r}: {why}")
+        self.name = name
+        self.value = value
+        self.why = why

@@ -1,7 +1,8 @@
 """``safeclean analyze``: safety levels and reasons for what a scan found (decision 0010).
 
 Read-only, like ``scan``: it walks and hashes, then reports. Nothing is created, moved or
-deleted, not even the data directory. Paths are absolute everywhere.
+deleted, not even the data directory. Paths are absolute everywhere. With ``--explain`` the
+findings are explained after the report (``cli_llm``, decision 0013).
 """
 
 from __future__ import annotations
@@ -13,10 +14,12 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
+from safeclean import cli_llm
 from safeclean.analysis.report import AnalysisReport, Finding, analyze
 from safeclean.analysis.score import Level
 from safeclean.analysis.size_age import Thresholds
 from safeclean.core.scanner import ScanContext, ScanReport, scan
+from safeclean.llm.explain import Explanations
 from safeclean.text import OPEN_FILES_NOTE, count, format_size, skip_json, skip_line
 
 MIB = 1024**2
@@ -59,6 +62,7 @@ def add_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) ->
         metavar="DAYS",
         help="report files unmodified for this many days for review (default: %(default)s)",
     )
+    cli_llm.add_explain(analyze_cmd)
 
 
 def analyze_paths(
@@ -77,11 +81,22 @@ def analyze_paths(
     return scanned, analysis
 
 
-def run(args: argparse.Namespace, context: ScanContext, out: TextIO) -> int:
+def run(
+    args: argparse.Namespace,
+    context: ScanContext,
+    out: TextIO,
+    err: TextIO,
+    explainer: cli_llm.Explainer | None = None,
+) -> int:
     thresholds = Thresholds(large_bytes=args.large * MIB, old_after_days=args.older_than)
     scanned, analysis = analyze_paths(args.paths, context, thresholds)
-    render = render_json if args.json else render_text
-    out.write(render(scanned, analysis, thresholds, context.open_files_checked))
+    explained = cli_llm.ask(explainer, analysis.findings)  # in the order both outputs show
+    checked = context.open_files_checked
+    if args.json:
+        out.write(render_json(scanned, analysis, thresholds, checked, explained))
+    else:
+        out.write(render_text(scanned, analysis, thresholds, checked) + cli_llm.section(explained))
+    cli_llm.notify(explained, err)
     return 0
 
 
@@ -138,7 +153,11 @@ def _finding_json(finding: Finding) -> dict[str, Any]:
 
 
 def render_json(
-    scanned: ScanReport, analysis: AnalysisReport, thresholds: Thresholds, checked: bool
+    scanned: ScanReport,
+    analysis: AnalysisReport,
+    thresholds: Thresholds,
+    checked: bool,
+    explained: Explanations | None = None,
 ) -> str:
     data: dict[str, Any] = {
         "roots": [str(r) for r in scanned.roots],
@@ -164,5 +183,6 @@ def render_json(
         ],
         "proposed": {"files": len(analysis.proposed), "bytes": analysis.proposed_bytes},
         "skipped": [skip_json(s) for s in scanned.skipped],
+        **cli_llm.json_keys(explained),
     }
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"

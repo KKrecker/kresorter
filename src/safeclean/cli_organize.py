@@ -9,7 +9,9 @@ moved or journaled; with it, the plan is made again inside the lock, checked onc
 (preflight) and carried out as one batch, and the output says what moved, what was refused and
 what stays. What recovery found is shown as ``safeclean recover`` shows it: each batch it
 closed with its state, the files still sorted and the command that moves them back; an undo
-batch that stopped names the batch it undoes, whose undo takes what is left.
+batch that stopped names the batch it undoes, whose undo takes what is left. ``move`` without
+``--yes`` takes ``--explain``: the files that stay are explained after the plan, once the lock
+is released (``cli_llm``, decision 0013); with ``--yes`` it is a usage error.
 
 Exit codes: 0 every planned move happened; 1 a preview, nothing to move, a refused folder or
 batch, or a file refused at move time (files that stay by the plan are not refusals); 2 usage
@@ -28,6 +30,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
+from safeclean import cli_llm
 from safeclean.cli_journal import RECOVER, UNSAFE, unfinished, with_journal
 from safeclean.core.preflight import Refused
 from safeclean.core.scanner import ScanContext
@@ -43,7 +46,7 @@ from safeclean.text import count, format_size, refusal_line, refusals
 
 UNDO = "safeclean organize undo"
 
-Action = Callable[[sqlite3.Connection, argparse.Namespace, ScanContext, TextIO], int]
+Action = Callable[[sqlite3.Connection, argparse.Namespace, ScanContext, TextIO, list[Stay]], int]
 Done = Callable[[int], tuple[list[str], list[str]]]  # batch id -> lines before and after
 
 
@@ -52,21 +55,34 @@ def add_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) ->
     actions = organize.add_subparsers(dest="action", required=True)
     move = actions.add_parser("move", help="sort the files directly in a folder by kind")
     move.add_argument("folder", help="the folder to sort")
-    move.add_argument("--yes", action="store_true", help="confirm: move the files")
+    yes_or_explain = move.add_mutually_exclusive_group()  # what acts is never explained
+    yes_or_explain.add_argument("--yes", action="store_true", help="confirm: move the files")
+    cli_llm.add_explain(yes_or_explain)
     actions.add_parser("list", help="show organize's batches")
     undo = actions.add_parser("undo", help="move back what a batch moved")
     undo.add_argument("batch", type=int, help="a batch id from 'list'")
     undo.add_argument("--yes", action="store_true", help="confirm: move the files back")
 
 
-def run(args: argparse.Namespace, context: ScanContext, out: TextIO, err: TextIO) -> int:
+def run(
+    args: argparse.Namespace,
+    context: ScanContext,
+    out: TextIO,
+    err: TextIO,
+    explainer: cli_llm.Explainer | None = None,
+) -> int:
     if args.action != "list":
         blocked = refusal(context.platform, context.open_files)
         if blocked is not None:
             err.write(blocked)
             return UNSAFE
-    session = functools.partial(_run_locked, args, context, out, err)
-    return with_journal(context, err, session, recover=RECOVER)
+    stays: list[Stay] = []  # what the plan shown leaves in place, for --explain
+    session = functools.partial(_run_locked, args, context, out, err, stays)
+    code = with_journal(context, err, session, recover=RECOVER)
+    explained = cli_llm.ask(explainer, stays)  # after the lock: the plan is final
+    out.write(cli_llm.section(explained))
+    cli_llm.notify(explained, err)
+    return code
 
 
 def _run_locked(
@@ -74,6 +90,7 @@ def _run_locked(
     context: ScanContext,
     out: TextIO,
     err: TextIO,
+    stays: list[Stay],
     conn: sqlite3.Connection,
     data_dir: Path,
 ) -> int:
@@ -82,13 +99,19 @@ def _run_locked(
     if others:  # its own was recovered above (0011 item 127)
         err.write(unfinished(others))
         return UNSAFE
-    return _ACTIONS[args.action](conn, args, context, out)
+    return _ACTIONS[args.action](conn, args, context, out, stays)
 
 
 # --- actions -----------------------------------------------------------------------------------
 
 
-def _move(conn: sqlite3.Connection, args: argparse.Namespace, ctx: ScanContext, out: TextIO) -> int:
+def _move(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+    ctx: ScanContext,
+    out: TextIO,
+    shown: list[Stay],
+) -> int:
     folder = Path(os.path.normpath(Path(args.folder).absolute()))  # links are not resolved
     try:
         found = plan(folder, ctx)
@@ -96,6 +119,7 @@ def _move(conn: sqlite3.Connection, args: argparse.Namespace, ctx: ScanContext, 
         detail = f" ({no.detail})" if no.detail else ""
         _write(out, [f"Refused: {folder}: {no.reason}{detail}"])
         return 1
+    shown.extend(found.stays)
     stays = _stays(found.stays, folder)
     if not found.moves:
         _write(out, [f"Nothing to move in {folder}.", *stays])
@@ -118,7 +142,13 @@ def _move(conn: sqlite3.Connection, args: argparse.Namespace, ctx: ScanContext, 
     return _carry(conn, folder, cleared, refused, stays, out, done=done)
 
 
-def _undo(conn: sqlite3.Connection, args: argparse.Namespace, ctx: ScanContext, out: TextIO) -> int:
+def _undo(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+    ctx: ScanContext,
+    out: TextIO,
+    shown: list[Stay],
+) -> int:
     try:
         found = plan_undo(conn, args.batch)
     except UndoRefused as no:
@@ -151,7 +181,13 @@ def _undo(conn: sqlite3.Connection, args: argparse.Namespace, ctx: ScanContext, 
     )
 
 
-def _list(conn: sqlite3.Connection, args: argparse.Namespace, ctx: ScanContext, out: TextIO) -> int:
+def _list(
+    conn: sqlite3.Connection,
+    args: argparse.Namespace,
+    ctx: ScanContext,
+    out: TextIO,
+    shown: list[Stay],
+) -> int:
     found = summaries(conn)
     if not found:
         _write(out, ["No organize batches."])
