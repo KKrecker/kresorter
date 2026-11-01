@@ -15,7 +15,7 @@ import pytest
 from fakes import FakeRegistry
 from safeclean import cli
 from safeclean.autostart.listing import AutostartContext
-from safeclean.autostart.registry import Hive, Registry, RegValue, ValueKind
+from safeclean.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
 from safeclean.autostart.run_keys import RUN
 from safeclean.core.heuristics import Platform
 from safeclean.core.scanner import ScanContext
@@ -37,12 +37,12 @@ def no_scan_context() -> ScanContext:
     raise AssertionError("autostart list needs no scan context")
 
 
-def no_registry() -> Registry:
+def no_registry() -> UserRegistry:
     raise AssertionError("the registry is only for Windows")
 
 
 def context(
-    platform: Platform, tmp_path: Path, registry: Registry | None = None
+    platform: Platform, tmp_path: Path, registry: UserRegistry | None = None
 ) -> AutostartContext:
     env = {
         "XDG_CONFIG_HOME": str(tmp_path / "config"),

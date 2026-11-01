@@ -18,7 +18,7 @@ from safeclean.autostart.listing import (
     list_autostart,
 )
 from safeclean.autostart.models import AutostartSkipped, Scope, Source
-from safeclean.autostart.registry import Hive, Registry, RegValue, ValueKind
+from safeclean.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
 from safeclean.autostart.run_keys import RUN
 from safeclean.autostart.services import SERVICES
 from safeclean.autostart.winregistry import WinRegistry
@@ -40,7 +40,7 @@ def write(path: Path, raw: bytes) -> Path:
     return path
 
 
-def no_registry() -> Registry:
+def no_registry() -> UserRegistry:
     raise AssertionError("the registry is only for Windows")
 
 
@@ -49,7 +49,7 @@ class CountingFactory:
         self.registry = registry
         self.calls = 0
 
-    def __call__(self) -> Registry:
+    def __call__(self) -> UserRegistry:
         self.calls += 1
         return self.registry
 
