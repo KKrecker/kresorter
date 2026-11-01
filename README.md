@@ -3,9 +3,9 @@
 Cross-platform desktop app for **safe** cleanup and triage of files on your PC.
 Open source, local-only, no telemetry.
 
-> Status: early development, console mode only. Steps 1-5 are done (scanner; quarantine and
-> journal; analysis; autostart; file organizer); step 6, local explanations, is next
-> ([roadmap](docs/roadmap.md)).
+> Status: early development, console mode only. Steps 1-6 are done (scanner; quarantine and
+> journal; analysis; autostart; file organizer; optional local AI explanations); step 7, the
+> desktop UI, is next ([roadmap](docs/roadmap.md)).
 
 ## Safety principles
 
@@ -14,7 +14,8 @@ Open source, local-only, no telemetry.
 - **No direct deletion.** All removal goes through the quarantine API; `os.remove`, `shutil.rmtree`
   and friends are banned in code *and* tests (enforced by ruff and a test).
 - **Safe zones by default.** Program Files, user profiles and open files are blacklisted.
-- **Local only.** No telemetry; the optional LLM (Ollama) runs locally.
+- **Local only.** No telemetry; the optional AI explanations come from Ollama on your own
+  machine, over loopback only, and are only ever shown.
 
 ## Usage (console)
 
@@ -109,6 +110,61 @@ Recovery decides by what is on the disk or in the registry, never redoing or und
 cannot act; it names the files an interrupted organize batch left sorted and the `organize
 undo` that moves them back.
 
+### AI explanations (optional)
+
+```bash
+safeclean llm status                           # what is in place, and how to set up the rest
+safeclean analyze --explain                    # the report, then what its findings are
+safeclean autostart list --json --explain      # four keys added to the JSON
+safeclean organize move ~/Downloads --explain  # the plan, then why files stay; not with --yes
+```
+
+`--explain` adds plain-language explanations of what safeclean has already decided: what a
+cache or a kind of file is, what an autostart program does, why a file stays. They are written
+by a language model running in [Ollama](https://ollama.com) on your machine; they are advisory
+and may be wrong. Levels, plans, refusals, the command's own output and the exit code are those
+of the run without `--explain`; an answer is only shown, never run or acted on, and nothing is
+stored. No command contacts Ollama without `--explain` or `llm status`, and without Ollama
+everything works as usual: a run that gets no explanation prints one line on stderr naming the
+cause. A run asks about at most 20 subjects, one request each, and results with the same facts
+are one subject (a thousand `__pycache__` files are one question). With `--json`, the report
+gains `explanations`, `explanations_model`, `explanations_not_explained` and
+`explanations_unavailable`.
+
+Ollama and the model are installed by you, never by safeclean: safeclean launches no program,
+so it does not install, update, start or configure them. `safeclean llm status` says what it
+found and what is left to do (exit code 0 when everything is in place, 1 otherwise):
+
+```text
+Ollama: not reachable at http://127.0.0.1:11434 ([Errno 111] Connection refused)
+Model: llama3.2: not checked
+AI explanations: unavailable; safeclean works as usual without them
+To set them up (safeclean installs nothing itself):
+  1. Install Ollama from https://ollama.com/download and start it
+  2. Download the model: ollama pull llama3.2
+  3. Check again: safeclean llm status
+Settings: SAFECLEAN_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),
+  SAFECLEAN_OLLAMA_MODEL (default llama3.2)
+```
+
+Both settings are environment variables. `SAFECLEAN_OLLAMA_URL`, by default
+`http://127.0.0.1:11434`, is `http://HOST[:PORT]` where HOST is `localhost`, an address in
+`127.0.0.0/8` or `[::1]` (an Ollama listening only on `::1` needs `http://[::1]:11434`);
+anything else is refused, proxy settings are ignored and redirects are not followed.
+`SAFECLEAN_OLLAMA_MODEL`, by default `llama3.2`, names a model you pulled.
+
+Each explanation is about one subject, and its facts are all that is sent; the explanation is
+labelled with them as `name=value`:
+
+- `finding` (`analyze`): `level`, `reasons` (a junk reason with its rule, as in
+  `junk_cache:python-bytecode`), `extension` (the file name's lower-cased suffix, `.pdf`)
+- `autostart` (`autostart list`): `source`, `scope`, `name`, `program` (the file name of the
+  program the command starts, `app` for `/usr/bin/app --tray`), `enabled`
+- `stay` (a file `organize move` leaves in place): `reason`, `extension`
+
+Nothing else is sent: not the path, the folder, the size, the times, the digest, the location,
+the whole command, notes or details, and never a file's content.
+
 ### Exit codes
 
 | Code | Meaning |
@@ -118,8 +174,9 @@ undo` that moves them back.
 | 2 | usage error |
 | 3 | cannot act safely here: no reliable open-file check (or, for organize, another blocker of the system), unfinished work of another kind, a data directory, lock or journal that cannot be used, a change that failed or cannot be checked, or a batch of moves that stopped |
 
-`scan`, `analyze` and `autostart list` exit with 0 or 2; `recover` and `organize list` with 0, 2
-or 3. For `organize`, files that stay by the plan are not refusals.
+`scan`, `analyze` and `autostart list` exit with 0 or 2, `--explain` or not; `llm status` with
+0, 1 or 2; `recover` and `organize list` with 0, 2 or 3. For `organize`, files that stay by the
+plan are not refusals.
 
 ## Development
 

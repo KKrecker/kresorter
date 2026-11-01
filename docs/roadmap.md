@@ -163,6 +163,39 @@ Scanner core and `safeclean scan` (read-only report).
   leaves a move `failed` for the user; folders watched by a sync client on Linux are sorted like
   any other.
 
+### Step 6: done (llm)
+- Decision 0013: optional explanations from a local Ollama of what safeclean has already
+  decided, advisory and never acted on; every item cited by a test, the meta-test's pending
+  list empty.
+- `llm.settings`: the address, loopback only (`localhost`, `127.0.0.0/8`, `[::1]`), and the
+  model, from the environment; anything else refused before any connection.
+- `llm.transport`, the one network point (pinned allowlist): `http.client` on a socket of its
+  own, no resolver, no proxy, no redirect, one deadline per request, bounded request and
+  answer.
+- `llm.client`: exactly three requests (`version`, `tags`, `generate`), `status`'s checks, the
+  only accepted answer, the reasons explanations are missing (`Unavailable`); `llm.prompt`,
+  the pinned instruction; `llm.clean`, the answer cleaned and bounded before it is shown.
+- `llm.subjects`: the facts per kind (finding, autostart entry, file that stays), nothing of
+  the files; one subject per set of facts. `llm.explain`: at most 20 per run, stopping at the
+  first failure, no connection when there is nothing to explain.
+- CLI: `safeclean llm status` (exit 0 or 1) and `--explain` on `analyze`, `autostart list`
+  and `organize move` without `--yes`: same stdout and exit code, the explanations after the
+  command's own output (text) or in four added keys (JSON), one line on stderr when they are
+  missing. Guards: no program launched, one network point, what `llm` imports, no file opened
+  by `llm`, no test leaving loopback.
+- README: the section `AI explanations (optional)`. 2103 tests, 100 % line and branch
+  coverage.
+
+### Accepted limitations carried into step 7
+- Everything from steps 2 to 5 still holds.
+- **Explanations** (decision 0013): English only, and the model can be wrong; nothing is
+  cached, so each run asks again; at most 20 subjects per run, one at a time, without
+  streaming; `localhost` is `127.0.0.1`, so an Ollama listening only on `::1` needs
+  `SAFECLEAN_OLLAMA_URL=http://[::1]:11434`; anything listening on the port that answers like
+  Ollama is believed to be it (it gets only the facts and its answer is untrusted text); names
+  steer the model, never a level, a plan or an action; the default model may be missing, and
+  safeclean never installs it.
+
 ### Left for later
 - B8: one environment object for `cli.main` instead of a factory per parameter.
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
@@ -180,7 +213,7 @@ src/safeclean/
 ├── analysis/     # step 3: duplicates, size_age, score, report
 ├── autostart/    # step 4: readers, listing, XDG and HKCU Run changes, recover
 ├── organize/     # step 5: categories, planner, mover, journal, recovery, undo (decision 0012)
-├── llm/          # step 6
+├── llm/          # step 6: settings, transport, client, prompt, clean, subjects, explain (0013)
 └── ui/           # step 7
 ```
 
