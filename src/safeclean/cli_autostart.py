@@ -73,9 +73,11 @@ def render_text(listing: AutostartListing, *, machine_note: bool) -> str:
 
 
 def _item_lines(item: AutostartItem) -> list[str]:
-    state = "enabled" if item.enabled else "disabled"
+    marks = ["enabled" if item.enabled else "disabled", str(item.scope)]
+    if item.disableable:
+        marks.append("disableable")
     lines = [
-        f"  {item.name}  [{state}, {item.scope}]",
+        f"  {item.name}  [{', '.join(marks)}]",
         f"    command: {item.command}",
         f"    location: {item.location}",
     ]
@@ -104,6 +106,7 @@ def _item_json(item: AutostartItem) -> dict[str, Any]:
         "command": item.command,
         "location": item.location,
         "enabled": item.enabled,
+        "disableable": item.disableable,
         "digest": item.digest,
         "shadows": item.shadows,
         "notes": list(item.notes),

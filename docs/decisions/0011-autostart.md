@@ -294,8 +294,12 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     and scope, `command`, `location`, `shadows` if any and every note, then the skips. On
     Windows without `--include-machine` a note says what was not read. JSON has `platform`,
     `include_machine`, every item field and the skips.
-56. **`disableable` is not shown** until `autostart disable` exists (commit 12): the report
-    does not promise an action it cannot take yet.
+56. **`disableable` is shown since `autostart disable` exists** (commit 12c1; it was hidden
+    before, so the report would not promise an action it could not take): the text adds
+    `disableable` to the marks of an entry, JSON has the field. It means the source can be
+    written (item 8), not that the action will pass: enabling an entry disabled elsewhere is
+    still refused (`foreign`, item 74). The report reads the system, not the journal, so it
+    cannot know that in advance.
 
 ## Addendum (step 4, commit 11): journal schema v3
 
