@@ -459,3 +459,21 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     is still what it was, `failed` otherwise. If the flag cannot be read back, the row stays
     `pending` and the error is raised: `recover()` (commit 12b) reconciles it, the outcome of
     a write that cannot be read is never guessed. The clock (`now`) is injectable for tests.
+
+## Addendum (step 4, commit 12b2): recovering `HKCU` Run changes
+
+88. **A pending `run_key` row is closed by the flag it names**: `RunKeyChanges.recover()`
+    reads the flag at the row's `location` (by name, ignoring case, item 86) and closes the
+    row `done` if it holds the bytes after the change, `rolled_back` if it holds the bytes
+    before (a missing flag is `NULL`), `failed` otherwise, with the reason in `error`. As in
+    item 72, the journal records what is in the registry, not what was intended.
+89. **`recover()` only reads the registry**: a change found written is not undone and one
+    found not written is not redone; the user asked for it once and can ask again.
+90. **An unreadable flag is never guessed**: the `RegistryError` is raised and the row stays
+    `pending` (item 87); rows already closed before it stay closed.
+91. **Only pending `run_key` rows are touched**: XDG rows are recovered by `XdgChanges`
+    (commit 12b3), and finished rows, `failed` included, stay as they are: the registry has
+    no store, so there is nothing left to reconcile. Nothing pending reads nothing.
+92. **The report is `ChangeRecovery`**: the ids of the closed changes, as `done`,
+    `rolled_back` and `failed`, shared with the XDG recovery. Once nothing is pending,
+    changes are allowed again (item 62).

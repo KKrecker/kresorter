@@ -1,4 +1,4 @@
-r"""Disabling and enabling ``HKCU`` Run values by their ``StartupApproved`` flag (0011, 81-87).
+r"""Disabling and enabling ``HKCU`` Run values by their ``StartupApproved`` flag (0011, 81-92).
 
 The ``Run`` value itself is never written; its flag in ``Explorer\StartupApproved\Run`` is,
 with the bytes the Task Manager writes: ``03 00 00 00`` and the FILETIME of the change to
@@ -6,6 +6,7 @@ disable, ``02`` and eleven zeros to enable. A missing flag means enabled; enabli
 a value, it writes ``02``. The value must still be exactly as listed and is found again by its
 digest; each change is journaled before the registry is written, and a failure is rolled back
 only if the flag is as it was. Only ``HKCU`` Run values change; nothing can write ``HKLM``.
+``recover()`` closes pending rows by the flag found there; it only reads the registry.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from collections.abc import Callable
 
 from safeclean.autostart.changes import (
     Change,
+    ChangeRecovery,
     ChangeRefusal,
     ChangeResult,
     ChangeState,
@@ -39,6 +41,9 @@ from safeclean.storage.transactions import transaction
 ENABLED_FLAG = b"\x02" + bytes(11)
 _DISABLED = b"\x03\x00\x00\x00"
 _UNIX_EPOCH_AS_FILETIME = 116_444_736_000_000_000  # 1970-01-01 in 100 ns since 1601-01-01
+_FLAGS = rf"{Hive.HKCU}\{APPROVED}" + "\\"  # a journaled location is this and the exact name
+_NOT_WRITTEN = "interrupted before the registry was written"
+_NEITHER = "the flag is neither as before nor as after the change"
 
 
 class RunKeyChanges:
@@ -90,6 +95,34 @@ class RunKeyChanges:
             return ChangeResult(change_id, state, None, message)
         finish_change(self._conn, change_id, ChangeState.DONE, None)
         return ChangeResult(change_id, ChangeState.DONE)
+
+    def recover(self) -> ChangeRecovery:
+        """Close pending ``run_key`` changes by the flag in the registry; never write it."""
+        pending = self._conn.execute(
+            "SELECT id, location, value_before, value_after FROM autostart_changes"
+            " WHERE state = ? AND source = ? ORDER BY id",
+            (ChangeState.PENDING.value, Source.RUN_KEY.value),
+        ).fetchall()
+        closed: dict[ChangeState, list[int]] = {
+            ChangeState.DONE: [],
+            ChangeState.ROLLED_BACK: [],
+            ChangeState.FAILED: [],
+        }
+        for change_id, location, before, after in pending:
+            found = self._flags().get(location.removeprefix(_FLAGS).casefold())
+            if found == after:
+                state, error = ChangeState.DONE, None
+            elif found == before:
+                state, error = ChangeState.ROLLED_BACK, _NOT_WRITTEN
+            else:
+                state, error = ChangeState.FAILED, _NEITHER
+            finish_change(self._conn, change_id, state, error)
+            closed[state].append(change_id)
+        return ChangeRecovery(
+            tuple(closed[ChangeState.DONE]),
+            tuple(closed[ChangeState.ROLLED_BACK]),
+            tuple(closed[ChangeState.FAILED]),
+        )
 
     def _find(self, digest: str) -> tuple[str, bytes | None] | None:
         """The name and flag bytes of the Run value with this digest, read once more."""

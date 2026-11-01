@@ -59,6 +59,15 @@ class ChangeResult:
     detail: str = ""
 
 
+@dataclass(frozen=True)
+class ChangeRecovery:
+    """What ``recover()`` found: the ids of the pending changes it closed, by their end."""
+
+    done: tuple[int, ...] = ()
+    rolled_back: tuple[int, ...] = ()
+    failed: tuple[int, ...] = ()
+
+
 class AutostartStore:
     """``<data_dir>/autostart/<change id>``: originals and removed stubs, never purged."""
 
