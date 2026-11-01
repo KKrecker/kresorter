@@ -19,9 +19,10 @@ from pathlib import Path
 import pytest
 
 from fakes import deny_stat
-from safeclean.autostart import changes
-from safeclean.autostart.changes import AutostartStore, ChangeRecovery, ChangeState, XdgChanges
+from safeclean.autostart import changes, journal
+from safeclean.autostart.changes import AutostartStore, XdgChanges
 from safeclean.autostart.entries import BrokenEntryError
+from safeclean.autostart.journal import ChangeRecovery, ChangeState
 from safeclean.autostart.models import AutostartItem, Source
 from safeclean.autostart.xdg import read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
@@ -365,10 +366,10 @@ def test_a_failed_change_is_reconciled_only_if_it_is_the_last_one_there(
 ) -> None:
     stub = double_fault(tree, monkeypatch)
     source, digest = Source.XDG_AUTOSTART, "0" * 32
-    later = changes.Change("enable", source, str(stub), str(stub), digest, b"", None)
+    later = journal.Change("enable", source, str(stub), str(stub), digest, b"", None)
     with transaction(tree.conn):
-        changes.insert_change(tree.conn, later)
-    changes.finish_change(tree.conn, 2, ChangeState.DONE, None)
+        journal.insert_change(tree.conn, later)
+    journal.finish_change(tree.conn, 2, ChangeState.DONE, None)
     before = tree.states()
 
     report = tree.changes.recover()
@@ -383,9 +384,9 @@ def test_a_failed_change_is_reconciled_only_if_it_is_the_last_one_there(
 
 def test_registry_rows_are_left_alone(tree: Tree) -> None:
     location = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run\App"
-    change = changes.Change("disable", Source.RUN_KEY, "Run", location, "0" * 32, None, b"\x03")
+    change = journal.Change("disable", Source.RUN_KEY, "Run", location, "0" * 32, None, b"\x03")
     with transaction(tree.conn):
-        changes.insert_change(tree.conn, change)
+        journal.insert_change(tree.conn, change)
 
     report = tree.changes.recover()
 

@@ -641,3 +641,8 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     The journal session (`cli_journal`) no longer depends on the quarantine, nor would
     organize; `QuarantineService` keeps its contract and raises `QuarantineError` with the
     same message.
+119. **The journal of autostart changes is `autostart.journal`** (B2): `ChangeState`,
+    `ChangeRefusal`, `ChangeResult`, `ChangeRecovery`, `Change`, `insert_change`,
+    `finish_change` and `refused`, shared by `XdgChanges` and `RunKeyChanges` (item 81), so
+    the Run module no longer imports the XDG one; `autostart.changes` keeps the store and the
+    XDG changes.

@@ -16,7 +16,7 @@ import pytest
 
 from fakes import FakeRegistry, RegistryKeys
 from safeclean.autostart import run_changes
-from safeclean.autostart.changes import ChangeRefusal, ChangeResult, ChangeState
+from safeclean.autostart.journal import ChangeRefusal, ChangeResult, ChangeState
 from safeclean.autostart.models import (
     AutostartItem,
     AutostartListing,

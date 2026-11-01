@@ -15,7 +15,14 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeRegistry, RegistryKeys
-from safeclean.autostart import changes, run_changes
+from safeclean.autostart import run_changes
+from safeclean.autostart.journal import (
+    Change,
+    ChangeRecovery,
+    ChangeState,
+    finish_change,
+    insert_change,
+)
 from safeclean.autostart.models import Source
 from safeclean.autostart.registry import Hive, RegistryError, RegValue, ValueKind
 from safeclean.autostart.run_keys import APPROVED, RUN, read_run_keys
@@ -54,9 +61,9 @@ def journal(
     location: str = LOCATION,
 ) -> int:
     """A ``pending`` row, as a change interrupted right after journaling leaves it."""
-    change = changes.Change(action, source, ENTRY, location, DIGEST, before, after)
+    change = Change(action, source, ENTRY, location, DIGEST, before, after)
     with transaction(conn):
-        return changes.insert_change(conn, change)
+        return insert_change(conn, change)
 
 
 def states(conn: sqlite3.Connection) -> list[tuple[object, ...]]:
@@ -108,7 +115,7 @@ def test_a_pending_change_is_closed_by_the_flag_in_the_registry(
     registry, report = recover(conn, keys)
 
     assert states(conn) == [(state, error, 1)]
-    assert report == changes.ChangeRecovery(**{state: (1,)})
+    assert report == ChangeRecovery(**{state: (1,)})
     assert registry.writes == []  # recover() only reads the registry
 
 
@@ -126,7 +133,7 @@ def test_the_unnamed_flag_is_not_the_one_named_default(conn: sqlite3.Connection)
 
     _, report = recover(conn, {(Hive.HKCU, APPROVED): [flag(DISABLE, name="(Default)")]})
 
-    assert report == changes.ChangeRecovery(done=(named,), rolled_back=(unnamed,))
+    assert report == ChangeRecovery(done=(named,), rolled_back=(unnamed,))
 
 
 def test_rows_of_other_sources_and_finished_rows_are_left_alone(
@@ -134,12 +141,12 @@ def test_rows_of_other_sources_and_finished_rows_are_left_alone(
 ) -> None:
     journal(conn, "disable", b"[Desktop Entry]\n", b"x", source=Source.XDG_AUTOSTART)
     failed = journal(conn, "disable", None, DISABLE)
-    changes.finish_change(conn, failed, changes.ChangeState.FAILED, "earlier")
+    finish_change(conn, failed, ChangeState.FAILED, "earlier")
     pending = journal(conn, "disable", None, DISABLE)
 
     _, report = recover(conn, {(Hive.HKCU, APPROVED): [flag(DISABLE)]})
 
-    assert report == changes.ChangeRecovery(done=(pending,))
+    assert report == ChangeRecovery(done=(pending,))
     assert states(conn) == [("pending", None, 0), ("failed", "earlier", 1), ("done", None, 1)]
 
 
@@ -156,7 +163,7 @@ def test_an_unreadable_flag_leaves_the_row_pending_and_raises(conn: sqlite3.Conn
 def test_nothing_pending_is_an_empty_report(conn: sqlite3.Connection) -> None:
     registry, report = recover(conn, {})
 
-    assert report == changes.ChangeRecovery()
+    assert report == ChangeRecovery()
     assert registry.reads == []
 
 
@@ -169,4 +176,4 @@ def test_changes_are_allowed_again_once_recovered(conn: sqlite3.Connection) -> N
 
     result = run_keys.disable(item)
 
-    assert (result.refusal, result.state) == (None, changes.ChangeState.DONE)
+    assert (result.refusal, result.state) == (None, ChangeState.DONE)

@@ -17,7 +17,7 @@ import pytest
 
 from fakes import FakeOpenFiles, FakeRegistry, deny_stat, journal_held, make_policy
 from safeclean import cli
-from safeclean.autostart.changes import ChangeResult, ChangeState
+from safeclean.autostart.journal import ChangeResult, ChangeState
 from safeclean.autostart.listing import AutostartContext
 from safeclean.autostart.models import AutostartItem
 from safeclean.autostart.registry import Hive, RegistryError, RegValue, UserRegistry, ValueKind

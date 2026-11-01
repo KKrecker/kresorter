@@ -25,15 +25,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TextIO
 
-from safeclean.autostart.changes import (
-    AutostartStore,
-    ChangeRecovery,
-    ChangeRefusal,
-    ChangeResult,
-    ChangeState,
-    XdgChanges,
-)
+from safeclean.autostart.changes import AutostartStore, XdgChanges
 from safeclean.autostart.entries import BrokenEntryError
+from safeclean.autostart.journal import ChangeRecovery, ChangeRefusal, ChangeResult, ChangeState
 from safeclean.autostart.listing import AutostartContext, list_autostart
 from safeclean.autostart.models import (
     AutostartItem,

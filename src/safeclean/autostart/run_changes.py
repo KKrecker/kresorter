@@ -15,7 +15,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 
-from safeclean.autostart.changes import (
+from safeclean.autostart.journal import (
     Change,
     ChangeRecovery,
     ChangeRefusal,

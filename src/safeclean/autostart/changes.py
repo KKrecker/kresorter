@@ -7,8 +7,7 @@ entry is never missing. Disable, a system entry: a stub is created in the user d
 store) only if the journal shows safeclean disabled it; a stub is moved to the store. Each
 change is a ``pending`` row of ``autostart_changes`` before the disk is touched; a failure
 rolls it back, and nothing is ever deleted. Refusals change nothing and journal nothing.
-The journal functions here (``insert_change``, ``finish_change``, ``refused``)
-are shared with ``run_changes`` (item 81).
+The journal of these changes (``autostart.journal``) is shared with ``run_changes`` (item 81).
 ``recover()`` closes pending changes, and failed ones still last at their place, by the disk.
 """
 
@@ -18,13 +17,21 @@ import contextlib
 import functools
 import os
 import sqlite3
-import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 
 from safeclean.autostart.entries import BrokenEntryError, decode, read_entry
+from safeclean.autostart.journal import (
+    Change,
+    ChangeRecovery,
+    ChangeRefusal,
+    ChangeResult,
+    ChangeState,
+    finish_change,
+    insert_change,
+    refused,
+)
 from safeclean.autostart.models import AutostartItem, Scope, Source, entry_digest
 from safeclean.autostart.xdg import parse_keys, read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
@@ -38,41 +45,6 @@ _NEITHER = "the entry is neither as before nor as after the change"
 _NOT_KEPT = "the entry is as after the change, but the store does not hold what it kept"
 _PARTIAL = "a partial stub was moved to the store"
 _NOTHING_THERE = (FileNotFoundError, NotADirectoryError)  # every other error: something is there
-
-
-class ChangeState(StrEnum):
-    PENDING = "pending"
-    DONE = "done"
-    FAILED = "failed"  # something was left on disk; recover() reconciles it
-    ROLLED_BACK = "rolled_back"
-
-
-class ChangeRefusal(StrEnum):
-    READ_ONLY = "read_only"  # a source step 4 does not write (item 9)
-    CHANGED = "changed"  # not the entry in effect as it was listed
-    ALREADY = "already"  # already disabled, or already enabled
-    PENDING = "pending"  # unfinished work in the journal: recover() first
-    OTHER_DEVICE = "other_device"  # the store cannot hold the original by a link
-    TOO_LARGE = "too_large"  # the disabled copy would be skipped by the reader
-    FOREIGN = "foreign"  # not disabled by safeclean: enabling would edit it (item 74)
-    ORIGINAL_CHANGED = "original_changed"  # the original in the store is missing or changed
-
-
-@dataclass(frozen=True)
-class ChangeResult:
-    change_id: int | None  # None when refused
-    state: ChangeState | None
-    refusal: ChangeRefusal | None = None
-    detail: str = ""
-
-
-@dataclass(frozen=True)
-class ChangeRecovery:
-    """What ``recover()`` found: the ids of the pending changes it closed, by their end."""
-
-    done: tuple[int, ...] = ()
-    rolled_back: tuple[int, ...] = ()
-    failed: tuple[int, ...] = ()
 
 
 class AutostartStore:
@@ -321,53 +293,6 @@ class XdgChanges:
         return has_pending(self._conn)
 
 
-@dataclass(frozen=True)
-class Change:
-    """One row of ``autostart_changes``, as journaled before the change is made."""
-
-    action: str  # "disable" or "enable"
-    source: Source
-    entry: str  # as listed
-    location: str  # what is written
-    digest: str
-    before: bytes | None  # None: nothing there
-    after: bytes | None
-
-
-def insert_change(conn: sqlite3.Connection, change: Change) -> int:
-    """Journal ``change`` as ``pending``; the caller holds the transaction."""
-    cursor = conn.execute(
-        "INSERT INTO autostart_changes (action, source, entry, location, digest,"
-        " value_before, value_after, state, created_at_ns)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (
-            change.action,
-            change.source.value,
-            change.entry,
-            change.location,
-            change.digest,
-            change.before,
-            change.after,
-            ChangeState.PENDING.value,
-            time.time_ns(),
-        ),
-    )
-    change_id = cursor.lastrowid
-    if change_id is None:  # pragma: no cover - sqlite3 always sets it after an INSERT
-        raise RuntimeError("no row id after INSERT")
-    return change_id
-
-
-def finish_change(
-    conn: sqlite3.Connection, change_id: int, state: ChangeState, error: str | None
-) -> None:
-    with transaction(conn):
-        conn.execute(
-            "UPDATE autostart_changes SET state = ?, finished_at_ns = ?, error = ? WHERE id = ?",
-            (state.value, time.time_ns(), error, change_id),
-        )
-
-
 def _write_new(path: Path, data: bytes) -> None:
     _write_and_close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, ENTRY_MODE), data)
 
@@ -418,7 +343,3 @@ def _device(path: Path) -> int:
             return path.stat().st_dev
         except _NOTHING_THERE:
             path = path.parent
-
-
-def refused(refusal: ChangeRefusal, detail: str) -> ChangeResult:
-    return ChangeResult(None, None, refusal, detail)

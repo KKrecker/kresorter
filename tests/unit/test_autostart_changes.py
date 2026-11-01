@@ -20,14 +20,9 @@ import pytest
 
 from fakes import deny_stat
 from safeclean.autostart import changes
-from safeclean.autostart.changes import (
-    AutostartStore,
-    ChangeRefusal,
-    ChangeResult,
-    ChangeState,
-    XdgChanges,
-)
+from safeclean.autostart.changes import AutostartStore, XdgChanges
 from safeclean.autostart.entries import MAX_ENTRY_BYTES
+from safeclean.autostart.journal import ChangeRefusal, ChangeResult, ChangeState
 from safeclean.autostart.models import (
     AutostartItem,
     AutostartListing,
