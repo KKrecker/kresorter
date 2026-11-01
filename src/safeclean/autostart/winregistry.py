@@ -4,7 +4,9 @@ Keys are opened read-only in the 64-bit view (``KEY_READ | KEY_WOW64_64KEY``), s
 ``WOW6432Node`` names exactly that key and nothing is redirected behind our back. A missing key
 reads as ``None``; any other failure, while opening or while enumerating, is a
 ``RegistryError``. Only ``ERROR_NO_MORE_ITEMS`` ends the enumeration, of values and of sub-keys
-alike. The key is always closed.
+alike. Writing is one value under ``HKCU`` (``KEY_SET_VALUE | KEY_WOW64_64KEY``), creating the
+key if it is missing; ``HKLM`` cannot be written and nothing is ever deleted (item 80). The key
+is always closed once it was opened.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ class _Winreg(Protocol):
     HKEY_CURRENT_USER: int
     HKEY_LOCAL_MACHINE: int
     KEY_READ: int
+    KEY_SET_VALUE: int
     KEY_WOW64_64KEY: int
 
     def OpenKey(self, key: int, sub_key: str, reserved: int, access: int, /) -> object: ...
@@ -31,6 +34,12 @@ class _Winreg(Protocol):
     def EnumValue(self, key: object, index: int, /) -> tuple[str, object, int]: ...
 
     def EnumKey(self, key: object, index: int, /) -> str: ...
+
+    def CreateKeyEx(self, key: int, sub_key: str, reserved: int, access: int, /) -> object: ...
+
+    def SetValueEx(
+        self, key: object, value_name: str, reserved: int, kind: int, value: object, /
+    ) -> None: ...
 
     def CloseKey(self, key: object, /) -> None: ...
 
@@ -49,6 +58,20 @@ class WinRegistry:
 
     def subkeys(self, hive: Hive, key: str) -> list[str] | None:
         return self._read(hive, key, _subkey)
+
+    def set_user_value(self, key: str, value: RegValue) -> None:
+        winreg = self._winreg()
+        access = winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY
+        try:
+            handle = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, key, 0, access)
+        except OSError as error:
+            raise RegistryError(_reason(error)) from error
+        try:
+            winreg.SetValueEx(handle, value.name, 0, value.kind, value.data)
+        except OSError as error:
+            raise RegistryError(_reason(error)) from error
+        finally:
+            winreg.CloseKey(handle)
 
     def _read(
         self, hive: Hive, key: str, item: Callable[[_Winreg, object, int], _T]

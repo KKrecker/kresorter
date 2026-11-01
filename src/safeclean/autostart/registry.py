@@ -1,8 +1,9 @@
-"""A read-only view of the Windows registry, so readers can be tested on a fake (0011, item 11).
+"""A view of the Windows registry, so readers can be tested on a fake (0011, items 11, 80).
 
 Value names are case-insensitive, as in the registry. A key that does not exist reads as
 ``None``, for its values and its sub-keys alike; a key that exists but cannot be read raises
-``RegistryError``.
+``RegistryError``. ``Registry`` only reads; ``UserRegistry`` also writes one value under
+``HKCU``, and nothing can write ``HKLM`` or delete anything.
 """
 
 from __future__ import annotations
@@ -49,6 +50,14 @@ class Registry(Protocol):
 
     def subkeys(self, hive: Hive, key: str) -> Sequence[str] | None:
         """Names of the keys directly below ``key``, in no particular order."""
+
+
+class UserRegistry(Registry, Protocol):
+    def set_user_value(self, key: str, value: RegValue) -> None:
+        """Write one value under ``HKCU\\key``, creating the key if it is missing.
+
+        There is no hive parameter: nothing in safeclean can write ``HKLM`` (0011, item 80).
+        """
 
 
 _KIND_NAMES = {kind.value: kind.name for kind in ValueKind}

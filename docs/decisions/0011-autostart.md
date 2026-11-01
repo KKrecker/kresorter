@@ -412,3 +412,13 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     journaled. Disabling a system entry now also reads its file again and compares it.
     The refusals are those of item 70, plus `already` for an enabled entry, `foreign` and
     `original_changed`; failures are rolled back as in item 72.
+
+## Addendum (step 4, commit 12a4a): writing the registry
+
+80. **Writing is one value under `HKCU`, and nothing else**: the `UserRegistry` protocol adds
+    a single method to `Registry`, `set_user_value(key, value)`, without a hive parameter,
+    so nothing in safeclean can write `HKLM`; the ban is in the API itself, like the closed
+    list of sources in the schema (item 60). There is no method to delete a value or a key.
+    `WinRegistry` opens the key with `CreateKeyEx(HKEY_CURRENT_USER, key, 0, KEY_SET_VALUE |
+    KEY_WOW64_64KEY)`, creating it if it is missing, writes with `SetValueEx` and closes the
+    key whatever happens once it was opened; a failure is a `RegistryError` with the reason.
