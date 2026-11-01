@@ -13,6 +13,7 @@ from safeclean import cli
 from safeclean.analysis.duplicates import KeepReason
 from safeclean.core.heuristics import JunkClassifier, default_rules
 from safeclean.core.scanner import ScanContext
+from support.files import snapshot
 
 DAY_NS = 86_400 * 10**9
 MIB = 1024**2
@@ -47,14 +48,6 @@ def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
         open_files=FakeOpenFiles(),
         classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checked,
-    )
-
-
-def snapshot(root: Path) -> list[tuple[str, int, int, bytes]]:
-    return sorted(
-        (str(p), p.stat().st_size, p.stat().st_mtime_ns, p.read_bytes())
-        for p in root.rglob("*")
-        if p.is_file()
     )
 
 

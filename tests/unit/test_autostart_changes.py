@@ -35,6 +35,7 @@ from safeclean.autostart.models import (
 from safeclean.autostart.xdg import read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
 from safeclean.storage.db import connect
+from support.files import write_desktop
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 COLUMNS = (
@@ -93,13 +94,6 @@ def tree(tmp_path: Path) -> Iterator[Tree]:
     conn.close()
 
 
-def write(directory: Path, name: str, raw: bytes) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"{name}.desktop"
-    path.write_bytes(raw)
-    return path
-
-
 def fail(*args: object, **kwargs: object) -> None:
     raise OSError(28, "No space left on device")
 
@@ -117,7 +111,7 @@ def test_the_store_is_apart_from_the_quarantine_and_made_private_by_the_first_ch
     assert tree.store.root == tree.store.data_dir / "autostart"
     assert tree.store.slot(7) == tree.store.root / "7"
     assert not tree.store.root.exists()  # not made by XdgChanges itself (item 115)
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
 
     tree.changes.disable(tree.item())
 
@@ -133,7 +127,7 @@ def test_a_store_not_made_yet_is_on_the_device_of_the_directory_above_it(tmp_pat
 
 
 def test_a_store_that_cannot_be_made_stops_the_change_before_it_is_journaled(tree: Tree) -> None:
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
     data = tree.root / "other"
     data.mkdir()
     (data / "autostart").write_bytes(b"")  # a file where the store would be made
@@ -151,7 +145,7 @@ def test_a_store_that_cannot_be_made_stops_the_change_before_it_is_journaled(tre
 
 
 def test_own_entry_is_replaced_by_its_hidden_copy(tree: Tree) -> None:
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     inode = path.stat().st_ino
     item = tree.item()
 
@@ -168,7 +162,7 @@ def test_own_entry_is_replaced_by_its_hidden_copy(tree: Tree) -> None:
 
 
 def test_own_entry_change_is_journaled(tree: Tree) -> None:
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     item = tree.item()
 
     tree.changes.disable(item)
@@ -193,7 +187,7 @@ def test_own_entry_change_is_journaled(tree: Tree) -> None:
 def test_journal_times_come_from_the_given_clock(tree: Tree) -> None:
     clock = functools.partial(next, itertools.count(1))
     xdg = XdgChanges(tree.conn, tree.store, tree.user, (tree.system,), now=clock)
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
 
     xdg.disable(tree.item())
     xdg.enable(tree.item())
@@ -203,8 +197,8 @@ def test_journal_times_come_from_the_given_clock(tree: Tree) -> None:
 
 
 def test_own_entry_over_a_system_entry_is_disabled_by_its_copy(tree: Tree) -> None:
-    shadowed = write(tree.system, "app", APP)
-    path = write(tree.user, "app", APP.replace(b"--tray", b"--quiet"))
+    shadowed = write_desktop(tree.system, "app", APP)
+    path = write_desktop(tree.user, "app", APP.replace(b"--tray", b"--quiet"))
     before = shadowed.read_bytes(), shadowed.stat().st_mtime_ns
 
     tree.changes.disable(tree.item())
@@ -218,7 +212,7 @@ def test_own_entry_over_a_system_entry_is_disabled_by_its_copy(tree: Tree) -> No
 def test_the_journal_row_exists_before_the_entry_is_touched(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
     seen: list[list[Row]] = []
     link = os.link
 
@@ -237,7 +231,7 @@ def test_the_journal_row_exists_before_the_entry_is_touched(
 
 
 def test_system_entry_is_hidden_by_a_user_stub(tree: Tree) -> None:
-    shadowed = write(tree.system, "app", APP)
+    shadowed = write_desktop(tree.system, "app", APP)
     before = shadowed.read_bytes(), shadowed.stat().st_mtime_ns
     item = tree.item()
 
@@ -268,7 +262,7 @@ def test_system_entry_is_hidden_by_a_user_stub(tree: Tree) -> None:
 
 
 def test_a_missing_user_directory_is_created_private(tree: Tree) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     assert not tree.user.parent.exists()
 
     tree.changes.disable(tree.item())
@@ -278,7 +272,7 @@ def test_a_missing_user_directory_is_created_private(tree: Tree) -> None:
 
 
 def test_an_existing_user_directory_keeps_its_mode(tree: Tree) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     tree.user.mkdir(parents=True)
     tree.user.chmod(0o755)
 
@@ -318,7 +312,7 @@ def test_a_read_only_source_is_refused(tree: Tree) -> None:
 
 
 def test_an_entry_edited_since_it_was_listed_is_refused(tree: Tree) -> None:
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     item = tree.item()
     path.write_bytes(APP.replace(b"--tray", b"--evil"))
     files = tree.files()
@@ -329,7 +323,7 @@ def test_an_entry_edited_since_it_was_listed_is_refused(tree: Tree) -> None:
 
 
 def test_an_entry_gone_since_it_was_listed_is_refused(tree: Tree) -> None:
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     item = tree.item()
     path.rename(tree.root / "elsewhere.desktop")
     files = tree.files()
@@ -344,7 +338,7 @@ def test_an_entry_changed_right_after_the_check_is_refused(
     tree: Tree, monkeypatch: pytest.MonkeyPatch, edit: str
 ) -> None:
     # The listing is read again first; the bytes the copy is made of are compared once more.
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     item = tree.item()
     stale = AutostartListing((item,), ())
 
@@ -364,9 +358,9 @@ def test_an_entry_changed_right_after_the_check_is_refused(
 
 
 def test_a_system_entry_shadowed_since_it_was_listed_is_refused(tree: Tree) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     item = tree.item()
-    write(tree.user, "app", APP)  # a user entry now replaces the listed one
+    write_desktop(tree.user, "app", APP)  # a user entry now replaces the listed one
     files = tree.files()
 
     result = tree.changes.disable(item)
@@ -383,7 +377,7 @@ def test_a_system_entry_shadowed_since_it_was_listed_is_refused(tree: Tree) -> N
     ids=["gnome-disabled", "hidden"],
 )
 def test_an_own_entry_already_disabled_is_refused(tree: Tree, raw: bytes) -> None:
-    write(tree.user, "app", raw)
+    write_desktop(tree.user, "app", raw)
     files = tree.files()
 
     result = tree.changes.disable(tree.item())
@@ -392,8 +386,8 @@ def test_an_own_entry_already_disabled_is_refused(tree: Tree, raw: bytes) -> Non
 
 
 def test_a_system_entry_already_hidden_is_refused(tree: Tree) -> None:
-    write(tree.system, "app", APP)
-    write(tree.user, "app", STUB)
+    write_desktop(tree.system, "app", APP)
+    write_desktop(tree.user, "app", STUB)
     files = tree.files()
 
     result = tree.changes.disable(tree.item())
@@ -412,7 +406,7 @@ def test_a_system_entry_already_hidden_is_refused(tree: Tree) -> None:
     ids=["autostart-change", "quarantine-operation"],
 )
 def test_unfinished_work_in_the_journal_is_refused(tree: Tree, sql: str) -> None:
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
     tree.conn.execute(sql)
     files = tree.files()
     rows = tree.rows()
@@ -432,7 +426,7 @@ def other_device() -> int:
 def test_a_store_on_another_device_is_refused(
     tree: Tree, monkeypatch: pytest.MonkeyPatch, scope: Scope
 ) -> None:
-    write(tree.user if scope is Scope.USER else tree.system, "app", APP)
+    write_desktop(tree.user if scope is Scope.USER else tree.system, "app", APP)
     files = tree.files()
     monkeypatch.setattr(tree.store, "device", other_device)
 
@@ -444,7 +438,7 @@ def test_a_store_on_another_device_is_refused(
 def test_a_user_directory_the_system_denies_is_not_taken_for_a_missing_one(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     tree.user.mkdir(parents=True)
     item = tree.item()
     files = tree.files()
@@ -459,7 +453,7 @@ def test_a_user_directory_the_system_denies_is_not_taken_for_a_missing_one(
 
 def test_an_own_entry_whose_copy_would_be_too_large_is_refused(tree: Tree) -> None:
     raw = APP + b"#" * (MAX_ENTRY_BYTES - len(APP) - 1) + b"\n"
-    write(tree.user, "app", raw)
+    write_desktop(tree.user, "app", raw)
     files = tree.files()
 
     result = tree.changes.disable(tree.item())
@@ -482,7 +476,7 @@ def assert_rolled_back(tree: Tree, result: ChangeResult, files: Snapshot) -> Non
 def test_own_entry_stays_as_it_was_when_a_step_fails(
     tree: Tree, monkeypatch: pytest.MonkeyPatch, step: str
 ) -> None:
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
     files = tree.files()
     item = tree.item()
     monkeypatch.setattr(os, step, fail)
@@ -496,7 +490,7 @@ def test_own_entry_stays_as_it_was_when_a_step_fails(
 def test_stub_that_could_not_be_created_leaves_nothing(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     files = tree.files()
     item = tree.item()
     monkeypatch.setattr(os, "open", fail)
@@ -511,7 +505,7 @@ def test_stub_that_could_not_be_created_leaves_nothing(
 def test_stub_written_but_not_synced_goes_to_the_store(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     tree.user.mkdir(parents=True)
     files = tree.files()
     item = tree.item()
@@ -530,7 +524,7 @@ def test_stub_written_but_not_synced_goes_to_the_store(
 def test_a_file_that_took_the_place_of_the_stub_is_kept_and_the_change_rolled_back(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     item = tree.item()
     stub = tree.user / "app.desktop"
     mine = b"[Desktop Entry]\nType=Application\nName=Mine\nExec=/usr/bin/mine\n"
@@ -557,7 +551,7 @@ def test_a_file_that_took_the_place_of_the_stub_is_kept_and_the_change_rolled_ba
 def test_an_interrupt_is_rolled_back_and_raised(
     tree: Tree, monkeypatch: pytest.MonkeyPatch, scope: Scope
 ) -> None:
-    write(tree.user if scope is Scope.USER else tree.system, "app", APP)
+    write_desktop(tree.user if scope is Scope.USER else tree.system, "app", APP)
     item = tree.item()
     monkeypatch.setattr(os, "fsync", interrupt)
 
@@ -574,13 +568,13 @@ def test_an_interrupt_is_rolled_back_and_raised(
 
 def disabled(tree: Tree, scope: Scope = Scope.USER) -> AutostartItem:
     """An entry disabled by safeclean (change 1), as listed now."""
-    write(tree.user if scope is Scope.USER else tree.system, "app", APP)
+    write_desktop(tree.user if scope is Scope.USER else tree.system, "app", APP)
     assert tree.changes.disable(tree.item()) == ChangeResult(1, ChangeState.DONE)
     return tree.item()
 
 
 def test_own_entry_disabled_here_gets_its_original_back(tree: Tree) -> None:
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     inode = path.stat().st_ino
     original = tree.item()
     tree.changes.disable(original)
@@ -620,7 +614,7 @@ def test_own_entry_enable_is_journaled(tree: Tree) -> None:
 
 
 def test_disable_and_enable_can_be_repeated(tree: Tree) -> None:
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     inode = path.stat().st_ino
 
     for _ in range(2):
@@ -659,7 +653,7 @@ def test_the_enable_row_exists_before_the_entry_is_touched(
 
 
 def test_stub_made_here_is_moved_to_the_store(tree: Tree) -> None:
-    shadowed = write(tree.system, "app", APP)
+    shadowed = write_desktop(tree.system, "app", APP)
     before = shadowed.read_bytes(), shadowed.stat().st_mtime_ns
     system_item = tree.item()
     tree.changes.disable(system_item)
@@ -691,9 +685,9 @@ def test_stub_made_here_is_moved_to_the_store(tree: Tree) -> None:
 
 def test_a_users_own_stub_is_moved_too(tree: Tree) -> None:
     # Moving it edits nothing (item 74); a stub may carry other keys.
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     raw = b"[Desktop Entry]\nName=App\nHidden=true\n"
-    write(tree.user, "app", raw)
+    write_desktop(tree.user, "app", raw)
 
     result = tree.changes.enable(tree.item())
 
@@ -738,7 +732,7 @@ def test_enabling_a_read_only_source_is_refused(tree: Tree) -> None:
 
 @pytest.mark.parametrize("scope", [Scope.USER, Scope.SYSTEM])
 def test_enabling_an_enabled_entry_is_refused(tree: Tree, scope: Scope) -> None:
-    write(tree.user if scope is Scope.USER else tree.system, "app", APP)
+    write_desktop(tree.user if scope is Scope.USER else tree.system, "app", APP)
     before = state(tree)
 
     assert_unchanged(tree, tree.changes.enable(tree.item()), ChangeRefusal.ALREADY, before)
@@ -763,7 +757,7 @@ def test_enabling_an_enabled_entry_is_refused(tree: Tree, scope: Scope) -> None:
 )
 def test_an_entry_disabled_elsewhere_is_refused(tree: Tree, scope: Scope, raw: bytes) -> None:
     # Enabling it would edit its content (item 74).
-    write(tree.user if scope is Scope.USER else tree.system, "app", raw)
+    write_desktop(tree.user if scope is Scope.USER else tree.system, "app", raw)
     before = state(tree)
 
     assert_unchanged(tree, tree.changes.enable(tree.item()), ChangeRefusal.FOREIGN, before)

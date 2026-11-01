@@ -657,3 +657,9 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     caller that forgets it. `RunKeyChanges` dates its rows with the clock that dates its flag
     (item 82). A test checks `created_at_ns` and `finished_at_ns` exactly; organize will take
     its clock the same way.
+122. **Test helpers used by several files live in `tests/support/`, one module per kind,
+    imported by name** (pre-step-5 audit, B10): files first (`write`, `write_desktop`,
+    `snapshot`). A helper that does something else under the same name stays in its file: a
+    `write` that also sets a time or writes text, the walker's one-byte default, a snapshot
+    with inodes. Boundary fakes stay in `tests/fakes.py`. Organize's tests start from these
+    instead of adding a seventh copy.

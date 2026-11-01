@@ -22,14 +22,9 @@ from safeclean.quarantine.preflight import (
     Refused,
     UnreliableCheckerError,
 )
+from support.files import write
 
 # --- helpers -----------------------------------------------------------------------------------
-
-
-def write(path: Path, data: bytes = b"payload") -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return path
 
 
 def scanned(path: Path) -> FileEntry:

@@ -20,6 +20,7 @@ from safeclean.core.heuristics import JunkClassifier, load_rules
 from safeclean.core.models import FileEntry
 from safeclean.core.scanner import ScanContext, scan
 from safeclean.quarantine.preflight import Candidate
+from support.files import snapshot
 
 RULES = """
 [[rule]]
@@ -71,10 +72,6 @@ def run(tmp_path: Path, root: Path) -> AnalysisReport:
         now_ns=NOW,
         thresholds=THRESHOLDS,
     )
-
-
-def snapshot(root: Path) -> list[tuple[Path, int, bytes]]:
-    return sorted((p, p.stat().st_mtime_ns, p.read_bytes()) for p in root.rglob("*") if p.is_file())
 
 
 def by_path(report: AnalysisReport) -> dict[Path, Finding]:

@@ -29,6 +29,7 @@ from safeclean.autostart.xdg import read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
 from safeclean.storage.db import connect
 from safeclean.storage.transactions import transaction
+from support.files import write_desktop
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 COPY = hidden_copy(APP)
@@ -90,13 +91,6 @@ def tree(tmp_path: Path) -> Iterator[Tree]:
     conn.close()
 
 
-def write(directory: Path, name: str, raw: bytes) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"{name}.desktop"
-    path.write_bytes(raw)
-    return path
-
-
 def interrupted(
     tree: Tree, monkeypatch: pytest.MonkeyPatch, action: str, step: str | None
 ) -> AutostartItem:
@@ -143,7 +137,7 @@ def test_an_interrupted_disable_is_closed_by_the_disk(
     state: str,
     stored: dict[str, bytes],
 ) -> None:
-    write(tree.system if system else tree.user, "app", APP)
+    write_desktop(tree.system if system else tree.user, "app", APP)
     item = interrupted(tree, monkeypatch, "disable", step)
     assert tree.states() == [("pending", None, 0)]
 
@@ -176,7 +170,7 @@ def test_an_interrupted_enable_is_closed_by_the_disk(
     state: str,
     stored: list[str],
 ) -> None:
-    write(tree.system if system else tree.user, "app", APP)
+    write_desktop(tree.system if system else tree.user, "app", APP)
     tree.changes.disable(tree.item())
     interrupted(tree, monkeypatch, "enable", step)
 
@@ -191,7 +185,7 @@ def test_an_interrupted_enable_is_closed_by_the_disk(
 def test_done_needs_the_store_to_hold_what_the_change_kept(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
     interrupted(tree, monkeypatch, "disable", None)
     tree.store.slot(1).write_bytes(MINE)  # the original kept in the store is not there anymore
 
@@ -204,7 +198,7 @@ def test_done_needs_the_store_to_hold_what_the_change_kept(
 def test_an_entry_changed_since_the_interruption_is_failed(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     interrupted(tree, monkeypatch, "disable", "replace")
     path.write_bytes(MINE)
 
@@ -218,7 +212,7 @@ def test_an_entry_changed_since_the_interruption_is_failed(
 def test_an_unreadable_entry_leaves_the_row_pending_and_raises(
     tree: Tree, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    path = write(tree.user, "app", APP)
+    path = write_desktop(tree.user, "app", APP)
     interrupted(tree, monkeypatch, "disable", "replace")
     path.rename(tmp_path / "elsewhere")
     path.mkdir()  # exists, but is not an entry that can be read
@@ -233,7 +227,7 @@ def test_an_unreadable_entry_leaves_the_row_pending_and_raises(
 def test_an_entry_the_system_denies_is_not_taken_for_a_missing_one(
     tree: Tree, monkeypatch: pytest.MonkeyPatch, system: bool, there: bytes
 ) -> None:
-    write(tree.system if system else tree.user, "app", APP)
+    write_desktop(tree.system if system else tree.user, "app", APP)
     interrupted(tree, monkeypatch, "disable", None)  # written, but not journaled as done
     entry = tree.user / "app.desktop"  # the copy, or the stub, is there
     deny_stat(monkeypatch, entry)
@@ -266,7 +260,7 @@ def test_a_stub_left_by_a_double_fault_is_reconciled(
     error: str | None,
     stored: dict[str, bytes],
 ) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     item = tree.item()
     monkeypatch.setattr(os, step, fail)
     monkeypatch.setattr(os, "rename", fail)  # the partial stub cannot go to the store either
@@ -290,7 +284,7 @@ def test_a_stub_left_by_a_double_fault_is_reconciled(
 def test_a_partial_stub_moved_to_the_store_right_before_a_crash_is_named_by_its_row(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     item = tree.item()
     move = os.rename
 
@@ -317,7 +311,7 @@ def test_a_partial_stub_moved_to_the_store_right_before_a_crash_is_named_by_its_
 def test_a_file_that_took_the_place_of_the_stub_is_never_moved_to_the_store(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     stub = tree.user / "app.desktop"
     create = os.open
 
@@ -340,7 +334,7 @@ def test_a_file_that_took_the_place_of_the_stub_is_never_moved_to_the_store(
 
 def double_fault(tree: Tree, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Change 1 failed, leaving an empty stub; returns the stub."""
-    write(tree.system, "app", APP)
+    write_desktop(tree.system, "app", APP)
     monkeypatch.setattr(os, "write", fail)
     monkeypatch.setattr(os, "rename", fail)
     tree.changes.disable(tree.item())
@@ -401,7 +395,7 @@ def test_nothing_journaled_is_an_empty_report_and_makes_no_store(tree: Tree) -> 
 
 
 def test_nothing_to_recover_is_an_empty_report(tree: Tree) -> None:
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
     tree.changes.disable(tree.item())
 
     assert tree.changes.recover() == ChangeRecovery()
@@ -411,7 +405,7 @@ def test_nothing_to_recover_is_an_empty_report(tree: Tree) -> None:
 def test_changes_are_allowed_again_once_recovered(
     tree: Tree, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    write(tree.user, "app", APP)
+    write_desktop(tree.user, "app", APP)
     item = interrupted(tree, monkeypatch, "disable", "replace")
     tree.changes.recover()
 

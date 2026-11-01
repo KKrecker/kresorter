@@ -12,12 +12,7 @@ from fakes import FakeOpenFiles, make_policy
 from safeclean import cli
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.scanner import ScanContext
-
-
-def write(path: Path, data: bytes) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return path
+from support.files import snapshot, write
 
 
 @pytest.fixture
@@ -40,14 +35,6 @@ def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
         open_files=FakeOpenFiles(),
         classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checked,
-    )
-
-
-def snapshot(root: Path) -> list[tuple[str, int, int, bytes]]:
-    return sorted(
-        (str(p), p.stat().st_size, p.stat().st_mtime_ns, p.read_bytes())
-        for p in root.rglob("*")
-        if p.is_file()
     )
 
 

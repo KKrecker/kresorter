@@ -21,14 +21,9 @@ from safeclean.core.scanner import ScanContext
 from safeclean.quarantine.service import QuarantineService
 from safeclean.storage.db import connect
 from safeclean.storage.lock import InstanceLock
+from support.files import write
 
 # --- helpers -----------------------------------------------------------------------------------
-
-
-def write(path: Path, data: bytes = b"payload") -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return path
 
 
 @pytest.fixture

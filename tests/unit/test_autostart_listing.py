@@ -23,6 +23,7 @@ from safeclean.autostart.run_keys import RUN
 from safeclean.autostart.services import SERVICES
 from safeclean.autostart.winregistry import WinRegistry
 from safeclean.core.heuristics import Platform
+from support.files import write
 
 DESKTOP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app\n"
 UNIT = b"[Service]\nExecStart=/usr/bin/sync\n"
@@ -32,12 +33,6 @@ TASK = (
     b"<Triggers><LogonTrigger/></Triggers><Actions><Exec><Command>t.exe</Command></Exec>"
     b"</Actions></Task>"
 )
-
-
-def write(path: Path, raw: bytes) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(raw)
-    return path
 
 
 def no_registry() -> UserRegistry:

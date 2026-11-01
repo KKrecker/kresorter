@@ -11,6 +11,7 @@ from safeclean.core.heuristics import JunkCategory, JunkClassifier, load_rules
 from safeclean.core.models import FileEntry, Skipped, SkipReason
 from safeclean.core.policy import BlockReason
 from safeclean.core.scanner import DuplicateGroup, ScanContext, scan
+from support.files import write
 
 RULES = """
 [[rule]]
@@ -19,12 +20,6 @@ category = "temp"
 description = "Temporary file"
 files = ["*.tmp"]
 """
-
-
-def write(path: Path, data: bytes) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return path
 
 
 def context(tmp_path: Path, *blocked: Path) -> ScanContext:

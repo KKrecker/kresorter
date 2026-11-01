@@ -27,15 +27,10 @@ from safeclean.autostart.xdg_changes import STUB, hidden_copy
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.scanner import ScanContext
 from safeclean.storage.db import connect
+from support.files import write
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 SYNC = RegValue("Sync", ValueKind.REG_SZ, r"C:\sync.exe")
-
-
-def write(path: Path, data: bytes) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return path
 
 
 @pytest.fixture

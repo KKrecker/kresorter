@@ -14,15 +14,9 @@ from safeclean.autostart.entries import MAX_ENTRY_BYTES, BrokenEntryError
 from safeclean.autostart.models import Scope, entry_digest
 from safeclean.autostart.xdg import parse_keys, read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
+from support.files import write_desktop
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
-
-
-def write(directory: Path, name: str, raw: bytes) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"{name}.desktop"
-    path.write_bytes(raw)
-    return path
 
 
 # --- hidden_copy -------------------------------------------------------------------------------
@@ -123,7 +117,7 @@ def test_a_copy_of_exactly_the_limit_is_accepted() -> None:
 def test_the_copy_reads_back_as_the_same_entry_disabled(tmp_path: Path) -> None:
     user = tmp_path / "home" / ".config" / "autostart"
     copy = hidden_copy(APP)
-    path = write(user, "app", copy)
+    path = write_desktop(user, "app", copy)
 
     (item,) = read_xdg(user, ()).items
 
@@ -146,8 +140,8 @@ def test_the_stub_is_only_the_group_and_hidden() -> None:
 def test_the_stub_reads_back_as_the_system_entry_disabled(tmp_path: Path) -> None:
     user = tmp_path / "home" / ".config" / "autostart"
     system = tmp_path / "etc" / "xdg" / "autostart"
-    shadowed = write(system, "app", APP)
-    stub = write(user, "app", STUB)
+    shadowed = write_desktop(system, "app", APP)
+    stub = write_desktop(user, "app", STUB)
 
     (item,) = read_xdg(user, (system,)).items
 

@@ -26,16 +26,11 @@ from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.scanner import ScanContext
 from safeclean.storage.db import connect
 from safeclean.storage.lock import InstanceLock
+from support.files import write
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 DISABLE = b"\x03\x00\x00\x00" + (133_444_736_000_000_000).to_bytes(8, "little")
 FLAG = rf"HKCU\{APPROVED}\Sync"
-
-
-def write(path: Path, data: bytes) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return path
 
 
 @pytest.fixture

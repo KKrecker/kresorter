@@ -30,16 +30,11 @@ from safeclean.quarantine.service import (
 )
 from safeclean.quarantine.vault import Vault
 from safeclean.storage.db import connect
+from support.files import write
 
 NO_RULES = JunkClassifier([], platform="linux")
 
 # --- helpers -----------------------------------------------------------------------------------
-
-
-def write(path: Path, data: bytes = b"payload") -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
-    return path
 
 
 def scanned(path: Path) -> FileEntry:

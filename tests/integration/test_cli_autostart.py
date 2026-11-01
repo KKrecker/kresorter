@@ -20,6 +20,7 @@ from safeclean.autostart.run_keys import RUN
 from safeclean.autostart.xdg import read_xdg
 from safeclean.core.heuristics import Platform
 from safeclean.core.scanner import ScanContext
+from support.files import snapshot
 
 APP = "[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 HINT = (
@@ -69,10 +70,6 @@ def linux(tmp_path: Path) -> AutostartContext:
     write(system / "tray.desktop", APP.replace("Name=App", "Name=Tray") + "Hidden=true\n")
     write(system / "broken.desktop", "not an entry\n")
     return context("linux", tmp_path)
-
-
-def snapshot(root: Path) -> list[tuple[str, bytes]]:
-    return sorted((str(p), p.read_bytes()) for p in root.rglob("*") if p.is_file())
 
 
 # --- text ----------------------------------------------------------------------------------------
