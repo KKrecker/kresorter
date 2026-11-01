@@ -17,6 +17,7 @@ from safeclean import cli
 from safeclean.autostart.listing import AutostartContext
 from safeclean.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
 from safeclean.autostart.run_keys import RUN
+from safeclean.autostart.xdg import read_xdg
 from safeclean.core.heuristics import Platform
 from safeclean.core.scanner import ScanContext
 
@@ -80,6 +81,7 @@ def snapshot(root: Path) -> list[tuple[str, bytes]]:
 def test_text_report_groups_entries_by_source(tmp_path: Path, linux: AutostartContext) -> None:
     user = tmp_path / "config" / "autostart" / "app.desktop"
     system = tmp_path / "etc" / "xdg" / "autostart"
+    app, tray = (item.digest[:12] for item in read_xdg(user.parent, (system,)).items)
 
     code, out = run(["autostart", "list"], linux)
 
@@ -94,9 +96,11 @@ def test_text_report_groups_entries_by_source(tmp_path: Path, linux: AutostartCo
         f"    location: {user}\n"
         f"    shadows: {system / 'app.desktop'}\n"
         "    note: OnlyShowIn=GNOME;\n"
+        f"    id: {app}\n"
         "  tray  [disabled, system, disableable]\n"
         "    command: /usr/bin/app --tray\n"
         f"    location: {system / 'tray.desktop'}\n"
+        f"    id: {tray}\n"
         "\n"
         "Skipped: 1\n"
         f"  xdg_autostart: {system / 'broken.desktop'} (no [Desktop Entry] group)\n"
