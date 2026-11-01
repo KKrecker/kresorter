@@ -1,7 +1,8 @@
-"""Text from the model, made safe to print (decision 0013, item 20).
+"""Text from the model and the facts sent to it, made safe (decision 0013, items 17, 20).
 
 Escape sequences are removed whole first, so none is left half; then tabs become spaces and
-every character of the listed categories goes, whatever a terminal would do with it.
+every character of the listed categories goes, whatever a terminal would do with it. An
+answer keeps its lines; a fact of a subject is one line.
 """
 
 import re
@@ -9,6 +10,7 @@ import unicodedata
 
 MAX_LINES = 6
 MAX_CHARACTERS = 600
+FACT_CHARACTERS = 100
 ELLIPSIS = "…"
 
 # A string sequence (OSC, DCS, SOS, PM, APC) ends at BEL, at ST, at the next ESC or at the end.
@@ -38,3 +40,13 @@ def cleaned_answer(text: str) -> str:
     if len(kept) > MAX_LINES:
         return shown[: MAX_CHARACTERS - 1] + ELLIPSIS
     return cut(shown, MAX_CHARACTERS)
+
+
+def one_line(text: str) -> str:
+    """Cleaned as an answer is, its stripped non-empty lines joined by a space: one line."""
+    return " ".join(line.strip() for line in without_controls(text).split("\n") if line.strip())
+
+
+def cleaned_fact(text: str) -> str:
+    """A fact of a subject (item 17): on one line and at most 100 characters."""
+    return cut(one_line(text), FACT_CHARACTERS)
