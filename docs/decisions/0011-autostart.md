@@ -387,3 +387,28 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     user's own entry with `Hidden=true` or `X-GNOME-Autostart-enabled=false` and no journal
     row would need its content edited. A user stub over a system entry can be enabled: it is
     moved, not edited.
+
+## Addendum (step 4, commit 12a3): enabling an XDG entry
+
+75. **A user's own entry gets its original back, never missing in between**: the copy is
+    hard-linked into the slot of the enable, then `os.replace` moves the original from the
+    slot of the disable to its place (the same inode it had before the disable). The slot of
+    the disable is then empty; its `disable` row stays as history. Disable and enable can be
+    repeated, each with its own slot.
+76. **"Disabled by safeclean" is decided by the journal, not by the file**: the last `done`
+    change at this location must be the `disable` of an own entry, and its `value_after` must
+    equal the file byte for byte. An enable after it, an edited copy, or no row at all is
+    `foreign` (item 74); `rolled_back` rows do not count. The journal is the only source of
+    truth about what safeclean did.
+77. **The original in the store is checked against `value_before` byte for byte** before it
+    is put back; missing or different is `original_changed`, so a substituted file never
+    reaches the entry's place.
+78. **A stub is a user entry without `Exec`** (the reader shows it only with `Hidden=true`
+    over a system entry). It is enabled by moving it to the store, without consulting the
+    journal: nothing is edited, so a user's own stub (even with other keys such as `Name=`)
+    is enabled like one made here.
+79. **The entry's bytes are read once, by one check shared by both actions**, after the
+    listing is compared: they are compared with the listed digest and are the bytes
+    journaled. Disabling a system entry now also reads its file again and compares it.
+    The refusals are those of item 70, plus `already` for an enabled entry, `foreign` and
+    `original_changed`; failures are rolled back as in item 72.

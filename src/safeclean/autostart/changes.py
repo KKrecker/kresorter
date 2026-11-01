@@ -1,27 +1,28 @@
-"""Disabling XDG autostart entries, journaled before they are made (decision 0011, items 66-74).
+"""Disabling and enabling XDG autostart entries, journaled first (decision 0011, items 66-79).
 
-A user's own entry: the copy with ``Hidden=true`` is staged in the autostart store, the
-original is linked into the store (same inode) and the copy atomically replaces it, so the
-entry is never missing. A system entry: a stub is created in the user directory with
-``O_EXCL``; ``/etc`` is never written. Each change is a ``pending`` row of
-``autostart_changes`` before the disk is touched; a failure rolls it back, and nothing is ever
-deleted. Refusals change nothing and journal nothing.
+Disable, a user's own entry: the copy with ``Hidden=true`` is staged in the autostart store,
+the original is linked into the store (same inode) and the copy atomically replaces it, so the
+entry is never missing. Disable, a system entry: a stub is created in the user directory with
+``O_EXCL``; ``/etc`` is never written. Enable puts the original back (the copy is kept in the
+store) only if the journal shows safeclean disabled it; a stub is moved to the store. Each
+change is a ``pending`` row of ``autostart_changes`` before the disk is touched; a failure
+rolls it back, and nothing is ever deleted. Refusals change nothing and journal nothing.
 """
-
 from __future__ import annotations
 
 import contextlib
+import functools
 import os
 import sqlite3
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from safeclean.autostart.entries import BrokenEntryError, read_entry
+from safeclean.autostart.entries import BrokenEntryError, decode, read_entry
 from safeclean.autostart.models import AutostartItem, Scope, Source, entry_digest
-from safeclean.autostart.xdg import read_xdg
+from safeclean.autostart.xdg import parse_keys, read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
 from safeclean.storage.transactions import transaction
 
@@ -39,10 +40,12 @@ class ChangeState(StrEnum):
 class ChangeRefusal(StrEnum):
     READ_ONLY = "read_only"  # a source step 4 does not write (item 9)
     CHANGED = "changed"  # not the entry in effect as it was listed
-    ALREADY = "already"  # already disabled
+    ALREADY = "already"  # already disabled, or already enabled
     PENDING = "pending"  # unfinished work in the journal: recover() first
     OTHER_DEVICE = "other_device"  # the store cannot hold the original by a link
     TOO_LARGE = "too_large"  # the disabled copy would be skipped by the reader
+    FOREIGN = "foreign"  # not disabled by safeclean: enabling would edit it (item 74)
+    ORIGINAL_CHANGED = "original_changed"  # the original in the store is missing or changed
 
 
 @dataclass(frozen=True)
@@ -76,10 +79,20 @@ class AutostartStore:
 
 @dataclass(frozen=True)
 class _Plan:
+    action: str
     entry: Path  # as listed
     location: Path  # what is written
     before: bytes | None  # None: nothing there
-    after: bytes
+    after: bytes | None  # None: nothing there afterwards
+    steps: Callable[[int, _Plan], None]  # given the change id
+    stores: bool  # the slot of this change is its vault_path from the start
+
+
+@dataclass(frozen=True)
+class _Disabled:
+    original: bytes
+    copy: bytes
+    slot: Path  # where the original is kept
 
 
 class XdgChanges:
@@ -97,6 +110,43 @@ class XdgChanges:
         store.ensure()
 
     def disable(self, item: AutostartItem) -> ChangeResult:
+        raw = self._check(item, enabled=True)
+        if isinstance(raw, ChangeResult):
+            return raw
+        location = Path(item.location)
+        if item.scope is Scope.SYSTEM:
+            stub = self._user_dir / location.name
+            plan = _Plan("disable", location, stub, None, STUB, self._create_stub, stores=False)
+        else:
+            try:
+                copy = hidden_copy(raw)
+            except BrokenEntryError as error:
+                return _refused(ChangeRefusal.TOO_LARGE, str(error))
+            steps = functools.partial(self._replace, copy)
+            plan = _Plan("disable", location, location, raw, copy, steps, stores=True)
+        return self._apply(item, plan)
+
+    def enable(self, item: AutostartItem) -> ChangeResult:
+        raw = self._check(item, enabled=False)
+        if isinstance(raw, ChangeResult):
+            return raw
+        location = Path(item.location)
+        if "Exec" not in parse_keys(decode(raw)):  # a stub: moved, never edited (item 74)
+            plan = _Plan("enable", location, location, raw, None, self._remove_stub, stores=True)
+            return self._apply(item, plan)
+        disabled = self._disabled_here(location)
+        if disabled is None or disabled.copy != raw:
+            detail = "not disabled by safeclean; enabling it would edit its content"
+            return _refused(ChangeRefusal.FOREIGN, detail)
+        if _read(disabled.slot) != disabled.original:
+            detail = f"the original in {disabled.slot} is missing or changed"
+            return _refused(ChangeRefusal.ORIGINAL_CHANGED, detail)
+        steps = functools.partial(self._restore, disabled.slot)
+        plan = _Plan("enable", location, location, raw, disabled.original, steps, stores=True)
+        return self._apply(item, plan)
+
+    def _check(self, item: AutostartItem, *, enabled: bool) -> bytes | ChangeResult:
+        """The entry's bytes, read once, if it may change; else the refusal."""
         if item.source is not Source.XDG_AUTOSTART:
             return _refused(ChangeRefusal.READ_ONLY, f"{item.source} entries are read-only")
         if self._has_pending():
@@ -104,31 +154,20 @@ class XdgChanges:
             return _refused(ChangeRefusal.PENDING, detail)
         if item not in read_xdg(self._user_dir, self._system_dirs).items:
             return _refused(ChangeRefusal.CHANGED, "the entry changed since it was listed")
-        if not item.enabled:
-            return _refused(ChangeRefusal.ALREADY, "the entry is already disabled")
-        if item.scope is Scope.SYSTEM:
-            stub = self._user_dir / Path(item.location).name
-            plan = _Plan(Path(item.location), stub, None, STUB)
-        else:
-            path = Path(item.location)
-            raw = _read(path)  # once: the copy is made of the bytes journaled
-            if raw is None or entry_digest(raw) != item.digest:
-                return _refused(ChangeRefusal.CHANGED, "the entry changed since it was listed")
-            try:
-                plan = _Plan(path, path, raw, hidden_copy(raw))
-            except BrokenEntryError as error:
-                return _refused(ChangeRefusal.TOO_LARGE, str(error))
-        if _device(plan.location.parent) != self._store.device():
-            return _refused(ChangeRefusal.OTHER_DEVICE, "the store is on another device")
-        return self._apply(item, plan)
+        if item.enabled is not enabled:
+            state = "enabled" if item.enabled else "disabled"
+            return _refused(ChangeRefusal.ALREADY, f"the entry is already {state}")
+        raw = _read(Path(item.location))  # once: what is journaled is what was compared
+        if raw is None or entry_digest(raw) != item.digest:
+            return _refused(ChangeRefusal.CHANGED, "the entry changed since it was listed")
+        return raw
 
     def _apply(self, item: AutostartItem, plan: _Plan) -> ChangeResult:
+        if _device(plan.location.parent) != self._store.device():
+            return _refused(ChangeRefusal.OTHER_DEVICE, "the store is on another device")
         change_id = self._journal(item, plan)
         try:
-            if plan.before is None:
-                self._create_stub(change_id, plan.location)
-            else:
-                self._replace(change_id, plan)
+            plan.steps(change_id, plan)
         except BaseException as error:
             message = str(error) or type(error).__name__
             # Rolled back only if the disk is as it was; anything left is for recover().
@@ -141,13 +180,24 @@ class XdgChanges:
         self._finish(change_id, ChangeState.DONE, None)
         return ChangeResult(change_id, ChangeState.DONE)
 
-    def _replace(self, change_id: int, plan: _Plan) -> None:
+    def _replace(self, copy: bytes, change_id: int, plan: _Plan) -> None:
+        """Disable an own entry: stage the copy, link the original into the store, swap."""
         staging = self._store.staging(change_id)
-        _write_new(staging, plan.after)
+        _write_new(staging, copy)
         self._store.slot(change_id).hardlink_to(plan.location)
         staging.replace(plan.location)
 
-    def _create_stub(self, change_id: int, stub: Path) -> None:
+    def _restore(self, original: Path, change_id: int, plan: _Plan) -> None:
+        """Enable an own entry: link the copy into the store, move the original back."""
+        self._store.slot(change_id).hardlink_to(plan.location)
+        original.replace(plan.location)
+
+    def _remove_stub(self, change_id: int, plan: _Plan) -> None:
+        """Enable a stub over a system entry: moved to the store, never edited."""
+        plan.location.rename(self._store.slot(change_id))
+
+    def _create_stub(self, change_id: int, plan: _Plan) -> None:
+        stub = plan.location
         with contextlib.suppress(FileExistsError):  # an existing directory keeps its mode
             self._user_dir.mkdir(mode=PRIVATE, parents=True)
         fd = os.open(stub, os.O_WRONLY | os.O_CREAT | os.O_EXCL, ENTRY_MODE)
@@ -164,8 +214,9 @@ class XdgChanges:
             cursor = self._conn.execute(
                 "INSERT INTO autostart_changes (action, source, entry, location, digest,"
                 " value_before, value_after, state, created_at_ns)"
-                " VALUES ('disable', ?, ?, ?, ?, ?, ?, ?, ?)",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
+                    plan.action,
                     item.source.value,
                     str(plan.entry),
                     str(plan.location),
@@ -179,7 +230,7 @@ class XdgChanges:
             change_id = cursor.lastrowid
             if change_id is None:  # pragma: no cover - sqlite3 always sets it after an INSERT
                 raise RuntimeError("no row id after INSERT")
-            if plan.before is not None:
+            if plan.stores:
                 self._set_vault_path(change_id, self._store.slot(change_id))
         return change_id
 
@@ -195,6 +246,17 @@ class XdgChanges:
                 " WHERE id = ?",
                 (state.value, time.time_ns(), error, change_id),
             )
+
+    def _disabled_here(self, location: Path) -> _Disabled | None:
+        """The disable of an own entry, if it is the last change done at ``location``."""
+        row = self._conn.execute(
+            "SELECT action, value_before, value_after, vault_path FROM autostart_changes"
+            " WHERE location = ? AND state = ? ORDER BY id DESC LIMIT 1",
+            (str(location), ChangeState.DONE.value),
+        ).fetchone()
+        if row is None or row[0] != "disable" or row[3] is None:  # never, or a stub's
+            return None
+        return _Disabled(original=row[1], copy=row[2], slot=Path(row[3]))
 
     def _has_pending(self) -> bool:
         """Unfinished autostart changes or quarantine operations block both (item 62)."""
