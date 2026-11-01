@@ -17,8 +17,7 @@ from pathlib import Path
 from typing import TextIO
 
 from safeclean.core.scanner import ScanContext
-from safeclean.quarantine.service import QuarantineError, check_data_dir
-from safeclean.quarantine.vault import PRIVATE
+from safeclean.storage.data_dir import PRIVATE, DataDirError, check_data_dir
 from safeclean.storage.db import StorageError, connect
 from safeclean.storage.lock import InstanceLock, LockedError
 
@@ -32,7 +31,7 @@ Body = Callable[[sqlite3.Connection, Path], int]  # (journal, data directory) ->
 def with_journal(context: ScanContext, err: TextIO, body: Body, *, recover: str) -> int:
     try:
         data_dir = check_data_dir(context.policy, context.classifier)
-    except QuarantineError as error:
+    except DataDirError as error:
         err.write(f"safeclean: {error}\n")
         return UNSAFE
     try:

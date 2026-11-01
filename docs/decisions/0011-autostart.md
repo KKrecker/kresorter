@@ -635,3 +635,9 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     (item 68), and the row is `rolled_back` with the error: refining item 72, the change left
     the disk as it found it. It was `failed`, and `recover()` then took an empty or partial
     file of the user's for a partial stub and moved it to the store (item 96).
+118. **The data directory's policy lives in `storage.data_dir`** (pre-step-5 audit, B1):
+    `check_data_dir` raises `DataDirError`, and `PRIVATE` (0700) is the mode of the data
+    directory and of every directory safeclean makes in it (the vault, the autostart store).
+    The journal session (`cli_journal`) no longer depends on the quarantine, nor would
+    organize; `QuarantineService` keeps its contract and raises `QuarantineError` with the
+    same message.

@@ -28,10 +28,10 @@ from safeclean.autostart.entries import BrokenEntryError, decode, read_entry
 from safeclean.autostart.models import AutostartItem, Scope, Source, entry_digest
 from safeclean.autostart.xdg import parse_keys, read_xdg
 from safeclean.autostart.xdg_changes import STUB, hidden_copy
+from safeclean.storage.data_dir import PRIVATE
 from safeclean.storage.pending import has_pending
 from safeclean.storage.transactions import transaction
 
-PRIVATE = 0o700
 ENTRY_MODE = 0o644
 _AS_BEFORE = "the entry is as it was before the change"
 _NEITHER = "the entry is neither as before nor as after the change"

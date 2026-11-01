@@ -66,6 +66,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `autostart.xdg.read_xdg()`: an autostart directory that exists but cannot be listed is now skipped with `cannot read: <reason>` instead of silently reading as empty; nothing it could change is shown: no items at all for the user directory, and for a system directory only the names found in the directories before it (decision 0011, item 32).
 
 ### Changed
+- The data-directory policy (`check_data_dir`, `DataDirError`, `PRIVATE`) moved from the quarantine to `storage.data_dir`; messages and exit codes are unchanged (decision 0011, item 118).
 - The coverage gate is 100 % of lines and branches (it was 80 %), and CI runs Python 3.11 to 3.14 (pre-step-5 audit, A4).
 - `DuplicateGroup` holds the scanned `FileEntry` of each copy (`entries`); `paths`, `size` and `wasted_bytes` are derived; a group with fewer than two copies or mixed sizes cannot be created. Feeds `analysis.duplicates.decide()` directly; `scan` output unchanged.
 - `safeclean scan` uses the real open-file check on Linux (`checker_for_platform()`); other OSes still disclose that it is missing.

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-PRIVATE = 0o700
+from safeclean.storage.data_dir import PRIVATE
 
 
 class Vault:
