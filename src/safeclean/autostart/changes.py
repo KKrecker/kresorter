@@ -1,4 +1,4 @@
-"""Disabling and enabling XDG autostart entries, journaled first (decision 0011, items 66-79).
+"""Disabling and enabling XDG autostart entries, journaled first (0011, items 66-79, 93-98).
 
 Disable, a user's own entry: the copy with ``Hidden=true`` is staged in the autostart store,
 the original is linked into the store (same inode) and the copy atomically replaces it, so the
@@ -9,6 +9,7 @@ change is a ``pending`` row of ``autostart_changes`` before the disk is touched;
 rolls it back, and nothing is ever deleted. Refusals change nothing and journal nothing.
 The journal functions here (``insert_change``, ``finish_change``, ``has_pending``, ``refused``)
 are shared with ``run_changes`` (item 81).
+``recover()`` closes pending changes, and failed ones still last at their place, by the disk.
 """
 
 from __future__ import annotations
@@ -31,6 +32,10 @@ from safeclean.storage.transactions import transaction
 
 PRIVATE = 0o700
 ENTRY_MODE = 0o644
+_AS_BEFORE = "the entry is as it was before the change"
+_NEITHER = "the entry is neither as before nor as after the change"
+_NOT_KEPT = "the entry is as after the change, but the store does not hold what it kept"
+_PARTIAL = "a partial stub was moved to the store"
 
 
 class ChangeState(StrEnum):
@@ -156,6 +161,56 @@ class XdgChanges:
         steps = functools.partial(self._restore, disabled.slot)
         plan = _Plan("enable", location, location, raw, disabled.original, steps, stores=True)
         return self._apply(item, plan)
+
+    def recover(self) -> ChangeRecovery:
+        """Close pending XDG changes, and failed ones still last at their place, by the disk."""
+        rows = self._conn.execute(
+            "SELECT id, location, value_before, value_after, vault_path, state"
+            " FROM autostart_changes AS c WHERE source = ? AND state IN (?, ?)"
+            " AND NOT EXISTS (SELECT 1 FROM autostart_changes AS later"
+            " WHERE later.location = c.location AND later.id > c.id) ORDER BY id",
+            (Source.XDG_AUTOSTART.value, ChangeState.PENDING.value, ChangeState.FAILED.value),
+        ).fetchall()
+        closed: dict[ChangeState, list[int]] = {
+            ChangeState.DONE: [],
+            ChangeState.ROLLED_BACK: [],
+            ChangeState.FAILED: [],
+        }
+        for change_id, location, before, after, vault_path, was in rows:
+            state, error = self._reconcile(change_id, Path(location), before, after, vault_path)
+            if state is ChangeState.FAILED and was == ChangeState.FAILED.value:
+                continue  # still failed: its first error is kept
+            self._finish(change_id, state, error)
+            closed[state].append(change_id)
+        return ChangeRecovery(
+            tuple(closed[ChangeState.DONE]),
+            tuple(closed[ChangeState.ROLLED_BACK]),
+            tuple(closed[ChangeState.FAILED]),
+        )
+
+    def _reconcile(
+        self,
+        change_id: int,
+        location: Path,
+        before: bytes | None,
+        after: bytes | None,
+        vault_path: str | None,
+    ) -> tuple[ChangeState, str | None]:
+        """How the disk shows the change ended; a partial stub is moved to the store."""
+        found = _current(location)
+        if found == after:
+            if vault_path is None or _current(Path(vault_path)) == before:
+                return ChangeState.DONE, None
+            return ChangeState.FAILED, _NOT_KEPT
+        if found == before:
+            return ChangeState.ROLLED_BACK, _AS_BEFORE
+        if before is None and after == STUB and found is not None and STUB.startswith(found):
+            slot = self._store.slot(change_id)
+            with transaction(self._conn):  # journaled before it is moved
+                self._set_vault_path(change_id, slot)
+            location.rename(slot)
+            return ChangeState.ROLLED_BACK, _PARTIAL
+        return ChangeState.FAILED, _NEITHER
 
     def _check(self, item: AutostartItem, *, enabled: bool) -> bytes | ChangeResult:
         """The entry's bytes, read once, if it may change; else the refusal."""
@@ -333,6 +388,16 @@ def _read(path: Path) -> bytes | None:
     try:
         return read_entry(path)
     except BrokenEntryError:
+        return None
+
+
+def _current(path: Path) -> bytes | None:
+    """The entry's bytes; ``None`` only if nothing is there: an unreadable one raises."""
+    try:
+        return read_entry(path)
+    except BrokenEntryError:
+        if path.exists() or path.is_symlink():
+            raise
         return None
 
 

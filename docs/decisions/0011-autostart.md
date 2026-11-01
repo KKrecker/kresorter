@@ -477,3 +477,32 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
 92. **The report is `ChangeRecovery`**: the ids of the closed changes, as `done`,
     `rolled_back` and `failed`, shared with the XDG recovery. Once nothing is pending,
     changes are allowed again (item 62).
+
+## Addendum (step 4, commit 12b3): recovering XDG changes
+
+93. **A pending XDG row is closed by the disk**: `XdgChanges.recover()` reads the entry at the
+    row's `location` and closes the row `done` if it holds the bytes after the change and the
+    store holds what the change kept there (`vault_path`, when set, holds the bytes before),
+    `failed` if the entry is as after but the store does not hold them, `rolled_back` if the
+    entry is as before, `failed` otherwise; the reason is in `error`. As in item 72, the
+    journal records the disk, not the intent.
+94. **Nothing is redone or undone**: a staged `<id>.new` is never put in place, and a link
+    or a copy left in the store stays there; the store is never purged (item 66). Whether to
+    change the entry again is the user's decision (item 89).
+95. **A failed row is looked at again only while it is the last change at its location**:
+    otherwise the disk shows a later change, not this one. If it is still neither as before
+    nor as after, it stays `failed` with its first error and is not reported.
+96. **A stub left by a double fault is moved to the store**: when writing (or syncing) a
+    stub failed and moving it to the store failed too, the row is `failed` with the stub in
+    place. If what is there is a strict beginning of `STUB`, `recover()` journals the slot
+    `<id>` as `vault_path` first, then moves the stub there, never deleting it, and the row
+    is `rolled_back`. A stub that is complete (only its `fsync` failed) is as after the
+    change: the row is `done`.
+97. **An entry that exists but cannot be read is never guessed**: a missing entry is a known
+    state (`NULL`), but anything else that is not a readable entry (a directory, a file
+    larger than 64 KiB, a file that cannot be opened) raises `BrokenEntryError` with the
+    reason, and the row stays as it is. Since a pending row blocks new changes (item 62),
+    autostart changes stay blocked until the user removes or fixes what is there: a strange
+    file in place of an entry is not a case for guessing.
+98. **Only XDG rows are touched**: rows of `run_key` are recovered by `RunKeyChanges`
+    (item 91), and the report is the same `ChangeRecovery` (item 92).
