@@ -78,6 +78,9 @@ class Tree:
         )
 
     def stored(self) -> list[str]:
+        """What the store holds; nothing if no change has made it yet (item 115)."""
+        if not self.store.root.is_dir():
+            return []
         return sorted(p.name for p in self.store.root.iterdir())
 
 
@@ -111,11 +114,40 @@ def interrupt(*args: object, **kwargs: object) -> None:
 # --- the store ---------------------------------------------------------------------------------
 
 
-def test_the_store_is_private_and_apart_from_the_quarantine(tree: Tree) -> None:
+def test_the_store_is_apart_from_the_quarantine_and_made_private_by_the_first_change(
+    tree: Tree,
+) -> None:
     assert tree.store.root == tree.store.data_dir / "autostart"
-    assert stat.S_IMODE(tree.store.root.stat().st_mode) == 0o700
     assert tree.store.slot(7) == tree.store.root / "7"
-    assert tree.stored() == []
+    assert not tree.store.root.exists()  # not made by XdgChanges itself (item 115)
+    write(tree.user, "app", APP)
+
+    tree.changes.disable(tree.item())
+
+    assert stat.S_IMODE(tree.store.root.stat().st_mode) == 0o700
+    assert tree.stored() == ["1"]
+
+
+def test_a_store_not_made_yet_is_on_the_device_of_the_directory_above_it(tmp_path: Path) -> None:
+    store = AutostartStore(tmp_path / "data")
+
+    assert store.device() == tmp_path.stat().st_dev
+    assert not store.data_dir.exists()
+
+
+def test_a_store_that_cannot_be_made_stops_the_change_before_it_is_journaled(tree: Tree) -> None:
+    write(tree.user, "app", APP)
+    data = tree.root / "other"
+    data.mkdir()
+    (data / "autostart").write_bytes(b"")  # a file where the store would be made
+    store = AutostartStore(data)
+    xdg = XdgChanges(tree.conn, store, tree.user, (tree.system,))
+    files = tree.files()
+
+    with pytest.raises(FileExistsError):
+        xdg.disable(tree.item())
+
+    assert (tree.files(), tree.rows()) == (files, [])
 
 
 # --- a user's own entry ------------------------------------------------------------------------
@@ -257,7 +289,7 @@ def assert_refused(
     assert result.detail
     assert tree.files() == files
     assert tree.rows() == []
-    assert tree.stored() == []
+    assert not tree.store.root.exists()  # nothing in the store: not even the store (item 115)
 
 
 def test_a_read_only_source_is_refused(tree: Tree) -> None:

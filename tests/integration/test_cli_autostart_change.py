@@ -217,6 +217,7 @@ def test_without_yes_it_shows_what_would_be_written_and_changes_nothing(
     assert entry.read_bytes() == APP
     assert [p.name for p in tmp_path.rglob("*.desktop")] == ["app.desktop"]  # no stub
     assert rows(data_dir) == []
+    assert not (data_dir / "autostart").exists()  # no store either (item 115)
 
 
 def test_enable_without_yes_says_nothing_is_deleted(

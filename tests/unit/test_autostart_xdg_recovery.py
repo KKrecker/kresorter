@@ -342,6 +342,11 @@ def test_registry_rows_are_left_alone(tree: Tree) -> None:
     assert tree.states() == [("pending", None, 0)]
 
 
+def test_nothing_journaled_is_an_empty_report_and_makes_no_store(tree: Tree) -> None:
+    assert tree.changes.recover() == ChangeRecovery()
+    assert not tree.store.root.exists()  # made by the first change only (item 115)
+
+
 def test_nothing_to_recover_is_an_empty_report(tree: Tree) -> None:
     write(tree.user, "app", APP)
     tree.changes.disable(tree.item())

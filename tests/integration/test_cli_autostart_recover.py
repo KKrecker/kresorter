@@ -154,6 +154,7 @@ def test_nothing_to_recover(tmp_path: Path, scan: ScanContext, data_dir: Path) -
 
     assert (code, out, err) == (0, "Nothing to recover.\n", "")
     assert (data_dir / "journal.db").exists()  # the shared journal, in the data directory
+    assert not (data_dir / "autostart").exists()  # the store is made by the first change only
 
 
 def test_an_interrupted_xdg_change_is_closed_by_the_disk(
