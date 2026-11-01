@@ -422,3 +422,36 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `WinRegistry` opens the key with `CreateKeyEx(HKEY_CURRENT_USER, key, 0, KEY_SET_VALUE |
     KEY_WOW64_64KEY)`, creating it if it is missing, writes with `SetValueEx` and closes the
     key whatever happens once it was opened; a failure is a `RegistryError` with the reason.
+
+## Addendum (step 4, commit 12a4b): the `HKCU` Run `StartupApproved` flag
+
+81. **One journal for both kinds of change**: the row of `autostart_changes` is written and
+    finished by shared functions of `autostart.changes` (`insert_change`, `finish_change`,
+    `has_pending`, `refused`), used by `XdgChanges` and `RunKeyChanges` alike, so the order
+    "journal, then act, then finish the row" exists once.
+82. **The Run value is never written, only its flag**: disabling writes to
+    `HKCU\...\Explorer\StartupApproved\Run` the bytes the Task Manager writes, `03 00 00 00`
+    followed by the FILETIME of the change (`now // 100 + 116444736000000000`, little-endian);
+    enabling writes `02` followed by eleven zero bytes. Values read as `06`/`07` are recognized
+    as before (item 21); the bytes found before the change are kept in
+    `value_before` of the journal.
+83. **A missing flag means enabled**: disabling it creates the flag; enabling writes `02`
+    and never deletes a value, even when there was no flag before the disable (nothing in
+    safeclean can delete a value, item 80).
+84. **A value disabled by the Task Manager can be enabled**: unlike an XDG entry disabled
+    elsewhere (item 74, `foreign`), the flag is the single, documented switch the Task Manager
+    itself flips back; enabling it edits nothing else, so it is not refused.
+85. **The value is checked again right before writing**: the Run keys are read again with
+    `read_run_keys` and the item is found by its digest, so an unnamed value and one named
+    `(Default)` stay distinct; a value that differs from the listing is `changed`. Only an
+    `HKCU` Run value can change (`read_only` otherwise: `HKLM`, `RunOnce`, other sources).
+    The window between the check and the write remains: the registry has no compare-and-swap,
+    and the compensation is the same as in quarantine (journal first, state read back).
+86. **Journal fields**: source `run_key`, entry the Run key path with the value name,
+    location the `StartupApproved` path with the value name (or `(Default)`), `vault_path`
+    NULL: nothing is kept in the store, the previous bytes are in the row itself.
+87. **A failure is read back, not assumed**: a `RegistryError` from the write is a result,
+    not an exception; the flag is then read again, and the row is `rolled_back` if the flag
+    is still what it was, `failed` otherwise. If the flag cannot be read back, the row stays
+    `pending` and the error is raised: `recover()` (commit 12b) reconciles it, the outcome of
+    a write that cannot be read is never guessed. The clock (`now`) is injectable for tests.

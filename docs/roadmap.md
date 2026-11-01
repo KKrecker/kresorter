@@ -101,10 +101,10 @@ read), `LimitLoadToSessionType` is ignored, `/System/Library` is not read.
 Done: journal schema v3, `autostart_changes` (commit 11, decision 0011, items 57-62).
 
 Done in commit 12: `xdg_changes` (12a1), XDG disable journaled (12a2, items 66-74), XDG
-enable (12a3, items 75-79).
+enable (12a3, items 75-79), `UserRegistry` (12a4a, item 80), the `HKCU` Run `StartupApproved`
+flag (12a4b, items 81-87).
 
-Remaining: 12a4 the `HKCU` Run `StartupApproved` flag, 12b `recover()`, 12c the CLI with
-`disableable`.
+Remaining: 12b `recover()`, 12c the CLI with `disableable`.
 
 ## Target package layout
 

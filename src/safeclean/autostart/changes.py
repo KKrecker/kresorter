@@ -7,6 +7,8 @@ entry is never missing. Disable, a system entry: a stub is created in the user d
 store) only if the journal shows safeclean disabled it; a stub is moved to the store. Each
 change is a ``pending`` row of ``autostart_changes`` before the disk is touched; a failure
 rolls it back, and nothing is ever deleted. Refusals change nothing and journal nothing.
+The journal functions here (``insert_change``, ``finish_change``, ``has_pending``, ``refused``)
+are shared with ``run_changes`` (item 81).
 """
 
 from __future__ import annotations
@@ -122,7 +124,7 @@ class XdgChanges:
             try:
                 copy = hidden_copy(raw)
             except BrokenEntryError as error:
-                return _refused(ChangeRefusal.TOO_LARGE, str(error))
+                return refused(ChangeRefusal.TOO_LARGE, str(error))
             steps = functools.partial(self._replace, copy)
             plan = _Plan("disable", location, location, raw, copy, steps, stores=True)
         return self._apply(item, plan)
@@ -138,10 +140,10 @@ class XdgChanges:
         disabled = self._disabled_here(location)
         if disabled is None or disabled.copy != raw:
             detail = "not disabled by safeclean; enabling it would edit its content"
-            return _refused(ChangeRefusal.FOREIGN, detail)
+            return refused(ChangeRefusal.FOREIGN, detail)
         if _read(disabled.slot) != disabled.original:
             detail = f"the original in {disabled.slot} is missing or changed"
-            return _refused(ChangeRefusal.ORIGINAL_CHANGED, detail)
+            return refused(ChangeRefusal.ORIGINAL_CHANGED, detail)
         steps = functools.partial(self._restore, disabled.slot)
         plan = _Plan("enable", location, location, raw, disabled.original, steps, stores=True)
         return self._apply(item, plan)
@@ -149,23 +151,23 @@ class XdgChanges:
     def _check(self, item: AutostartItem, *, enabled: bool) -> bytes | ChangeResult:
         """The entry's bytes, read once, if it may change; else the refusal."""
         if item.source is not Source.XDG_AUTOSTART:
-            return _refused(ChangeRefusal.READ_ONLY, f"{item.source} entries are read-only")
+            return refused(ChangeRefusal.READ_ONLY, f"{item.source} entries are read-only")
         if self._has_pending():
             detail = "the journal has unfinished work; run recover() first"
-            return _refused(ChangeRefusal.PENDING, detail)
+            return refused(ChangeRefusal.PENDING, detail)
         if item not in read_xdg(self._user_dir, self._system_dirs).items:
-            return _refused(ChangeRefusal.CHANGED, "the entry changed since it was listed")
+            return refused(ChangeRefusal.CHANGED, "the entry changed since it was listed")
         if item.enabled is not enabled:
             state = "enabled" if item.enabled else "disabled"
-            return _refused(ChangeRefusal.ALREADY, f"the entry is already {state}")
+            return refused(ChangeRefusal.ALREADY, f"the entry is already {state}")
         raw = _read(Path(item.location))  # once: what is journaled is what was compared
         if raw is None or entry_digest(raw) != item.digest:
-            return _refused(ChangeRefusal.CHANGED, "the entry changed since it was listed")
+            return refused(ChangeRefusal.CHANGED, "the entry changed since it was listed")
         return raw
 
     def _apply(self, item: AutostartItem, plan: _Plan) -> ChangeResult:
         if _device(plan.location.parent) != self._store.device():
-            return _refused(ChangeRefusal.OTHER_DEVICE, "the store is on another device")
+            return refused(ChangeRefusal.OTHER_DEVICE, "the store is on another device")
         change_id = self._journal(item, plan)
         try:
             plan.steps(change_id, plan)
@@ -211,26 +213,17 @@ class XdgChanges:
             raise
 
     def _journal(self, item: AutostartItem, plan: _Plan) -> int:
+        change = Change(
+            plan.action,
+            item.source,
+            str(plan.entry),
+            str(plan.location),
+            item.digest,
+            plan.before,
+            plan.after,
+        )
         with transaction(self._conn):
-            cursor = self._conn.execute(
-                "INSERT INTO autostart_changes (action, source, entry, location, digest,"
-                " value_before, value_after, state, created_at_ns)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    plan.action,
-                    item.source.value,
-                    str(plan.entry),
-                    str(plan.location),
-                    item.digest,
-                    plan.before,
-                    plan.after,
-                    ChangeState.PENDING.value,
-                    time.time_ns(),
-                ),
-            )
-            change_id = cursor.lastrowid
-            if change_id is None:  # pragma: no cover - sqlite3 always sets it after an INSERT
-                raise RuntimeError("no row id after INSERT")
+            change_id = insert_change(self._conn, change)
             if plan.stores:
                 self._set_vault_path(change_id, self._store.slot(change_id))
         return change_id
@@ -241,12 +234,7 @@ class XdgChanges:
         )
 
     def _finish(self, change_id: int, state: ChangeState, error: str | None) -> None:
-        with transaction(self._conn):
-            self._conn.execute(
-                "UPDATE autostart_changes SET state = ?, finished_at_ns = ?, error = ?"
-                " WHERE id = ?",
-                (state.value, time.time_ns(), error, change_id),
-            )
+        finish_change(self._conn, change_id, state, error)
 
     def _disabled_here(self, location: Path) -> _Disabled | None:
         """The disable of an own entry, if it is the last change done at ``location``."""
@@ -260,12 +248,63 @@ class XdgChanges:
         return _Disabled(original=row[1], copy=row[2], slot=Path(row[3]))
 
     def _has_pending(self) -> bool:
-        """Unfinished autostart changes or quarantine operations block both (item 62)."""
-        row = self._conn.execute(
-            "SELECT EXISTS (SELECT 1 FROM autostart_changes WHERE state = 'pending')"
-            " OR EXISTS (SELECT 1 FROM operations WHERE state = 'pending')"
-        ).fetchone()
-        return bool(row[0])
+        return has_pending(self._conn)
+
+
+@dataclass(frozen=True)
+class Change:
+    """One row of ``autostart_changes``, as journaled before the change is made."""
+
+    action: str  # "disable" or "enable"
+    source: Source
+    entry: str  # as listed
+    location: str  # what is written
+    digest: str
+    before: bytes | None  # None: nothing there
+    after: bytes | None
+
+
+def insert_change(conn: sqlite3.Connection, change: Change) -> int:
+    """Journal ``change`` as ``pending``; the caller holds the transaction."""
+    cursor = conn.execute(
+        "INSERT INTO autostart_changes (action, source, entry, location, digest,"
+        " value_before, value_after, state, created_at_ns)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            change.action,
+            change.source.value,
+            change.entry,
+            change.location,
+            change.digest,
+            change.before,
+            change.after,
+            ChangeState.PENDING.value,
+            time.time_ns(),
+        ),
+    )
+    change_id = cursor.lastrowid
+    if change_id is None:  # pragma: no cover - sqlite3 always sets it after an INSERT
+        raise RuntimeError("no row id after INSERT")
+    return change_id
+
+
+def finish_change(
+    conn: sqlite3.Connection, change_id: int, state: ChangeState, error: str | None
+) -> None:
+    with transaction(conn):
+        conn.execute(
+            "UPDATE autostart_changes SET state = ?, finished_at_ns = ?, error = ? WHERE id = ?",
+            (state.value, time.time_ns(), error, change_id),
+        )
+
+
+def has_pending(conn: sqlite3.Connection) -> bool:
+    """Unfinished autostart changes or quarantine operations block both (item 62)."""
+    row = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM autostart_changes WHERE state = 'pending')"
+        " OR EXISTS (SELECT 1 FROM operations WHERE state = 'pending')"
+    ).fetchone()
+    return bool(row[0])
 
 
 def _write_new(path: Path, data: bytes) -> None:
@@ -295,5 +334,5 @@ def _device(path: Path) -> int:
     return path.stat().st_dev
 
 
-def _refused(refusal: ChangeRefusal, detail: str) -> ChangeResult:
+def refused(refusal: ChangeRefusal, detail: str) -> ChangeResult:
     return ChangeResult(None, None, refusal, detail)
