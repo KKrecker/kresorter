@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from safeclean.autostart.models import Source
+from safeclean.storage.journal import insert_row
 from safeclean.storage.transactions import transaction
 
 
@@ -66,7 +67,8 @@ class Change:
 
 def insert_change(conn: sqlite3.Connection, change: Change) -> int:
     """Journal ``change`` as ``pending``; the caller holds the transaction."""
-    cursor = conn.execute(
+    return insert_row(
+        conn,
         "INSERT INTO autostart_changes (action, source, entry, location, digest,"
         " value_before, value_after, state, created_at_ns)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -82,10 +84,6 @@ def insert_change(conn: sqlite3.Connection, change: Change) -> int:
             time.time_ns(),
         ),
     )
-    change_id = cursor.lastrowid
-    if change_id is None:  # pragma: no cover - sqlite3 always sets it after an INSERT
-        raise RuntimeError("no row id after INSERT")
-    return change_id
 
 
 def finish_change(

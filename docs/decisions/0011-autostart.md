@@ -646,3 +646,7 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `finish_change` and `refused`, shared by `XdgChanges` and `RunKeyChanges` (item 81), so
     the Run module no longer imports the XDG one; `autostart.changes` keeps the store and the
     XDG changes.
+120. **One `insert_row()` for every journal** (B3): `storage.journal.insert_row` runs one
+    `INSERT` and returns the id of its row; it is the only place that handles a `lastrowid`
+    of `None`, which sqlite3 never returns after a successful `INSERT`. The quarantine and the
+    autostart journal use it, and organize will.

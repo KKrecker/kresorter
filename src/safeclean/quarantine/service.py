@@ -50,6 +50,7 @@ from safeclean.quarantine.preflight import Candidate, Cleared, Preflight, Refusa
 from safeclean.quarantine.purge import delete_from_vault
 from safeclean.quarantine.vault import Vault
 from safeclean.storage.data_dir import DataDirError, check_data_dir
+from safeclean.storage.journal import insert_row
 from safeclean.storage.pending import has_pending
 from safeclean.storage.transactions import transaction
 
@@ -278,7 +279,7 @@ class QuarantineService:
         """Commit the operation and its items as pending; nothing has moved yet."""
         items: list[Moved] = []
         with transaction(self._conn):
-            operation_id = _insert(
+            operation_id = insert_row(
                 self._conn,
                 "INSERT INTO operations (kind, state, created_at_ns) VALUES ('quarantine', ?, ?)",
                 (OperationState.PENDING, time.time_ns()),
@@ -287,7 +288,7 @@ class QuarantineService:
                 original = entry.candidate.entry.path
                 # The slot name is the item id, known only after the insert: write a unique
                 # placeholder, then the real slot, in the same transaction.
-                item_id = _insert(
+                item_id = insert_row(
                     self._conn,
                     "INSERT INTO items (operation_id, original_path, vault_path, size, mtime_ns,"
                     " atime_ns, mode, digest, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -396,7 +397,7 @@ class QuarantineService:
     def _journal_side_operation(self, kind: str, column: str, items: list[_Journaled]) -> int:
         """Journal a restore or purge as pending and link its items, before touching the disk."""
         with transaction(self._conn):
-            operation_id = _insert(
+            operation_id = insert_row(
                 self._conn,
                 "INSERT INTO operations (kind, state, created_at_ns) VALUES (?, ?, ?)",
                 (kind, OperationState.PENDING, time.time_ns()),
@@ -652,13 +653,6 @@ def _probe(path: Path, size: int, mtime_ns: int) -> _Copy:
         return _Copy.MISSING
     same = (info.st_size, info.st_mtime_ns) == (size, mtime_ns)
     return _Copy.MATCHES if stat.S_ISREG(info.st_mode) and same else _Copy.CHANGED
-
-
-def _insert(conn: sqlite3.Connection, sql: str, params: tuple[object, ...]) -> int:
-    rowid = conn.execute(sql, params).lastrowid
-    if rowid is None:  # pragma: no cover - sqlite3 always sets it after a successful INSERT
-        raise QuarantineError("journal insert returned no row id")
-    return rowid
 
 
 def _exists(path: Path) -> bool:
