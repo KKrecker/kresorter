@@ -623,3 +623,8 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     it. A store that cannot be made raises its `OSError` before anything is journaled, as a
     check before acting (item 113). So every journaled XDG change has its store, and
     `recover()` never makes it.
+116. **The slot of a partial stub is journaled before the stub is moved there** (pre-step-5
+    audit, B9b), in `disable` as in `recover()` (item 96): a crash right after the move leaves
+    a row that names the slot, never a stub in the store that no row names. If the move then
+    fails, `vault_path` names an empty slot; `recover()` reads it as holding nothing, which is
+    what the change of a stub keeps, so the row is still closed by the entry in its place.

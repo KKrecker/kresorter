@@ -276,8 +276,9 @@ class XdgChanges:
             _write_and_close(fd, STUB)
         except BaseException:
             slot = self._store.slot(change_id)
+            with transaction(self._conn):  # journaled before it is moved, as in recover()
+                self._set_vault_path(change_id, slot)
             stub.rename(slot)  # a partial stub is kept, never deleted
-            self._set_vault_path(change_id, slot)
             raise
 
     def _journal(self, item: AutostartItem, plan: _Plan) -> int:
