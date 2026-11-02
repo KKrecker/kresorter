@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from safeclean.environment import Environment
+from safeclean.ui.theme import Look
 
 __all__ = ["run"]
 
@@ -18,5 +19,6 @@ def run(argv: Sequence[str], environment: Environment) -> int:
     application = QApplication.instance() or QApplication(list(argv))
     window = QMainWindow()
     window.setWindowTitle(TITLE)
+    Look(window)
     window.show()
     return application.exec()
