@@ -281,6 +281,20 @@ def test_the_overview_s_chips_figures_captions_and_cards_that_open_a_page(
 
 
 @pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
+def test_a_confirmation_s_title_is_18_px_semibold_and_its_details_on_surface(
+    palette: Palette,
+) -> None:
+    # [0014.50]
+    rules = dict(_rules(style_sheet(palette)))
+    assert rules['QLabel[role="question"]'] == {"font-size": "18px", "font-weight": "600"}
+    assert rules['QScrollArea[role="details"]'] == {
+        "background-color": palette.surface,
+        "border": "none",
+        "border-radius": "8px",
+    }
+
+
+@pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
 def test_a_title_is_24_px_semibold_and_what_it_does_secondary_text(palette: Palette) -> None:
     # [0014.46]
     rules = dict(_rules(style_sheet(palette)))
