@@ -67,7 +67,7 @@ COMPLETED: frozenset[int] = frozenset(
         44,
     }
 )
-PENDING: frozenset[int] = frozenset(range(1, 45)) - COMPLETED
+PENDING: frozenset[int] = frozenset(range(1, 56)) - COMPLETED
 
 
 def numbered(text: str) -> list[int]:
