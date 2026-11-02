@@ -30,53 +30,21 @@ from safeclean.storage.db import connect
 from safeclean.storage.lock import InstanceLock
 from support.cli import autostart_context, run, scan_context
 from support.files import write
+from support.interrupted import (
+    APP,
+    crashed_batch,
+    interrupted_xdg_disable,
+    left_pending,
+    quarantined,
+)
 from support.journal import query
 from support.moves import MOVED, A, B, C, Fault, crash, planned, three_files
 
-APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 DISABLE = b"\x03\x00\x00\x00" + (133_444_736_000_000_000).to_bytes(8, "little")
 FLAG = rf"HKCU\{APPROVED}\Sync"
 RECOVER = pytest.mark.parametrize(
     "command", [["recover"], ["autostart", "recover"]], ids=["recover", "alias"]
 )
-
-
-def interrupted_xdg_disable(tmp_path: Path, data_dir: Path) -> Path:
-    """A user entry disabled for real, its row left pending as a crash before the end would."""
-    user, system = tmp_path / "config" / "autostart", tmp_path / "etc" / "xdg" / "autostart"
-    entry = write(user / "app.desktop", APP)
-    data_dir.mkdir(parents=True, exist_ok=True)
-    conn = connect(data_dir / "journal.db")
-    try:
-        changes = XdgChanges(conn, AutostartStore(data_dir), user, (system,))
-        (item,) = read_xdg(user, (system,)).items
-        changes.disable(item)
-        conn.execute("UPDATE autostart_changes SET state = 'pending', finished_at_ns = NULL")
-    finally:
-        conn.close()
-    return entry
-
-
-def quarantined(scan: ScanContext, zone: Path) -> Path:
-    """A file moved into the quarantine for real; the operation is done."""
-    path = write(zone / "a.bin")
-    assert run(["quarantine", "add", str(path)], scan)[0] == 0
-    return path
-
-
-def left_pending(data_dir: Path) -> None:
-    """The quarantine's operation as a crash right after the move would leave it."""
-    query(data_dir, "UPDATE items SET state = 'pending'")
-    query(data_dir, "UPDATE operations SET state = 'pending', finished_at_ns = NULL")
-
-
-def crashed_batch(zone: Path, data_dir: Path, faults: dict[str, Fault]) -> Path:
-    """An organize batch of ``three_files`` that crashed where ``faults`` say: its folder."""
-    data_dir.mkdir(parents=True, exist_ok=True)
-    folder = three_files(zone)
-    at = {folder / name: fault for name, fault in faults.items()}
-    crash(data_dir / "journal.db", folder, planned(folder), at)
-    return folder
 
 
 def crashed_undo(zone: Path, data_dir: Path, faults: dict[str, Fault]) -> Path:

@@ -22,6 +22,8 @@ CITATION = re.compile(r"\[0014\.(\d+)\]")
 COMPLETED: frozenset[int] = frozenset(
     {
         1,
+        2,
+        3,
         4,
         5,
         7,
@@ -30,6 +32,7 @@ COMPLETED: frozenset[int] = frozenset(
         10,
         11,
         12,
+        13,
         14,
         15,
         16,
@@ -40,6 +43,8 @@ COMPLETED: frozenset[int] = frozenset(
         21,
         22,
         23,
+        24,
+        25,
         28,
         29,
         30,

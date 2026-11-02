@@ -82,13 +82,13 @@ def test_the_action_s_button_confirms(parent: QWidget) -> None:
 
 @pytest.mark.parametrize("key", [Qt.Key.Key_Escape, Qt.Key.Key_Return])
 def test_escape_and_the_default_button_cancel(parent: QWidget, key: Qt.Key) -> None:
-    # [0014.38] Cancel is the default button.
+    # [0014.3] [0014.38] Cancel is the default button.
     _once_open(lambda box: QTest.keyClick(box, key))
     assert not confirm(parent, Translator("en"), MOVE)
 
 
 def test_cancel_and_a_dialog_closed_otherwise_act_on_nothing(parent: QWidget) -> None:
-    # [0014.38]
+    # [0014.3] [0014.38]
     _once_open(lambda box: _button(box, "Отмена").click())
     assert not confirm(parent, Translator("ru"), MOVE)
     _once_open(lambda box: box.close())

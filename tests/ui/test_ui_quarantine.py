@@ -163,7 +163,7 @@ def test_the_page_in_russian(
 def test_restoring_asks_first_and_a_cancel_restores_nothing(
     qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path], data_dir: Path
 ) -> None:
-    # [0014.22]
+    # [0014.3] [0014.22]
     dialogs.answer = False
     _check(window, 1, 3)
     window.quarantine.restore_button.click()
@@ -236,7 +236,7 @@ def test_a_restore_acts_only_on_what_is_still_in_the_quarantine(
 def test_deleting_shows_its_plan_first_and_a_cancel_deletes_nothing(
     qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path], data_dir: Path
 ) -> None:
-    # [0014.5] [0014.22]
+    # [0014.3] [0014.5] [0014.22]
     dialogs.answer = False
     _check(window, 1, 2)
     window.quarantine.purge_button.click()

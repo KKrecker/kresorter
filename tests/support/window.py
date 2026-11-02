@@ -10,6 +10,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QAbstractButton, QWidget
 from pytestqt.qtbot import QtBot
 
+from safeclean.autostart.registry import UserRegistry
 from safeclean.core.heuristics import Platform
 from safeclean.core.open_files import OpenFileChecker
 from safeclean.environment import Environment
@@ -27,12 +28,14 @@ def environment(
     *,
     platform: Platform = "linux",
     open_files: OpenFileChecker | None = None,
+    registry: UserRegistry | None = None,
 ) -> Environment:
     """The window's environment for tmp_path: ``zone`` the one scan zone, ``data_dir`` the data
-    directory, autostart under tmp_path, no setting of the local AI."""
+    directory, autostart under tmp_path (``registry`` on Windows), no setting of the local
+    AI."""
     return Environment(
         scan_context=lambda: scan_context(tmp_path, zone, data_dir, open_files, platform=platform),
-        autostart_context=lambda: autostart_context(platform, tmp_path),
+        autostart_context=lambda: autostart_context(platform, tmp_path, registry),
         llm_env={},
     )
 
@@ -85,11 +88,13 @@ def make_window(
     language: Language = "en",
     dialogs: FakeDialogs | None = None,
 ) -> Window:
-    """A window shown offscreen, closed and deleted after the test."""
+    """A window shown offscreen, closed and deleted after the test, once it has looked for
+    unfinished work."""
     window = Window(environment, Translator(language), (dialogs or FakeDialogs()).dialogs)
     qtbot.addWidget(window)
     window.show()
     qtbot.waitExposed(window)
+    wait_idle(qtbot, window)
     return window
 
 

@@ -270,7 +270,7 @@ def test_a_plan_made_again_replaces_the_one_shown(
 def test_moving_asks_first_and_a_cancel_moves_nothing(
     qtbot: QtBot, window: Window, dialogs: FakeDialogs, folder: Path, data_dir: Path
 ) -> None:
-    # [0014.23]
+    # [0014.3] [0014.23]
     _planned(qtbot, window)
     dialogs.answer = False
     window.organize.move_button.click()
@@ -494,7 +494,7 @@ def test_undo_shows_its_plan_then_moves_back_after_confirmation(
 def test_an_undo_cancelled_moves_nothing_back(
     qtbot: QtBot, window: Window, dialogs: FakeDialogs, folder: Path
 ) -> None:
-    # [0014.23]
+    # [0014.3] [0014.23]
     _sorted(qtbot, window, dialogs)
     dialogs.answer = False
     _undo(qtbot, window, 1)

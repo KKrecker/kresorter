@@ -277,7 +277,7 @@ def test_a_review_finding_is_selected_by_its_own_check_box_alone(
 def test_moving_asks_first_and_a_cancel_moves_nothing(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
 ) -> None:
-    # [0014.21]
+    # [0014.3] [0014.21]
     dialogs = FakeDialogs(confirm=False)
     window = make_window(qtbot, environment(tmp_path, zone, data_dir), dialogs=dialogs)
     scanned(qtbot, window)

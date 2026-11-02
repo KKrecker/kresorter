@@ -13,7 +13,7 @@ from pytestqt.qtbot import QtBot
 from safeclean.ui.i18n import Language, Translator
 from safeclean.ui.tasks import Task
 from safeclean.ui.window import PAGES, Window
-from support.window import environment, unnamed
+from support.window import environment, unnamed, wait_idle
 
 
 def _make(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, language: Language) -> Window:
@@ -21,6 +21,7 @@ def _make(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, language: La
     qtbot.addWidget(window)
     window.show()
     qtbot.waitExposed(window)
+    wait_idle(qtbot, window)
     return window
 
 
