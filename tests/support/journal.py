@@ -34,3 +34,16 @@ def pending_move_batch(data_dir: Path) -> None:
         )
     finally:
         conn.close()
+
+
+def pending_quarantine(data_dir: Path) -> None:
+    """A quarantine operation a crash left pending: unfinished work of another domain."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    conn = connect(data_dir / "journal.db")
+    try:
+        conn.execute(
+            "INSERT INTO operations (kind, state, created_at_ns)"
+            " VALUES ('quarantine', 'pending', 1)"
+        )
+    finally:
+        conn.close()

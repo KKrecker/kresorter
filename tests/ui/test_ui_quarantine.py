@@ -213,6 +213,23 @@ def test_a_refused_restore_says_why_and_stays_selected(
     assert window.quarantine.selected() == [1]
 
 
+def test_a_restore_acts_only_on_what_is_still_in_the_quarantine(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path], data_dir: Path
+) -> None:
+    # [0014.14] Restored by another session while the dialog was open.
+    scan = window.environment.scan_context()
+    dialogs.meanwhile.append(lambda: run(["quarantine", "restore", "1"], scan))
+    _check(window, 1, 2)
+    window.quarantine.restore_button.click()
+    wait_idle(qtbot, window)
+    assert window.quarantine.result.text().splitlines() == [
+        "Restored: 1 file",
+        f"Refused: [1] {tree['n']} (Not in the quarantine: restored)",
+    ]
+    assert _states(data_dir) == [(1, "restored"), (2, "restored"), (3, "quarantined")]
+    assert _ids(window) == ["3"]
+
+
 # --- delete permanently [0014.5] [0014.22] -------------------------------------------------------
 
 
@@ -265,6 +282,23 @@ def test_a_copy_changed_in_the_quarantine_is_not_deleted(
     ]
     assert Path(str(vault)).read_bytes() == b"changed in the vault"
     assert _ids(window) == ["2", "3"]
+
+
+def test_a_deletion_acts_only_on_what_its_plan_still_holds(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path], data_dir: Path
+) -> None:
+    # [0014.14] Restored by another session while the plan was shown: the plan is made again.
+    scan = window.environment.scan_context()
+    dialogs.meanwhile.append(lambda: run(["quarantine", "restore", "1"], scan))
+    _check(window, 1, 2)
+    window.quarantine.purge_button.click()
+    wait_idle(qtbot, window)
+    assert window.quarantine.result.text().splitlines() == [
+        "Deleted permanently: 1 file, freed 8 B",
+        f"Refused: [1] {tree['n']} (Not in the quarantine: restored)",
+    ]
+    assert _states(data_dir) == [(1, "restored"), (2, "purged"), (3, "quarantined")]
+    assert tree["n"].read_bytes() == b"other bytecode!"
 
 
 def test_nothing_left_to_delete_asks_nothing(

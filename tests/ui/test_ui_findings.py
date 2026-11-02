@@ -339,7 +339,7 @@ def test_the_selection_the_user_made_is_kept_for_what_stays(
 
 
 def test_a_refusal_says_what_it_found(qtbot: QtBot, window: Window, tree: dict[str, Path]) -> None:
-    # [0014.21] The copy that stays changed since the scan: the other copy stays as well.
+    # [0014.14] [0014.21] The copy that stays changed since the scan: the other copy stays.
     window.findings.clear_button.click()
     _check(window, tree["copy"])
     write(tree["kept"], b"changed")
@@ -350,6 +350,24 @@ def test_a_refusal_says_what_it_found(qtbot: QtBot, window: Window, tree: dict[s
         f"Refused: {tree['copy']} (The copy that stays has changed: {tree['kept']})",
     ]
     assert _checked(window) == {tree["copy"]}
+
+
+def test_a_finding_changed_while_the_dialog_was_open_stays(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path]
+) -> None:
+    # [0014.14] Each confirmed file is checked again when it moves.
+    window.findings.clear_button.click()
+    _check(window, tree["m"])
+    _check(window, tree["n"])
+    dialogs.meanwhile.append(lambda: write(tree["m"], b"changed bytecode"))
+    window.findings.move_button.click()
+    wait_idle(qtbot, window)
+    assert window.findings.result.text().splitlines() == [
+        "Moved to the quarantine: 1 file, 15 B",
+        f"Refused: {tree['m']} (Changed since the scan)",
+    ]
+    assert tree["m"].read_bytes() == b"changed bytecode"
+    assert not tree["n"].exists()
 
 
 def test_a_group_whose_findings_all_moved_leaves_the_list(

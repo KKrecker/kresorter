@@ -4,7 +4,7 @@ answers, and the buttons that have neither a text nor an accessible name (decisi
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from PySide6.QtWidgets import QAbstractButton, QWidget
@@ -54,15 +54,20 @@ def junk_tree(zone: Path) -> dict[str, Path]:
 
 
 class FakeDialogs:
-    """The dialogs a page would block on, answered as the test says; every question is kept."""
+    """The dialogs a page would block on, answered as the test says; every question is kept.
+    ``meanwhile`` runs while the next confirmation is open: another program at work."""
 
     def __init__(self, *, confirm: bool = True, folders: Sequence[Path | None] = ()) -> None:
         self.answer = confirm
         self.folders = list(folders)
         self.asked: list[Confirmation] = []
+        self.meanwhile: list[Callable[[], object]] = []
 
     def confirm(self, confirmation: Confirmation) -> bool:
         self.asked.append(confirmation)
+        for change in self.meanwhile:
+            change()
+        self.meanwhile.clear()
         return self.answer
 
     def choose_folder(self) -> Path | None:
