@@ -127,7 +127,7 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
     },
     UndoReason: {
         "not_found": _both("No such batch", "Нет такого пакета"),
-        "undo_batch": _both("An undo cannot be undone", "Отмену нельзя отменить"),
+        "undo_batch": _both("An undo cannot be undone", "Возврат нельзя отменить"),
         "pending": _both("The batch is unfinished", "Пакет не завершён"),
     },
     Blocker: {
@@ -142,7 +142,7 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
     },
     BatchKind: {
         "organize": _both("Sorted", "Сортировка"),
-        "undo": _both("Undo", "Отмена"),
+        "undo": _both("Undo", "Возврат"),
     },
     BatchState: {
         "pending": _both("Unfinished", "Не завершён"),
