@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TextIO
 
 from safeclean import cli_autostart, cli_organize, cli_quarantine
+from safeclean.autostart.changers import changes_for
 from safeclean.autostart.listing import AutostartContext
 from safeclean.cli_journal import RECOVER, UNSAFE, with_journal
 from safeclean.core.scanner import ScanContext
@@ -41,7 +42,7 @@ def _recover(
 ) -> int:
     found = cli_quarantine.report_recovery(recovery.recover(conn), out, err)
     found = cli_organize.report_recovery(organize_recovery.recover(conn), out, err) or found
-    changes = cli_autostart.changes_for(context, conn, data_dir)
+    changes = changes_for(context, conn, data_dir)
     report = cli_autostart.recovered(changes, err)
     if report is None:
         return UNSAFE

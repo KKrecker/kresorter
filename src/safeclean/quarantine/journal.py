@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 import stat
+from dataclasses import dataclass
 from enum import Enum, StrEnum
 from pathlib import Path
 
@@ -30,6 +31,22 @@ class ItemState(StrEnum):
     ROLLED_BACK = "rolled_back"
     LOST = "lost"
     PURGED = "purged"
+
+
+@dataclass(frozen=True)
+class QuarantinedItem:
+    item_id: int
+    original: Path
+    size: int
+
+
+def quarantined(conn: sqlite3.Connection) -> tuple[QuarantinedItem, ...]:
+    """The files in the quarantine now, by id (``quarantine list``, the window's page)."""
+    rows = conn.execute(
+        "SELECT id, original_path, size FROM items WHERE state = ? ORDER BY id",
+        (ItemState.QUARANTINED,),
+    ).fetchall()
+    return tuple(QuarantinedItem(item_id, Path(original), size) for item_id, original, size in rows)
 
 
 def set_item(conn: sqlite3.Connection, item_id: int, state: ItemState) -> None:

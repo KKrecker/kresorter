@@ -27,7 +27,8 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from safeclean import cli_llm
-from safeclean.autostart.changes import AutostartStore, XdgChanges
+from safeclean.autostart.changers import changes_for
+from safeclean.autostart.changes import XdgChanges
 from safeclean.autostart.entries import BrokenEntryError
 from safeclean.autostart.journal import ChangeRecovery, ChangeRefusal, ChangeResult, ChangeState
 from safeclean.autostart.listing import AutostartContext, list_autostart
@@ -252,18 +253,6 @@ def _outcome(
         " run 'safeclean autostart recover'\n"
     )
     return UNSAFE
-
-
-def changes_for(
-    context: AutostartContext, conn: sqlite3.Connection, data_dir: Path
-) -> XdgChanges | RunKeyChanges | None:
-    """What can change autostart entries here: XDG on Linux, HKCU Run on Windows, else none."""
-    if context.platform == "linux":
-        user, system = autostart_dirs(context.env, context.home)
-        return XdgChanges(conn, AutostartStore(data_dir), user, system)
-    if context.platform == "windows":
-        return RunKeyChanges(conn, context.registry())
-    return None
 
 
 def render_recovery(report: ChangeRecovery) -> str:

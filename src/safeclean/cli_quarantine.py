@@ -22,13 +22,14 @@ from pathlib import Path
 from typing import TextIO
 
 from safeclean import cli_analyze
+from safeclean.analysis.run import analyze_paths
 from safeclean.analysis.score import Level
 from safeclean.analysis.size_age import Thresholds
 from safeclean.cli_journal import RECOVER, UNSAFE, unfinished, with_journal
 from safeclean.core.models import FileEntry
 from safeclean.core.preflight import Candidate, UnreliableCheckerError
 from safeclean.core.scanner import ScanContext
-from safeclean.quarantine.journal import ItemState
+from safeclean.quarantine.journal import quarantined
 from safeclean.quarantine.recovery import RecoveryReport
 from safeclean.quarantine.service import PurgeRefused, QuarantineService, RestoreRefused
 from safeclean.storage.pending import pending_domains
@@ -151,7 +152,7 @@ def _add(session: Session, args: argparse.Namespace, out: TextIO) -> int:
 
 
 def _add_from_analysis(session: Session, args: argparse.Namespace, out: TextIO) -> int:
-    _, analysis = cli_analyze.analyze_paths(args.paths, session.context, Thresholds())
+    _, analysis = analyze_paths(args.paths, session.context, Thresholds())
     levels = BULK_LEVELS[args.level]
     chosen = [f for f in analysis.proposed if f.level in levels]
     if not chosen:
@@ -182,13 +183,10 @@ def _quarantine(service: QuarantineService, candidates: list[Candidate], out: Te
 
 
 def _list(session: Session, args: argparse.Namespace, out: TextIO) -> int:
-    rows = session.conn.execute(
-        "SELECT id, original_path, size FROM items WHERE state = ? ORDER BY id",
-        (ItemState.QUARANTINED,),
-    ).fetchall()
-    total = sum(size for _, _, size in rows)
-    lines = [f"Quarantine: {count(len(rows), 'file')}, {format_size(total)}"]
-    lines += [f"  [{item_id}] {original}  {format_size(size)}" for item_id, original, size in rows]
+    items = quarantined(session.conn)
+    total = sum(item.size for item in items)
+    lines = [f"Quarantine: {count(len(items), 'file')}, {format_size(total)}"]
+    lines += [f"  [{i.item_id}] {i.original}  {format_size(i.size)}" for i in items]
     _write(out, lines)
     return 0
 

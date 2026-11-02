@@ -9,16 +9,14 @@ from __future__ import annotations
 
 import argparse
 import json
-import time
-from collections.abc import Sequence
-from pathlib import Path
 from typing import Any, TextIO
 
 from safeclean import cli_llm
-from safeclean.analysis.report import AnalysisReport, Finding, analyze
+from safeclean.analysis.report import AnalysisReport, Finding
+from safeclean.analysis.run import analyze_paths
 from safeclean.analysis.score import Level
 from safeclean.analysis.size_age import Thresholds
-from safeclean.core.scanner import ScanContext, ScanReport, scan
+from safeclean.core.scanner import ScanContext, ScanReport
 from safeclean.llm.explain import Explanations
 from safeclean.text import OPEN_FILES_NOTE, count, format_size, skip_json, skip_line
 
@@ -63,22 +61,6 @@ def add_parser(commands: argparse._SubParsersAction[argparse.ArgumentParser]) ->
         help="report files unmodified for this many days for review (default: %(default)s)",
     )
     cli_llm.add_explain(analyze_cmd)
-
-
-def analyze_paths(
-    paths: Sequence[str], context: ScanContext, thresholds: Thresholds
-) -> tuple[ScanReport, AnalysisReport]:
-    """Scan ``paths`` (default: the safe zones) and rate what was found. Read-only."""
-    roots = [Path(p) for p in paths or context.policy.default_roots()]
-    scanned = scan(roots, context, hash_duplicates=True)
-    analysis = analyze(
-        scanned,
-        classifier=context.classifier,
-        safe_zones=context.policy.default_roots(),
-        now_ns=time.time_ns(),
-        thresholds=thresholds,
-    )
-    return scanned, analysis
 
 
 def run(

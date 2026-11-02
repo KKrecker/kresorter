@@ -1,7 +1,7 @@
-"""The journal session shared by the commands that act (decisions 0009, 0011 item 62).
-
-The data directory is checked before anything is created there, the single-instance lock is
-taken, and the journal is opened in it; quarantine and autostart changes share all three.
+"""The journal session of the commands that act, as the console reports it (decisions 0009,
+0011 item 62). The session itself, shared with the window, is ``storage.session`` (0014 item
+11): the data directory checked before anything is created there, the single-instance lock,
+the journal opened in it.
 
 Exit code 3: the data directory, the lock or the journal cannot be used safely, the body
 stopped on an ``OSError`` it did not handle (only the first two are named the data directory),
@@ -18,53 +18,40 @@ from pathlib import Path
 from typing import TextIO
 
 from safeclean.core.scanner import ScanContext
-from safeclean.storage.data_dir import PRIVATE, DataDirError, check_data_dir
-from safeclean.storage.db import StorageError, connect
-from safeclean.storage.lock import InstanceLock, LockedError
 from safeclean.storage.pending import Domain
+from safeclean.storage.session import (
+    JOURNAL_NAME,
+    LOCK_NAME,
+    SessionFailed,
+    SessionFailure,
+    run_session,
+)
 
-JOURNAL_NAME = "journal.db"
-LOCK_NAME = "safeclean.lock"
+__all__ = ["JOURNAL_NAME", "LOCK_NAME", "RECOVER", "UNSAFE", "unfinished", "with_journal"]
+
 UNSAFE = 3
 RECOVER = "safeclean recover"
 
 Body = Callable[[sqlite3.Connection, Path], int]  # (journal, data directory) -> exit code
 
+_MESSAGES = {
+    SessionFailure.DATA_DIR: "safeclean: {detail}\n",
+    SessionFailure.LOCKED: "safeclean: {detail}\n",
+    SessionFailure.DATA_DIR_OS: "safeclean: cannot use the data directory: {detail}\n",
+    SessionFailure.JOURNAL_OPEN: "safeclean: cannot open the journal: {detail}\n",
+    SessionFailure.STOPPED: "safeclean: stopped: {detail}\n",
+    SessionFailure.JOURNAL_FAILED: "safeclean: journal failed: {detail}; run '{recover}'\n",
+}
+
 
 def with_journal(context: ScanContext, err: TextIO, body: Body, *, recover: str) -> int:
-    try:
-        data_dir = check_data_dir(context.policy, context.classifier)
-    except DataDirError as error:
-        err.write(f"safeclean: {error}\n")
+    """``body``'s exit code; 3, with the message on ``err``, when the session could not run
+    (``storage.session``, decision 0014 item 11)."""
+    result = run_session(context, body)
+    if isinstance(result, SessionFailed):
+        err.write(_MESSAGES[result.failure].format(detail=result.detail, recover=recover))
         return UNSAFE
-    try:
-        data_dir.mkdir(mode=PRIVATE, parents=True, exist_ok=True)
-        with InstanceLock(data_dir / LOCK_NAME):
-            return _open(data_dir, err, body, recover)
-    except LockedError as error:
-        err.write(f"safeclean: {error}\n")
-        return UNSAFE
-    except OSError as error:
-        err.write(f"safeclean: cannot use the data directory: {error}\n")
-        return UNSAFE
-
-
-def _open(data_dir: Path, err: TextIO, body: Body, recover: str) -> int:
-    try:
-        conn = connect(data_dir / JOURNAL_NAME)
-    except (OSError, sqlite3.Error, StorageError) as error:
-        err.write(f"safeclean: cannot open the journal: {error}\n")
-        return UNSAFE
-    try:
-        return body(conn, data_dir)
-    except OSError as error:  # the body's own: not the data directory (item 112)
-        err.write(f"safeclean: stopped: {error}\n")
-        return UNSAFE
-    except sqlite3.Error as error:  # in the middle: its end cannot be trusted (item 114)
-        err.write(f"safeclean: journal failed: {error}; run '{recover}'\n")
-        return UNSAFE
-    finally:
-        conn.close()
+    return result
 
 
 def unfinished(domains: set[Domain]) -> str:
