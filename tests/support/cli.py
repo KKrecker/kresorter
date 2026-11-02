@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from fakes import FakeOpenFiles, FakeRegistry, make_policy
@@ -13,6 +14,7 @@ from safeclean.autostart.registry import UserRegistry
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.open_files import OpenFileChecker
 from safeclean.core.scanner import ScanContext
+from safeclean.environment import Environment
 
 
 def scan_context(
@@ -57,13 +59,10 @@ def run(
 ) -> tuple[int, str, str]:
     """``safeclean <args>``: exit code, stdout, stderr."""
     out, err = io.StringIO(), io.StringIO()
-    code = cli.main(
-        args,
-        out=out,
-        err=err,
-        context_factory=lambda: scan,
-        autostart_context=None if auto is None else _given(auto),
-    )
+    environment = Environment(scan_context=lambda: scan)
+    if auto is not None:
+        environment = replace(environment, autostart_context=_given(auto))
+    code = cli.main(args, out=out, err=err, environment=environment)
     return code, out.getvalue(), err.getvalue()
 
 

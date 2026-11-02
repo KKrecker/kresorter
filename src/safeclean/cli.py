@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from collections import defaultdict
-from collections.abc import Callable, Mapping, Sequence
-from pathlib import Path, PurePosixPath
-from typing import Any, Literal, TextIO
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any, TextIO
 
 from safeclean import (
     cli_analyze,
@@ -20,58 +19,17 @@ from safeclean import (
     cli_quarantine,
     cli_recover,
 )
-from safeclean.autostart.listing import AutostartContext, default_autostart_context
-from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
-from safeclean.core.open_files import checker_for_platform
-from safeclean.core.policy import PathPolicy
-from safeclean.core.scanner import JunkFinding, ScanContext, ScanReport, scan
-from safeclean.llm.transport import LIMITS, Limits
+from safeclean.core.scanner import JunkFinding, ScanReport, scan
+from safeclean.environment import Environment
 from safeclean.text import OPEN_FILES_NOTE, count, format_size, skip_json, skip_line
 
 __all__ = [
     "build_parser",
-    "default_context",
-    "detect_platform",
     "format_size",
     "main",
     "render_json",
     "render_text",
 ]
-
-_PLATFORMS: dict[str, Platform] = {"win32": "windows", "linux": "linux", "darwin": "darwin"}
-
-
-def detect_platform(sys_platform: str = sys.platform) -> Platform:
-    try:
-        return _PLATFORMS[sys_platform]
-    except KeyError:
-        raise RuntimeError(f"unsupported platform: {sys_platform}") from None
-
-
-def default_context(
-    platform: Platform | None = None,
-    env: Mapping[str, str] | None = None,
-    home: Path | None = None,
-) -> ScanContext:
-    """Context for the current system (arguments exist for tests)."""
-    current = platform or detect_platform()
-    if current == "windows":
-        policy = PathPolicy.for_windows(os.environ if env is None else env)
-    else:
-        posix: Literal["linux", "darwin"] = "darwin" if current == "darwin" else "linux"
-        policy = PathPolicy.for_posix(
-            home=PurePosixPath(home or Path.home()),
-            platform=posix,
-            env=os.environ if env is None else env,
-        )
-    open_files = checker_for_platform(current)
-    return ScanContext(
-        policy=policy,
-        open_files=open_files,
-        classifier=JunkClassifier(default_rules(), platform=current),
-        open_files_checked=open_files.reliable,
-        platform=current,
-    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -95,30 +53,28 @@ def main(
     *,
     out: TextIO | None = None,
     err: TextIO | None = None,
-    context_factory: Callable[[], ScanContext] | None = None,
-    autostart_context: Callable[[], AutostartContext] | None = None,
-    llm_env: Mapping[str, str] | None = None,
-    llm_limits: Limits = LIMITS,
+    environment: Environment | None = None,
 ) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    env = os.environ if llm_env is None else llm_env  # read only by llm status and --explain
+    system = Environment() if environment is None else environment
     if args.command == "llm":
-        return cli_llm.run_status(env, out or sys.stdout, llm_limits)
-    explainer = cli_llm.Explainer(env, llm_limits) if getattr(args, "explain", False) else None
+        return cli_llm.run_status(system.llm_env, out or sys.stdout, system.llm_limits)
+    explainer = (
+        cli_llm.Explainer(system.llm_env, system.llm_limits)
+        if getattr(args, "explain", False)
+        else None
+    )
     if args.command in ("autostart", "recover"):  # autostart list needs no scan context
-        if autostart_context is None:
-            listing_context = default_autostart_context(detect_platform())
-        else:
-            listing_context = autostart_context()
-        factory = context_factory or default_context  # built only by the commands that act
+        listing_context = system.autostart_context()
+        factory = system.scan_context  # built only by the commands that act
         if args.command == "recover" or args.action == "recover":  # one command, an alias
             return cli_recover.run(listing_context, factory(), out or sys.stdout, err or sys.stderr)
         return cli_autostart.run(
             args, listing_context, factory, out or sys.stdout, err or sys.stderr, explainer
         )
     cli_quarantine.check_usage(parser, args)
-    context = (context_factory or default_context)()
+    context = system.scan_context()
     if args.command == "analyze":
         return cli_analyze.run(args, context, out or sys.stdout, err or sys.stderr, explainer)
     if args.command == "quarantine":

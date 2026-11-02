@@ -13,7 +13,7 @@ from pathlib import Path, PurePath
 import pytest
 
 from fakes import FakeOpenFiles, journal_held
-from safeclean import cli, cli_quarantine
+from safeclean import cli_quarantine, environment
 from safeclean.core.heuristics import Platform
 from safeclean.core.open_files import NoOpenFileCheck, ProcFdChecker
 from safeclean.core.scanner import ScanContext
@@ -355,7 +355,7 @@ def test_bad_usage_exits_with_2(context: ScanContext, args: list[str]) -> None:
 
 
 def test_scan_context_on_linux_checks_open_files(tmp_path: Path) -> None:
-    context = cli.default_context(platform="linux", env={}, home=tmp_path)
+    context = environment.default_context(platform="linux", env={}, home=tmp_path)
     assert isinstance(context.open_files, ProcFdChecker)
     assert context.open_files_checked is True
 
@@ -365,7 +365,7 @@ def test_scan_context_elsewhere_discloses_the_missing_check(
     tmp_path: Path, platform: Platform
 ) -> None:
     env = {"USERPROFILE": r"C:\Users\Alice"}
-    context = cli.default_context(platform=platform, env=env, home=tmp_path)
+    context = environment.default_context(platform=platform, env=env, home=tmp_path)
     assert context.open_files_checked is False
     assert context.open_files.reliable is False
 

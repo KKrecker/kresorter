@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 
 from fakes import FakeOpenFiles, UnreliableOpenFiles
-from safeclean import cli
+from safeclean import environment
 from safeclean.core.heuristics import Platform
 from safeclean.core.open_files import NoOpenFileCheck
 from safeclean.core.scanner import ScanContext
@@ -182,14 +182,15 @@ def test_a_scan_context_carries_the_platform_it_was_made_for(
 ) -> None:
     # [0012.37] [0012.39] the refusal asks the context, not the system the tests run on
     env = {"USERPROFILE": r"C:\Users\Alice"}
-    assert cli.default_context(platform=platform, env=env, home=tmp_path).platform == platform
+    context = environment.default_context(platform=platform, env=env, home=tmp_path)
+    assert context.platform == platform
 
 
 def test_the_default_context_is_made_for_the_system_it_detects(tmp_path: Path) -> None:
     # [0012.39]
     env = {"USERPROFILE": r"C:\Users\Alice"}
-    context = cli.default_context(env=env, home=tmp_path)
-    assert context.platform == cli.detect_platform()
+    context = environment.default_context(env=env, home=tmp_path)
+    assert context.platform == environment.detect_platform()
 
 
 def test_a_scan_context_cannot_be_made_without_its_platform(scan: ScanContext) -> None:

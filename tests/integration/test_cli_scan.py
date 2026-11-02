@@ -9,9 +9,10 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean import cli
+from safeclean import cli, environment
 from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
 from safeclean.core.scanner import ScanContext
+from safeclean.environment import Environment
 from support.files import snapshot, write
 
 
@@ -41,7 +42,7 @@ def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
 
 def run(args: list[str], context: ScanContext) -> tuple[int, str]:
     out = io.StringIO()
-    code = cli.main(args, out=out, context_factory=lambda: context)
+    code = cli.main(args, out=out, environment=Environment(scan_context=lambda: context))
     return code, out.getvalue()
 
 
@@ -150,12 +151,12 @@ def test_format_size(size: int, text: str) -> None:
     [("win32", "windows"), ("linux", "linux"), ("darwin", "darwin")],
 )
 def test_detect_platform(sys_platform: str, expected: str) -> None:
-    assert cli.detect_platform(sys_platform) == expected
+    assert environment.detect_platform(sys_platform) == expected
 
 
 def test_unsupported_platform_is_rejected() -> None:
     with pytest.raises(RuntimeError, match="unsupported platform"):
-        cli.detect_platform("sunos5")
+        environment.detect_platform("sunos5")
 
 
 def test_explicit_scan_never_lists_the_app_data_dir(tmp_path: Path, tree: Path) -> None:
@@ -184,14 +185,14 @@ def test_explicit_scan_never_lists_the_app_data_dir(tmp_path: Path, tree: Path) 
 
 def test_default_context_passes_environment_to_posix_policy(tmp_path: Path) -> None:
     env = {"XDG_DATA_HOME": str(tmp_path / "xdg")}
-    context = cli.default_context(platform="linux", env=env, home=tmp_path)
+    context = environment.default_context(platform="linux", env=env, home=tmp_path)
 
     assert context.policy.app_data_dir == tmp_path / "xdg" / "safeclean"
 
 
 @pytest.mark.parametrize("platform", ["linux", "darwin"])
 def test_default_context_posix(tmp_path: Path, platform: Platform) -> None:
-    context = cli.default_context(platform=platform, env={}, home=tmp_path)
+    context = environment.default_context(platform=platform, env={}, home=tmp_path)
 
     assert context.policy.default_roots() == (tmp_path / ".cache", tmp_path / "Downloads")
     assert context.policy.app_data_dir.name == "safeclean"
@@ -199,7 +200,7 @@ def test_default_context_posix(tmp_path: Path, platform: Platform) -> None:
 
 def test_default_context_windows() -> None:
     env = {"USERPROFILE": r"C:\Users\Alice"}
-    context = cli.default_context(platform="windows", env=env, home=Path("/unused"))
+    context = environment.default_context(platform="windows", env=env, home=Path("/unused"))
 
     assert [str(p) for p in context.policy.default_roots()] == [
         r"C:\Users\Alice\.cache",
@@ -208,7 +209,7 @@ def test_default_context_windows() -> None:
 
 
 def test_default_context_uses_current_system() -> None:
-    context = cli.default_context()
+    context = environment.default_context()
 
     assert context.policy.default_roots()[0].name == ".cache"
 
@@ -216,7 +217,7 @@ def test_default_context_uses_current_system() -> None:
 def test_python_dash_m_entry_point(
     tmp_path: Path, tree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(cli, "default_context", lambda: ctx(tmp_path, tree))
+    monkeypatch.setattr(environment, "default_context", lambda: ctx(tmp_path, tree))
     monkeypatch.setattr(sys, "argv", ["safeclean", "scan", "--json", str(tree)])
     out = io.StringIO()
     monkeypatch.setattr(sys, "stdout", out)

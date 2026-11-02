@@ -26,6 +26,7 @@ from safeclean.autostart.listing import AutostartContext
 from safeclean.autostart.registry import Hive, RegValue, ValueKind
 from safeclean.autostart.run_keys import RUN, RUN_ONCE
 from safeclean.core.scanner import ScanContext
+from safeclean.environment import Environment
 from safeclean.llm.settings import Address
 from safeclean.llm.transport import LIMITS, Limits
 from support.cli import autostart_context, scan_context
@@ -68,10 +69,12 @@ def safeclean(
         args,
         out=out,
         err=err,
-        context_factory=given(scan),
-        autostart_context=given(auto),
-        llm_env={} if env is None else env,
-        llm_limits=limits,
+        environment=Environment(
+            scan_context=given(scan),
+            autostart_context=given(auto),
+            llm_env={} if env is None else env,
+            llm_limits=limits,
+        ),
     )
     return code, out.getvalue(), err.getvalue()
 

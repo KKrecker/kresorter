@@ -13,6 +13,7 @@ from safeclean import cli
 from safeclean.analysis.duplicates import KeepReason
 from safeclean.core.heuristics import JunkClassifier, default_rules
 from safeclean.core.scanner import ScanContext
+from safeclean.environment import Environment
 from support.files import snapshot
 
 DAY_NS = 86_400 * 10**9
@@ -54,7 +55,7 @@ def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
 
 def run(args: list[str], context: ScanContext) -> tuple[int, str]:
     out = io.StringIO()
-    code = cli.main(args, out=out, context_factory=lambda: context)
+    code = cli.main(args, out=out, environment=Environment(scan_context=lambda: context))
     return code, out.getvalue()
 
 

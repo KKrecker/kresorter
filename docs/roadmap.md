@@ -196,8 +196,13 @@ Scanner core and `safeclean scan` (read-only report).
   steer the model, never a level, a plan or an action; the default model may be missing, and
   safeclean never installs it.
 
+### Before step 7
+- Refactor without behaviour change (B8): `cli.main` takes one `Environment`
+  (`safeclean.environment`: the scan and autostart contexts, the settings environment of `llm`
+  and its limits) instead of a factory per parameter; `detect_platform` and `default_context`
+  live there, so the CLI and the UI make the same contexts.
+
 ### Left for later
-- B8: one environment object for `cli.main` instead of a factory per parameter.
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
 - B11: CI on Windows and macOS and live `WinRegistry` tests, once the repository is published.
 - Before the first release: CI confirms Python 3.14 (step 6 was checked on it locally only).

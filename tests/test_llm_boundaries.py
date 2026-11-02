@@ -2,10 +2,10 @@
 
 The guards read the AST of ``src``. From safeclean, ``llm`` imports only the package itself
 (for its version), its own modules and the results it explains, and only the command-line
-modules import ``llm`` [0013.21]. ``llm`` opens, reads and writes no file [0013.22]. Imports are
-resolved as Python resolves them: ``from safeclean import text`` is ``safeclean.text``, a
-relative import is taken from the module's package, and a literal name given to ``__import__``
-or ``importlib.import_module`` counts too.
+modules and ``safeclean.environment`` import ``llm`` [0013.21]. ``llm`` opens, reads and writes
+no file [0013.22]. Imports are resolved as Python resolves them: ``from safeclean import text``
+is ``safeclean.text``, a relative import is taken from the module's package, and a literal name
+given to ``__import__`` or ``importlib.import_module`` counts too.
 """
 
 import ast
@@ -87,10 +87,12 @@ def llm_may_import(name: str) -> bool:
 
 
 def may_import_llm(module: str) -> bool:
-    """``llm`` itself, and ``safeclean.cli`` or ``safeclean.cli_*``."""
+    """``llm`` itself, ``safeclean.cli`` or ``safeclean.cli_*``, and ``safeclean.environment``
+    (it carries the settings environment and the limits to the commands)."""
     last = module.rsplit(".", 1)[-1]
     command_line = last == "cli" or last.startswith("cli_")
-    return _in_llm(module) or (module.count(".") == 1 and command_line)
+    front = module.count(".") == 1 and (command_line or last == "environment")
+    return _in_llm(module) or front
 
 
 def _opens(node: ast.Name | ast.Attribute) -> bool:
@@ -173,8 +175,10 @@ def test_what_llm_may_import(name: str, allowed: bool) -> None:
         ("safeclean.cli", True),
         ("safeclean.cli_analyze", True),
         ("safeclean.llm.explain", True),
+        ("safeclean.environment", True),
         ("safeclean.text", False),
         ("safeclean.core.cli_tools", False),
+        ("safeclean.core.environment", False),
         ("safeclean.organize.planner", False),
         ("safeclean.client", False),
     ],
@@ -269,8 +273,8 @@ def test_the_guards_see_llm_and_its_importers() -> None:
         and any(_in_llm(name) for _, name in imports(path.read_text(encoding="utf-8"), module))
     }
     assert importers == {
-        "safeclean.cli",
         "safeclean.cli_analyze",
         "safeclean.cli_autostart",
         "safeclean.cli_llm",
+        "safeclean.environment",
     }

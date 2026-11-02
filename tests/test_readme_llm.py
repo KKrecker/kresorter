@@ -16,6 +16,7 @@ import pytest
 
 from safeclean import cli
 from safeclean.cli_llm import AGAIN, INSTALL, PULL, SETTINGS
+from safeclean.environment import Environment
 from safeclean.llm.settings import DEFAULT_ADDRESS, DEFAULT_MODEL, MODEL_VARIABLE, URL_VARIABLE
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,7 +116,9 @@ def status_when_nothing_answers() -> list[str]:
     with socket.create_server(("127.0.0.1", 0)) as taken:
         url = f"http://127.0.0.1:{taken.getsockname()[1]}"
     out, err = io.StringIO(), io.StringIO()
-    code = cli.main(["llm", "status"], out=out, err=err, llm_env={URL_VARIABLE: url})
+    code = cli.main(
+        ["llm", "status"], out=out, err=err, environment=Environment(llm_env={URL_VARIABLE: url})
+    )
     assert (code, err.getvalue()) == (1, "")
     return out.getvalue().splitlines()
 

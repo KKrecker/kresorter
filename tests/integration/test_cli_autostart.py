@@ -13,13 +13,14 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeRegistry
-from safeclean import cli
+from safeclean import cli, environment
 from safeclean.autostart.listing import AutostartContext
 from safeclean.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
 from safeclean.autostart.run_keys import RUN
 from safeclean.autostart.xdg import read_xdg
 from safeclean.core.heuristics import Platform
 from safeclean.core.scanner import ScanContext
+from safeclean.environment import Environment
 from support.files import snapshot
 
 APP = "[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
@@ -56,9 +57,8 @@ def context(
 
 def run(args: list[str], autostart: AutostartContext) -> tuple[int, str]:
     out = io.StringIO()
-    code = cli.main(
-        args, out=out, context_factory=no_scan_context, autostart_context=lambda: autostart
-    )
+    environment = Environment(scan_context=no_scan_context, autostart_context=lambda: autostart)
+    code = cli.main(args, out=out, environment=environment)
     return code, out.getvalue()
 
 
@@ -217,11 +217,12 @@ def test_without_a_context_the_detected_platform_is_listed(
         platforms.append(platform)
         return linux  # never the live system in a test
 
-    monkeypatch.setattr(cli, "default_autostart_context", live)
+    monkeypatch.setattr(environment, "default_autostart_context", live)
     out = io.StringIO()
 
-    assert cli.main(["autostart", "list"], out=out, context_factory=no_scan_context) == 0
-    assert platforms == [cli.detect_platform()]
+    given = Environment(scan_context=no_scan_context)
+    assert cli.main(["autostart", "list"], out=out, environment=given) == 0
+    assert platforms == [environment.detect_platform()]
     assert "  app  [enabled, user, disableable]\n" in out.getvalue()
 
 
