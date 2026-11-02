@@ -1,15 +1,17 @@
-"""The Quarantine page: the quarantined files from the journal, Restore, and Delete
-permanently, the one action drawn in the danger colour (decision 0014, items 5 and 22)."""
+"""The Quarantine page: the quarantined files from the journal, a row each, the bar with the
+selection, Restore, and Delete permanently, the one action drawn in the danger colour (decision
+0014, items 5, 22 and 51)."""
 
 from pathlib import Path
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QTreeWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
 from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.parts import QUIET, SECONDARY
 from safeclean.ui.window import Window
 from support.cli import run
 from support.files import write
@@ -29,6 +31,11 @@ def dialogs() -> FakeDialogs:
 
 def _opened(qtbot: QtBot, window: Window) -> None:
     window.show_page("quarantine")
+    wait_idle(qtbot, window)
+
+
+def _refreshed(qtbot: QtBot, window: Window) -> None:
+    window.quarantine.refresh_button.click()
     wait_idle(qtbot, window)
 
 
@@ -55,14 +62,22 @@ def window(
     return window
 
 
-def _rows(window: Window) -> list[tuple[str, str, str]]:
+def _listed(window: Window) -> list[QTreeWidgetItem]:
     root = window.quarantine.items.invisibleRootItem()
-    rows: list[tuple[str, str, str]] = []
-    for index in range(root.childCount()):
-        row = root.child(index)
-        assert row is not None
-        rows.append((row.text(0), row.text(1), row.text(2)))
-    return rows
+    listed = [root.child(index) for index in range(root.childCount())]
+    return [row for row in listed if row is not None]
+
+
+def _rows(window: Window) -> list[tuple[str, str, str]]:
+    """Each row's id, original path (its folder, then its name) and size."""
+    return [
+        (row.text(2), str(Path(row.data(0, SECONDARY), row.text(0))), row.text(1))
+        for row in _listed(window)
+    ]
+
+
+def _bar(window: Window) -> tuple[str, str]:
+    return (window.quarantine.chosen.text(), window.quarantine.chosen_size.text())
 
 
 def _ids(window: Window) -> list[str]:
@@ -78,7 +93,7 @@ def _states(data_dir: Path) -> list[tuple[object, ...]]:
     return list(query(data_dir, "SELECT id, state FROM items ORDER BY id"))
 
 
-# --- the list [0014.22] --------------------------------------------------------------------------
+# --- the list [0014.22] [0014.51] ---------------------------------------------------------------
 
 
 def test_the_page_lists_the_quarantined_files_by_id(window: Window, tree: dict[str, Path]) -> None:
@@ -89,8 +104,6 @@ def test_the_page_lists_the_quarantined_files_by_id(window: Window, tree: dict[s
         ("2", str(tree["m"]), "8 B"),
         ("3", str(tree["copy"]), "4 B"),
     ]
-    header = page.items.headerItem()
-    assert [header.text(column) for column in range(3)] == ["Id", "Original path", "Size"]
     assert page.total.text() == "In the quarantine: 3 files, 27 B"
     assert page.selected() == []
     assert not page.restore_button.isEnabled()
@@ -99,6 +112,61 @@ def test_the_page_lists_the_quarantined_files_by_id(window: Window, tree: dict[s
     assert page.selected() == [2]
     assert page.restore_button.isEnabled()
     assert page.purge_button.isEnabled()
+
+
+def test_a_row_has_the_name_its_original_folder_the_size_and_the_id_in_secondary_text(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path, tree: dict[str, Path]
+) -> None:
+    # [0014.51]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    _moved(qtbot, window)
+    _opened(qtbot, window)
+    page = window.quarantine
+    header = page.items.headerItem()
+    assert [header.text(column) for column in range(3)] == ["Name", "Size", "ID"]
+    first = _listed(window)[0]
+    assert (first.text(0), first.data(0, SECONDARY)) == (
+        "n.cpython-313.pyc",
+        str(Path("~", "zone", "lib", "__pycache__")),
+    )
+    assert (first.text(1), first.text(2)) == ("15 B", "1")
+    assert [first.data(column, QUIET) for column in (1, 2)] == [True, True]
+    right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+    assert header.textAlignment(1) == first.textAlignment(1) == right
+    assert not page.items.isHidden()
+    assert page.empty.isHidden()
+
+
+def test_with_no_file_the_page_says_the_quarantine_is_empty(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
+) -> None:
+    # [0014.51]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    _opened(qtbot, window)
+    page = window.quarantine
+    assert page.empty.text() == "The quarantine is empty."
+    assert page.empty.property("role") == "secondary"
+    assert page.items.isHidden()
+    assert page.total.isHidden()
+    _moved(qtbot, window)
+    _refreshed(qtbot, window)
+    assert page.empty.isHidden()
+    assert not page.items.isHidden()
+
+
+def test_the_bar_shows_the_files_checked_and_their_size_with_restore_and_delete(
+    window: Window,
+) -> None:
+    # [0014.51]
+    page = window.quarantine
+    assert page.bar.property("role") == "bar"
+    assert _bar(window) == ("0 files selected", "· 0 B")
+    _check(window, 1, 3)
+    assert _bar(window) == ("2 files selected", "· 19 B")
+    assert page.restore_button.property("role") == "primary"
+    assert page.purge_button.property("role") == "danger"
+    for part in (page.chosen, page.restore_button, page.permanent, page.purge_button):
+        assert page.bar.isAncestorOf(part)
 
 
 def test_the_list_is_read_again_each_time_the_page_opens(
@@ -142,14 +210,17 @@ def test_without_a_reliable_open_file_check_the_page_says_so(
 def test_the_page_in_russian(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
 ) -> None:
-    # [0014.22]
+    # [0014.22] [0014.51]
     window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
-    _moved(qtbot, window)
     _opened(qtbot, window)
     page = window.quarantine
+    assert page.empty.text() == "Карантин пуст."
+    _moved(qtbot, window)
+    _refreshed(qtbot, window)
     header = page.items.headerItem()
-    assert [header.text(column) for column in range(3)] == ["№", "Исходный путь", "Размер"]
+    assert [header.text(column) for column in range(3)] == ["Имя", "Размер", "№"]
     assert page.total.text() == "Сейчас в карантине: 3 файла, 27 Б"
+    assert _bar(window) == ("Выбрано: 0 файлов", "· 0 Б")
     assert [b.text() for b in (page.refresh_button, page.restore_button, page.purge_button)] == [
         "Обновить",
         "Восстановить",
