@@ -31,7 +31,6 @@ from PySide6.QtWidgets import (
 
 from safeclean.analysis.report import AnalysisReport, Finding
 from safeclean.analysis.score import Evidence, Level
-from safeclean.core.preflight import Refused
 from safeclean.quarantine.service import QuarantineResult
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
@@ -207,10 +206,7 @@ class FindingsPage(QWidget):
             text("detail.modified", moment=moment),
             text("detail.level", level=translator.label(finding.level)),
         ]
-        lines += [
-            text("detail.reason", reason=translator.label(reason.evidence), detail=reason.detail)
-            for reason in finding.reasons
-        ]
+        lines += [translator.reason(reason.evidence, reason.detail) for reason in finding.reasons]
         if finding.keeps is not None:
             lines.append(text("detail.kept"))
         return lines
@@ -309,19 +305,16 @@ class FindingsPage(QWidget):
         if result.error:
             lines.append(translator.text("move.stopped", error=result.error))
         lines += [
-            translator.text("move.refused", path=refused.path, reason=self._why(refused))
+            translator.text(
+                "move.refused",
+                path=refused.path,
+                reason=translator.reason(refused.reason, refused.detail),
+            )
             for refused in result.refused
         ]
         self.result.setText("\n".join(lines))
         self._remove(gone)
         self._refresh()
-
-    def _why(self, refused: Refused) -> str:
-        translator = self._window.translator
-        reason = translator.label(refused.reason)
-        if refused.detail:
-            return translator.text("detail.reason", reason=reason, detail=refused.detail)
-        return reason
 
     def _remove(self, gone: set[str]) -> None:
         """What moved leaves the list, and a group left empty with it."""

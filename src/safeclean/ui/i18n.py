@@ -120,6 +120,11 @@ class Translator:
     def label(self, value: StrEnum) -> str:
         return LABELS[type(value)][value.value][self.language]
 
+    def reason(self, value: StrEnum, detail: str = "") -> str:
+        """A value's label, and its detail, as it is, when there is one."""
+        label = self.label(value)
+        return self.text("detail.reason", reason=label, detail=detail) if detail else label
+
     def size(self, n: int) -> str:
         """Bytes as such, larger sizes in binary multiples with one decimal, as the CLI writes
         them in English."""

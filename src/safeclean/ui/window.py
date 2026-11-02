@@ -30,6 +30,7 @@ from safeclean.ui.dialogs import Dialogs, choose_folder, confirm
 from safeclean.ui.findings import FindingsPage
 from safeclean.ui.i18n import Translator
 from safeclean.ui.overview import OverviewPage
+from safeclean.ui.quarantine import QuarantinePage
 from safeclean.ui.tasks import Task, Tasks
 from safeclean.ui.theme import Look
 
@@ -76,7 +77,12 @@ class Window(QMainWindow):
 
         self.overview = OverviewPage(self)
         self.findings = FindingsPage(self)
-        made: dict[str, QWidget] = {"overview": self.overview, "findings": self.findings}
+        self.quarantine = QuarantinePage(self)
+        made: dict[str, QWidget] = {
+            "overview": self.overview,
+            "findings": self.findings,
+            "quarantine": self.quarantine,
+        }
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
         self.pages = QStackedWidget()
@@ -87,6 +93,7 @@ class Window(QMainWindow):
             self._pages.append(made.get(name) or _placeholder(title))
             self.pages.addWidget(self._pages[-1])
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
+        self.sidebar.currentRowChanged.connect(self._opened)
         self.sidebar.setCurrentRow(0)
 
         self.message = QLabel()
@@ -112,6 +119,11 @@ class Window(QMainWindow):
 
     def show_page(self, name: str) -> None:
         self.sidebar.setCurrentRow(PAGES.index(name))
+
+    def _opened(self, row: int) -> None:
+        """The Quarantine page reads its list each time it opens."""
+        if PAGES[row] == "quarantine":
+            self.quarantine.load()
 
     def add_starter(self, control: QWidget, when: Callable[[], bool] = _always) -> None:
         """``control`` starts a task: enabled only while none runs and ``when()`` holds."""
