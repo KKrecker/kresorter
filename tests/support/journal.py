@@ -21,3 +21,16 @@ def query(data_dir: Path, sql: str, *params: object) -> list[Row]:
         return rows(conn, sql, *params)
     finally:
         conn.close()
+
+
+def pending_move_batch(data_dir: Path) -> None:
+    """An organize batch a crash left pending: unfinished work of another domain."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    conn = connect(data_dir / "journal.db")
+    try:
+        conn.execute(
+            "INSERT INTO move_batches (kind, folder, state, created_at_ns)"
+            " VALUES ('organize', '/home/a/Downloads', 'pending', 1)"
+        )
+    finally:
+        conn.close()

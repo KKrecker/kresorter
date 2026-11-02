@@ -27,7 +27,9 @@ UI = "safeclean.ui"
 QT_ROOTS = frozenset({"PySide6", "shiboken6"})
 QT_ALLOWED = frozenset({"PySide6.QtCore", "PySide6.QtGui", "PySide6.QtWidgets"})
 QT_FORBIDDEN_NAMES = frozenset({"QProcess", "QDesktopServices"})
-QT_STORAGE_NAMES = frozenset({"QSettings", "QFile", "QSaveFile", "QTemporaryFile"})
+# Qt's own file dialog keeps its state in Qt's settings file: the window has a folder dialog of
+# its own.
+QT_STORAGE_NAMES = frozenset({"QSettings", "QFile", "QSaveFile", "QTemporaryFile", "QFileDialog"})
 SETTINGS = "safeclean.ui.settings"  # the one module of the window that touches a file
 REFUSED_URL = {"SAFECLEAN_OLLAMA_URL": "http://192.0.2.1:11434"}  # not loopback: no connection
 

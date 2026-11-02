@@ -19,6 +19,7 @@ from safeclean.organize.undo import UndoReason
 from safeclean.quarantine.service import PurgeRefusal, RestoreRefusal
 from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailure
+from safeclean.text import format_size
 from safeclean.ui.i18n import (
     CATALOG,
     LABELS,
@@ -202,3 +203,22 @@ def test_an_unknown_key_is_an_error() -> None:
     # [0014.28] a key the catalog lacks is a mistake of the window, never shown as a key
     with pytest.raises(KeyError):
         Translator("en").text("no.such.key")
+
+
+@pytest.mark.parametrize(
+    ("n", "english", "russian"),
+    [
+        (0, "0 B", "0 Б"),
+        (8, "8 B", "8 Б"),
+        (1023, "1023 B", "1023 Б"),
+        (1024, "1.0 KiB", "1,0 КиБ"),
+        (1536, "1.5 KiB", "1,5 КиБ"),
+        (10 * 1024**2, "10.0 MiB", "10,0 МиБ"),
+        (3 * 1024**3, "3.0 GiB", "3,0 ГиБ"),
+        (5 * 1024**5, "5120.0 TiB", "5120,0 ТиБ"),
+    ],
+)
+def test_sizes_in_each_language(n: int, english: str, russian: str) -> None:
+    # [0014.28] English as the CLI writes them; Russian with its units and decimal comma.
+    assert Translator("en").size(n) == english == format_size(n)
+    assert Translator("ru").size(n) == russian

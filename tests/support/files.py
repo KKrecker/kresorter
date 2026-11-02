@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 
 
@@ -25,3 +27,13 @@ def snapshot(root: Path) -> list[tuple[str, int, int, bytes]]:
         for p in root.rglob("*")
         if p.is_file()
     )
+
+
+DAY_NS = 86_400 * 1_000_000_000
+
+
+def aged(path: Path, days: int) -> Path:
+    """``path`` last modified ``days`` days ago."""
+    stamp = time.time_ns() - days * DAY_NS
+    os.utime(path, ns=(stamp, stamp))
+    return path
