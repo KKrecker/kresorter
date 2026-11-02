@@ -202,6 +202,38 @@ Scanner core and `safeclean scan` (read-only report).
   and its limits) instead of a factory per parameter; `detect_platform` and `default_context`
   live there, so the CLI and the UI make the same contexts.
 
+### Step 7: done (ui)
+- Decision 0014: an optional desktop window over the services the CLI runs, report first and
+  every action confirmed; every item cited by a test, the meta-test's pending list empty.
+- Refactor first, without behaviour change: the journal session in `storage.session`,
+  `analysis.run`, `autostart.changers` and `quarantine.journal.quarantined`, which the CLI and
+  the window share.
+- The extra `ui` (`PySide6-Essentials`), `safeclean-ui` and `python -m safeclean.ui`
+  (`ui.launch`); without PySide6 one line and exit 3. The core still depends on nothing and no
+  module outside `safeclean.ui` imports Qt; the window imports only `QtCore`, `QtGui` and
+  `QtWidgets`, no CLI module, and reaches the network only through `llm`.
+- `ui.i18n`, `ui.texts`, `ui.labels`: English and Russian, counts in each language's forms, a
+  label for every value shown. `ui.theme`: the tokens, their contrast, light and dark as the
+  system says. `ui.settings`: `settings.json` alone, written only on a change, a broken file
+  not used.
+- `ui.tasks` and `ui.window`: one task at a time in a worker thread; closing waits for what
+  acts. Pages: `ui.overview`, `ui.findings`, `ui.quarantine`, `ui.organize`, `ui.autostart`,
+  `ui.settings_page`; `ui.dialogs` (confirmation, folder), `ui.sessions` (each action in its
+  domain's session, plans made again under the lock), `ui.recovery` (the banner and Recover),
+  `ui.explain` (Explain (local AI) on request), `ui.app`.
+- Tests: `pytest-qt` offscreen with the real worker thread, no live system, and the window and
+  the CLI compared on the same trees. 2493 tests, 100 % line and branch coverage.
+
+### Accepted limitations carried into step 8
+- Everything from steps 2 to 6 still holds.
+- **Window** (decision 0014): a task cannot be cancelled, and a scan that only reads is left
+  behind when the window closes; the folders added on Overview are not remembered; a new
+  language applies the next time the window opens; organize's category directories keep their
+  English names, and the model answers in its own words, in the Russian window too; the
+  machine scope is read only on Windows and only listed, as with `--include-machine`; the
+  window is tested offscreen on Linux only (B11), with no screen reader; there are no
+  screenshots yet (step 8).
+
 ### Left for later
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
 - B11: CI on Windows and macOS and live `WinRegistry` tests, once the repository is published.
@@ -220,7 +252,9 @@ src/safeclean/
 ├── autostart/    # step 4: readers, listing, XDG and HKCU Run changes, recover
 ├── organize/     # step 5: categories, planner, mover, journal, recovery, undo (decision 0012)
 ├── llm/          # step 6: settings, transport, client, prompt, clean, subjects, explain (0013)
-└── ui/           # step 7
+└── ui/           # step 7: launch, app, window, tasks, i18n, texts, labels, theme, settings,
+                  #   dialogs, sessions, overview, findings, quarantine, organize,
+                  #   autostart, recovery, explain, settings_page (0014)
 ```
 
 Directories are created only when their step starts.

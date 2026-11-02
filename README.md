@@ -178,6 +178,56 @@ the whole command, notes or details, and never a file's content.
 0, 1 or 2; `recover` and `organize list` with 0, 2 or 3. For `organize`, files that stay by the
 plan are not refusals.
 
+## Desktop app (optional)
+
+The window is an extra: the console commands need none of it.
+
+```bash
+pip install "safeclean[ui]"   # adds PySide6-Essentials
+safeclean-ui
+python -m safeclean.ui        # the same window
+```
+
+On Linux, Qt needs a few system libraries; on Debian or Ubuntu:
+
+```bash
+sudo apt-get install libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+```
+
+Without PySide6, `safeclean-ui` says which extra to install and exits with 3.
+
+The sidebar opens six pages:
+
+- **Overview**: the folders to scan (the safe zones, and folders you add) and Scan, which only
+  reads; then each level's files and size, the duplicate groups and the skipped paths.
+- **Findings**: grouped by their strongest reason, with level filters and a search, and the
+  detail of each. Only what is proposed at the Safe level is selected at first; a Review
+  finding is selected only by its own check box, the copy a duplicate group keeps never. Move
+  to quarantine moves the selection.
+- **Quarantine**: the quarantined files; Restore, or Delete permanently, the one red button.
+- **Organize**: a folder's plan by category and the files that stay, the move as one batch, the
+  batches and their undo; where `organize` refuses (not Linux, or no reliable open-file check),
+  the page says why.
+- **Autostart**: the entries by source, with their state, scope and location; Disable and Enable
+  for those that can change.
+- **Settings**: the language, on Windows the machine-wide autostart entries (off until you turn
+  them on), a Check of the local AI and the data folder.
+
+Nothing changes until you confirm: every action (quarantine, restore, delete permanently,
+organize, undo, disable, enable, recover) first opens a dialog that shows what it will do, with
+Cancel as its default button. The window runs what the commands run, on the same journal and
+the same lock: what one moved the other can restore or undo, and when the window finds
+interrupted work it offers Recover, as `safeclean recover` does. Explain (local AI), under a
+finding, an autostart entry or a file that stays in place, asks Ollama about that one result
+only when you press it (see [AI explanations](#ai-explanations-optional)).
+
+The window is in English or Russian: the system's language by default (Russian when it is
+Russian, English otherwise), or the one chosen on the Settings page, from the next time it
+opens. It keeps one file, `settings.json` in the data directory (see
+[Recovery](#recovery)), by default `{"language": "system", "include_machine": false}`; it is
+written only when you change a setting, and a broken file is not used, as the Settings page
+says. No finding, path, plan or explanation is kept.
+
 ## Development
 
 ```bash
