@@ -29,6 +29,7 @@ from safeclean.environment import Environment
 from safeclean.ui.dialogs import Dialogs, choose_folder, confirm
 from safeclean.ui.findings import FindingsPage
 from safeclean.ui.i18n import Translator
+from safeclean.ui.organize import OrganizePage
 from safeclean.ui.overview import OverviewPage
 from safeclean.ui.quarantine import QuarantinePage
 from safeclean.ui.tasks import Task, Tasks
@@ -78,10 +79,12 @@ class Window(QMainWindow):
         self.overview = OverviewPage(self)
         self.findings = FindingsPage(self)
         self.quarantine = QuarantinePage(self)
+        self.organize = OrganizePage(self)
         made: dict[str, QWidget] = {
             "overview": self.overview,
             "findings": self.findings,
             "quarantine": self.quarantine,
+            "organize": self.organize,
         }
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
@@ -121,9 +124,11 @@ class Window(QMainWindow):
         self.sidebar.setCurrentRow(PAGES.index(name))
 
     def _opened(self, row: int) -> None:
-        """The Quarantine page reads its list each time it opens."""
-        if PAGES[row] == "quarantine":
-            self.quarantine.load()
+        """The Quarantine and Organize pages read the journal each time they open."""
+        loads = {"quarantine": self.quarantine.load, "organize": self.organize.load}
+        load = loads.get(PAGES[row])
+        if load is not None:
+            load()
 
     def add_starter(self, control: QWidget, when: Callable[[], bool] = _always) -> None:
         """``control`` starts a task: enabled only while none runs and ``when()`` holds."""

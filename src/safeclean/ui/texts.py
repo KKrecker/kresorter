@@ -118,6 +118,100 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Refused: [{item}] {path} ({reason})",
         "ru": "Отказано: [{item}] {path} ({reason})",
     },
+    "organize.blocked": {
+        "en": "Organize does not move files on this system:",
+        "ru": "На этой системе сортировка не перемещает файлы:",
+    },
+    "organize.choose": {"en": "Choose folder…", "ru": "Выбрать папку…"},
+    "organize.plan": {"en": "The plan", "ru": "План"},
+    "organize.would": {
+        "en": "Would move {files}, {size} in {folder}.",
+        "ru": "Папка {folder}: будет перемещено {files}, {size}.",
+    },
+    "organize.nothing": {
+        "en": "Nothing to move in {folder}.",
+        "ru": "Папка {folder}: перемещать нечего.",
+    },
+    "organize.refused": {"en": "Refused: {folder}: {reason}", "ru": "Отказано: {folder}: {reason}"},
+    "organize.category": {"en": "{category}: {files}, {size}", "ru": "{category}: {files}, {size}"},
+    "organize.line": {"en": "{name} → {category}/", "ru": "{name} → {category}/"},
+    "organize.stays": {"en": "Stay in place: {n}", "ru": "Остаются на месте: {n}"},
+    "organize.stay": {"en": "{name} ({reason})", "ru": "{name} ({reason})"},
+    "organize.move": {"en": "Move files", "ru": "Переместить файлы"},
+    "organize.confirm": {
+        "en": "Move {files} ({size}) into category folders in {folder}? Undo moves them back.",
+        "ru": "Разложить {files} ({size}) по папкам категорий внутри {folder}? Их можно"
+        " вернуть кнопкой «Вернуть файлы…».",
+    },
+    "organize.done": {
+        "en": "Moved {files}, {size} in {folder} (batch {batch}).",
+        "ru": "Перемещено: {files}, {size}, папка {folder} (пакет {batch}).",
+    },
+    "organize.nothing_moved": {
+        "en": "Nothing was moved in {folder}.",
+        "ru": "Ничего не перемещено, папка {folder}.",
+    },
+    "organize.stopped": {
+        "en": "Stopped: {error}. Batch {batch}: {state}.",
+        "ru": "Остановлено: {error}. Пакет {batch}: {state}.",
+    },
+    "organize.still": {"en": "Still sorted: {path}", "ru": "Остался разложенным: {path}"},
+    "organize.left": {
+        "en": "Undo batch {batch} moves them back.",
+        "ru": "Возврат пакета {batch} вернёт их на место.",
+    },
+    "organize.changed": {
+        "en": "Changed since the plan: {path}",
+        "ru": "Изменился после плана: {path}",
+    },
+    "organize.undo": {"en": "Undo…", "ru": "Вернуть файлы…"},
+    "batches.title": {"en": "Batches", "ru": "Пакеты"},
+    "batches.id": {"en": "Id", "ru": "№"},
+    "batches.time": {"en": "Time", "ru": "Время"},
+    "batches.kind": {"en": "Kind", "ru": "Вид"},
+    "batches.moved": {"en": "Files moved", "ru": "Перемещено файлов"},
+    "batches.state": {"en": "State", "ru": "Состояние"},
+    "batches.folder": {"en": "Folder", "ru": "Папка"},
+    "batches.undo_of": {"en": "{kind} of batch {batch}", "ru": "{kind} пакета {batch}"},
+    "batches.undone": {"en": "{state}, undone", "ru": "{state}, возвращён"},
+    "batches.partly_undone": {
+        "en": "{state}, partly undone",
+        "ru": "{state}, частично возвращён",
+    },
+    "undo.title": {"en": "Undo batch {batch}", "ru": "Возврат пакета {batch}"},
+    "undo.confirm": {
+        "en": "Move back {files} ({size}) sorted by batch {batch} in {folder}?",
+        "ru": "Вернуть на прежнее место {files} ({size}) из пакета {batch}, папка {folder}?",
+    },
+    "undo.action": {"en": "Move back", "ru": "Вернуть"},
+    "undo.line": {"en": "{source} → {destination}", "ru": "{source} → {destination}"},
+    "undo.refused": {
+        "en": "Refused: batch {batch}: {reason}",
+        "ru": "Отказано: пакет {batch}: {reason}",
+    },
+    "undo.nothing": {
+        "en": "Nothing to move back from batch {batch}.",
+        "ru": "Из пакета {batch} нечего возвращать.",
+    },
+    "undo.nothing_moved": {
+        "en": "Nothing was moved back from batch {batch}.",
+        "ru": "Из пакета {batch} ничего не возвращено.",
+    },
+    "undo.done": {
+        "en": "Moved back {files}, {size} in {folder} (batch {batch}, undoing batch {undoing}).",
+        "ru": "Возвращено: {files}, {size}, папка {folder} (пакет {batch}, возврат пакета"
+        " {undoing}).",
+    },
+    "undo.again": {
+        "en": "Undo batch {batch} again to move back the files still sorted.",
+        "ru": "Повторите возврат пакета {batch}, чтобы вернуть файлы, которые остались"
+        " разложенными.",
+    },
+    "task.batches": {"en": "Reading the batches", "ru": "Чтение пакетов"},
+    "task.plan": {"en": "Planning", "ru": "Подготовка плана"},
+    "task.organize": {"en": "Moving files", "ru": "Перемещение файлов"},
+    "task.plan_undo": {"en": "Planning the undo", "ru": "Подготовка возврата"},
+    "task.undo": {"en": "Moving files back", "ru": "Возврат файлов"},
     "folder.title": {"en": "Choose a folder", "ru": "Выберите папку"},
     "folder.path": {"en": "Folder", "ru": "Папка"},
     "folder.choose": {"en": "Choose", "ru": "Выбрать"},
