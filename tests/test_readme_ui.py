@@ -15,7 +15,7 @@ from support.markdown import blocks, section
 
 ROOT = Path(__file__).resolve().parents[1]
 TITLE = "Desktop app (optional)"
-PAGES = ("overview", "findings", "quarantine", "organize", "autostart", "settings")
+PAGES = ("overview", "findings", "organize", "autostart", "quarantine", "settings")
 ACTIONS = ("quarantine", "restore", "delete", "organize", "undo", "disable", "enable", "recover")
 
 

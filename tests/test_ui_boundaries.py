@@ -4,8 +4,9 @@ No module outside ``safeclean.ui`` imports PySide6 or shiboken6, the package dep
 and the CLI runs every command with Qt made unimportable [0014.1]. From PySide6 the window
 imports only QtCore, QtGui and QtWidgets, never names ``QProcess`` or ``QDesktopServices``, and
 imports no module of the CLI [0014.7]. Only ``safeclean.ui.settings`` opens, reads or writes a
-file, and no module of the window names Qt's own ways to store [0014.35]. The guards read the
-AST of ``src`` (``support.imports``).
+file, besides ``safeclean.ui.icons``, which reads the icons shipped in the package [0014.47],
+and no module of the window names Qt's own ways to store [0014.35]. The guards read the AST of
+``src`` (``support.imports``).
 """
 
 import argparse
@@ -31,6 +32,8 @@ QT_FORBIDDEN_NAMES = frozenset({"QProcess", "QDesktopServices"})
 # its own.
 QT_STORAGE_NAMES = frozenset({"QSettings", "QFile", "QSaveFile", "QTemporaryFile", "QFileDialog"})
 SETTINGS = "safeclean.ui.settings"  # the one module of the window that touches a file
+ICONS = "safeclean.ui.icons"  # reads its icons, shipped in the package, and writes nothing
+SHIPPED_ICON = 'files("safeclean.ui").joinpath("icons", f"{name}.svg").read_text('
 REFUSED_URL = {"SAFECLEAN_OLLAMA_URL": "http://192.0.2.1:11434"}  # not loopback: no connection
 
 
@@ -222,16 +225,25 @@ def test_the_window_names_no_qprocess_and_no_qdesktopservices() -> None:
     assert offenders == []
 
 
+def _reads_a_shipped_icon(module: str, source: str, line: int) -> bool:
+    return module == ICONS and SHIPPED_ICON in source.splitlines()[line - 1]
+
+
 def test_the_window_stores_nothing_but_its_settings() -> None:
-    # [0014.35] No finding, path, plan or explanation is stored: only the settings module
-    # touches a file, and nothing in the window uses Qt's settings or files.
+    # [0014.35] [0014.47] No finding, path, plan or explanation is stored: only the settings
+    # module touches a file, besides the icons read from the package, and nothing in the
+    # window uses Qt's settings or files.
     modules = dict(ui_sources())
-    assert SETTINGS in modules
+    assert {SETTINGS, ICONS} <= set(modules)
+    icons = modules[ICONS].read_text(encoding="utf-8")
+    assert [_reads_a_shipped_icon(ICONS, icons, line) for line in file_uses(icons)] == [True]
+    read = {module: path.read_text(encoding="utf-8") for module, path in modules.items()}
     files = [
         f"{module}:{line}"
-        for module, path in modules.items()
+        for module, source in read.items()
         if module != SETTINGS
-        for line in file_uses(path.read_text(encoding="utf-8"))
+        for line in file_uses(source)
+        if not _reads_a_shipped_icon(module, source, line)
     ]
     stores = [
         f"{module}:{line} {name}"

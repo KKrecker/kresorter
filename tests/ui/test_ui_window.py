@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QPushButton, QWidget
 from pytestqt.qtbot import QtBot
 
 from safeclean.ui.i18n import Language, Translator
+from safeclean.ui.sidebar import NAV_ROW
 from safeclean.ui.tasks import Task
 from safeclean.ui.window import PAGES, Window
 from support.window import environment, unnamed, wait_idle
@@ -35,7 +36,7 @@ def _nothing(result: object) -> None:
 
 
 def _shown(window: Window) -> list[str]:
-    return [window.sidebar.item(row).text() for row in range(window.sidebar.count())]
+    return [window.sidebar.text(row) for row in range(window.sidebar.count())]
 
 
 # --- navigation [0014.18] ------------------------------------------------------------------------
@@ -44,52 +45,56 @@ def _shown(window: Window) -> list[str]:
 @pytest.mark.parametrize(
     ("language", "names"),
     [
-        ("en", ["Overview", "Findings", "Quarantine", "Organize", "Autostart", "Settings"]),
-        ("ru", ["Обзор", "Находки", "Карантин", "Сортировка", "Автозагрузка", "Настройки"]),
+        ("en", ["Overview", "Findings", "Organize", "Autostart", "Quarantine", "Settings"]),
+        ("ru", ["Обзор", "Находки", "Сортировка", "Автозагрузка", "Карантин", "Настройки"]),
     ],
 )
-def test_the_sidebar_opens_the_six_pages_in_order(
+def test_the_sidebar_opens_the_six_pages_in_order_and_settings_apart(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, language: Language, names: list[str]
 ) -> None:
     # [0014.18]
     window = _make(qtbot, tmp_path, zone, data_dir, language)
-    assert PAGES == ("overview", "findings", "quarantine", "organize", "autostart", "settings")
+    assert PAGES == ("overview", "findings", "organize", "autostart", "quarantine", "settings")
     assert window.sidebar.objectName() == "sidebar"
     assert _shown(window) == names
+    top, bottom = window.sidebar.lists
+    assert [top.item(row).text() for row in range(top.count())] == names[:-1]
+    assert [bottom.item(row).text() for row in range(bottom.count())] == names[-1:]
+    assert bottom.geometry().top() > top.geometry().bottom() + 2 * NAV_ROW  # at the bottom
     assert window.pages.count() == len(PAGES)
     assert [window.page(name) for name in PAGES] == [
         window.pages.widget(index) for index in range(len(PAGES))
     ]
 
 
-def _marked(window: Window) -> list[int]:
-    return [row for row in range(window.sidebar.count()) if window.sidebar.item(row).isSelected()]
-
-
 def test_the_current_page_is_marked(window: Window) -> None:
     # [0014.18]
     assert window.pages.currentIndex() == 0
-    assert _marked(window) == [0]
+    assert window.sidebar.marked() == [0]
     window.show_page("quarantine")
     assert window.pages.currentWidget() is window.page("quarantine")
-    assert window.sidebar.currentRow() == 2
-    assert _marked(window) == [2]
-    window.sidebar.setCurrentRow(4)
+    assert window.sidebar.currentRow() == 4
+    assert window.sidebar.marked() == [4]
+    window.sidebar.setCurrentRow(3)
     assert window.pages.currentWidget() is window.page("autostart")
-    assert _marked(window) == [4]
+    assert window.sidebar.marked() == [3]
+    window.show_page("settings")
+    assert window.pages.currentWidget() is window.page("settings")
+    assert window.sidebar.marked() == [5]
 
 
 def test_every_page_is_reachable_with_the_keyboard(window: Window) -> None:
     # [0014.18]
-    assert window.sidebar.focusPolicy() & Qt.FocusPolicy.TabFocus
+    sidebar = window.sidebar
+    assert all(listed.focusPolicy() & Qt.FocusPolicy.TabFocus for listed in sidebar.lists)
     reached = [window.pages.currentIndex()]
     for _ in PAGES[1:]:
-        QTest.keyClick(window.sidebar, Qt.Key.Key_Down)
+        QTest.keyClick(sidebar.current_list(), Qt.Key.Key_Down)
         reached.append(window.pages.currentIndex())
     assert reached == list(range(len(PAGES)))
-    QTest.keyClick(window.sidebar, Qt.Key.Key_Home)
+    QTest.keyClick(sidebar.current_list(), Qt.Key.Key_Home)
     assert window.pages.currentIndex() == 0
-    assert _marked(window) == [0]
+    assert sidebar.marked() == [0]
 
 
 def test_buttons_without_a_text_or_an_accessible_name_are_found(qtbot: QtBot) -> None:

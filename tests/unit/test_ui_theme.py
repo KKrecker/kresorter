@@ -1,4 +1,5 @@
-"""The window's look: the tokens, the contrast, the style sheet (decision 0014, items 32-33)."""
+"""The window's look: the tokens, the contrast, the style sheet (decision 0014, items 32, 33, 46
+and 47)."""
 
 import re
 from pathlib import Path
@@ -169,19 +170,20 @@ def test_the_style_sheet_uses_no_other_colour(palette: Palette) -> None:
 
 
 @pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
-def test_the_accent_marks_the_current_page_the_selection_and_the_focus(palette: Palette) -> None:
-    # [0014.32]
+def test_the_accent_marks_the_selection_and_the_focus(palette: Palette) -> None:
+    # [0014.32] A selected row and a chip that is on are on the accent's tint: the likely safe
+    # badge's background, the likely safe colour being the accent.
     rules = _rules(style_sheet(palette))
-
-    def uses_accent(part: str) -> bool:
-        return any(
-            part in selector and any(palette.accent in value for value in declarations.values())
-            for selector, declarations in rules
-        )
-
-    assert uses_accent("#sidebar::item:selected")
-    assert uses_accent("::item:selected")
-    assert uses_accent(":focus")
+    found = dict(rules)
+    assert palette.levels[Level.LIKELY_SAFE] == palette.accent
+    assert palette.selection == palette.badges[Level.LIKELY_SAFE].background
+    assert found["QAbstractItemView"]["selection-background-color"] == palette.selection
+    chip = found['QPushButton[role="chip"]:checked']
+    assert chip["background-color"] == palette.selection
+    assert chip["border"] == f"1px solid {palette.accent}"
+    focus = [d for s, d in rules if ":focus" in s and "link" not in s and "nav" not in s]
+    assert focus
+    assert all(d["border"] == f"1px solid {palette.accent}" for d in focus)
     primary = [d for s, d in rules if s == 'QPushButton[role="primary"]']
     assert primary == [
         {
@@ -190,6 +192,11 @@ def test_the_accent_marks_the_current_page_the_selection_and_the_focus(palette: 
             "border": f"1px solid {palette.accent_text}",
         }
     ]
+
+
+def test_the_dark_selection_is_a_12_percent_tint_of_the_accent() -> None:
+    # [0014.32]
+    assert DARK.selection == tint(DARK.accent, over=DARK.canvas, amount=0.12)
 
 
 @pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
@@ -202,10 +209,55 @@ def test_a_badge_is_its_text_on_its_background_and_a_dot_the_level_colour(
         badge = rules[f'QLabel[badge="{level.value}"]']
         assert badge["color"] == palette.badges[level].text
         assert badge["background-color"] == palette.badges[level].background
-        assert rules[f'QLabel[dot="{level.value}"]'] == {"color": palette.levels[level]}
+        dot = rules[f'QFrame[dot="{level.value}"]']
+        assert dot == {
+            "background-color": palette.levels[level],
+            "border": "none",
+            "border-radius": "4px",
+        }
+    assert rules['QFrame[dot="none"]']["background-color"] == palette.secondary
     danger = rules['QLabel[badge="danger"]']
     assert danger["color"] == palette.danger_badge.text
     assert danger["background-color"] == palette.danger_badge.background
+
+
+@pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
+def test_cards_chips_fields_buttons_links_and_badges(palette: Palette) -> None:
+    # [0014.47] Fields and buttons: 34 px inside a border of 1 px, 36 px in all; a badge 20 px
+    # high, its radius half of it: a pill.
+    rules = dict(_rules(style_sheet(palette)))
+    assert rules['QFrame[role="card"]'] == {
+        "background-color": palette.canvas,
+        "border": f"1px solid {palette.border}",
+        "border-radius": "12px",
+    }
+    assert rules['QFrame[role="card"][tone="surface"]'] == {"background-color": palette.surface}
+    for selector in ("QPushButton", "QLineEdit, QComboBox"):
+        assert rules[selector]["border-radius"] == "8px"
+        assert rules[selector]["border"] == f"1px solid {palette.border}"
+        assert rules[selector]["min-height"] == "34px"
+    assert rules["QPushButton"]["background-color"] == palette.canvas
+    link = rules['QPushButton[role="link"], QPushButton[role="link"]:focus']
+    assert link["color"] == palette.accent_text
+    assert link["border"] == "none"
+    assert link["background-color"] == "transparent"
+    for kind in [level.value for level in Level] + ["danger"]:
+        assert rules[f'QLabel[badge="{kind}"]']["border-radius"] == "10px"
+    header = rules["QHeaderView::section"]
+    assert (header["color"], header["font-size"]) == (palette.secondary, "12px")
+    assert header["border-bottom"] == f"1px solid {palette.border}"
+    views = rules["QAbstractItemView"]
+    assert views["background-color"] == palette.canvas
+    assert rules["QScrollBar::handle:vertical"]["background-color"] == palette.border
+    assert rules["QFrame#sidebar"]["border-right"] == f"1px solid {palette.border}"
+
+
+@pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
+def test_a_title_is_24_px_semibold_and_what_it_does_secondary_text(palette: Palette) -> None:
+    # [0014.46]
+    rules = dict(_rules(style_sheet(palette)))
+    assert rules["QLabel#title"] == {"font-size": "24px", "font-weight": "600"}
+    assert rules["QLabel#subtitle"] == {"color": palette.secondary}
 
 
 @pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])

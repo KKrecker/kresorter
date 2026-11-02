@@ -1,4 +1,5 @@
-"""The system decides light or dark, and a change applies at once (decision 0014, item 34)."""
+"""The system decides light or dark, and a change applies at once (decision 0014, items 34 and
+47)."""
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QWidget
@@ -32,3 +33,18 @@ def test_the_scheme_qt_reports_decides_and_a_change_applies_at_once(
     hints.colorSchemeChanged.emit(Qt.ColorScheme.Light)
     assert look.palette is LIGHT
     assert window.styleSheet() == style_sheet(LIGHT)
+
+
+def test_a_change_of_the_scheme_says_which_palette_applies_now(
+    qtbot: QtBot, qapp: QApplication
+) -> None:
+    # [0014.34] [0014.47] What draws itself (icons, rows) is drawn again in the new palette.
+    window = QWidget()
+    qtbot.addWidget(window)
+    look = Look(window)
+    told: list[object] = []
+    look.changed.connect(told.append)
+    hints = qapp.styleHints()
+    hints.colorSchemeChanged.emit(Qt.ColorScheme.Dark)
+    hints.colorSchemeChanged.emit(Qt.ColorScheme.Light)
+    assert told == [DARK, LIGHT]

@@ -65,6 +65,9 @@ COMPLETED: frozenset[int] = frozenset(
         42,
         43,
         44,
+        45,
+        46,
+        47,
     }
 )
 PENDING: frozenset[int] = frozenset(range(1, 56)) - COMPLETED
