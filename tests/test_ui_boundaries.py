@@ -3,7 +3,9 @@
 No module outside ``safeclean.ui`` imports PySide6 or shiboken6, the package depends on nothing,
 and the CLI runs every command with Qt made unimportable [0014.1]. From PySide6 the window
 imports only QtCore, QtGui and QtWidgets, never names ``QProcess`` or ``QDesktopServices``, and
-imports no module of the CLI [0014.7]. The guards read the AST of ``src`` (``support.imports``).
+imports no module of the CLI [0014.7]. Only ``safeclean.ui.settings`` opens, reads or writes a
+file, and no module of the window names Qt's own ways to store [0014.35]. The guards read the
+AST of ``src`` (``support.imports``).
 """
 
 import argparse
@@ -19,12 +21,14 @@ import pytest
 from safeclean import cli
 from safeclean.environment import Environment
 from support.cli import autostart_context, scan_context
-from support.imports import SRC, imports, sources
+from support.imports import SRC, file_uses, imports, sources
 
 UI = "safeclean.ui"
 QT_ROOTS = frozenset({"PySide6", "shiboken6"})
 QT_ALLOWED = frozenset({"PySide6.QtCore", "PySide6.QtGui", "PySide6.QtWidgets"})
 QT_FORBIDDEN_NAMES = frozenset({"QProcess", "QDesktopServices"})
+QT_STORAGE_NAMES = frozenset({"QSettings", "QFile", "QSaveFile", "QTemporaryFile"})
+SETTINGS = "safeclean.ui.settings"  # the one module of the window that touches a file
 REFUSED_URL = {"SAFECLEAN_OLLAMA_URL": "http://192.0.2.1:11434"}  # not loopback: no connection
 
 
@@ -64,8 +68,11 @@ def qt_allowed(name: str) -> bool:
     return name.split(".")[0] == "shiboken6" or ".".join(name.split(".")[:2]) in QT_ALLOWED
 
 
-def forbidden_names(source: str) -> list[tuple[int, str]]:
-    """Where ``source`` names ``QProcess`` or ``QDesktopServices``, however it reaches them."""
+def forbidden_names(
+    source: str, names: frozenset[str] = QT_FORBIDDEN_NAMES
+) -> list[tuple[int, str]]:
+    """Where ``source`` names one of ``names`` (by default ``QProcess`` or
+    ``QDesktopServices``), however it reaches them."""
     found: list[tuple[int, str]] = []
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Name):
@@ -74,7 +81,7 @@ def forbidden_names(source: str) -> list[tuple[int, str]]:
             found.append((node.lineno, node.attr))
         elif isinstance(node, ast.ImportFrom):
             found += [(node.lineno, alias.name) for alias in node.names]
-    return [(line, name) for line, name in found if name in QT_FORBIDDEN_NAMES]
+    return [(line, name) for line, name in found if name in names]
 
 
 def is_cli(name: str) -> bool:
@@ -145,6 +152,16 @@ def test_qprocess_and_qdesktopservices_are_found(source: str, lines: list[int]) 
     assert [line for line, _ in forbidden_names(source)] == lines
 
 
+def test_qt_s_ways_to_store_are_found() -> None:
+    # [0014.35]
+    source = "from PySide6.QtCore import QSettings\nQtCore.QSaveFile(name)\nQFile\nQProcess\n"
+    assert sorted(forbidden_names(source, QT_STORAGE_NAMES)) == [
+        (1, "QSettings"),
+        (2, "QSaveFile"),
+        (3, "QFile"),
+    ]
+
+
 @pytest.mark.parametrize(
     ("name", "cli_module"),
     [
@@ -201,6 +218,26 @@ def test_the_window_names_no_qprocess_and_no_qdesktopservices() -> None:
         for line, name in forbidden_names(path.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+def test_the_window_stores_nothing_but_its_settings() -> None:
+    # [0014.35] No finding, path, plan or explanation is stored: only the settings module
+    # touches a file, and nothing in the window uses Qt's settings or files.
+    modules = dict(ui_sources())
+    assert SETTINGS in modules
+    files = [
+        f"{module}:{line}"
+        for module, path in modules.items()
+        if module != SETTINGS
+        for line in file_uses(path.read_text(encoding="utf-8"))
+    ]
+    stores = [
+        f"{module}:{line} {name}"
+        for module, path in modules.items()
+        for line, name in forbidden_names(path.read_text(encoding="utf-8"), QT_STORAGE_NAMES)
+    ]
+    assert files == []
+    assert stores == []
 
 
 def test_the_window_imports_no_module_of_the_cli() -> None:

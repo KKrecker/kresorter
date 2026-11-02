@@ -6,11 +6,9 @@ command-line modules, ``safeclean.environment`` and the window import ``llm`` [0
 [0014.7]. ``llm`` opens, reads and writes no file [0013.22].
 """
 
-import ast
-
 import pytest
 
-from support.imports import imports, ours, sources
+from support.imports import file_uses, imports, ours, sources
 
 LLM = "safeclean.llm"
 UI = "safeclean.ui"
@@ -22,8 +20,6 @@ EXPLAINED = frozenset(
         "safeclean.organize.planner",
     }
 )
-FILE_MODULES = frozenset({"tempfile", "sqlite3", "shelve", "pickle"})
-FILE_PREFIXES = ("read_", "write_")  # Path.read_text, Path.write_bytes, ...
 
 
 def _in_llm(name: str) -> bool:
@@ -43,29 +39,6 @@ def may_import_llm(module: str) -> bool:
     front = module.count(".") == 1 and (command_line or last == "environment")
     window = module == UI or module.startswith(f"{UI}.")
     return _in_llm(module) or front or window
-
-
-def _opens(node: ast.Name | ast.Attribute) -> bool:
-    """``open``, or ``.open`` / ``.read_*`` / ``.write_*`` on anything."""
-    if isinstance(node, ast.Name):
-        return node.id == "open"
-    return node.attr == "open" or node.attr.startswith(FILE_PREFIXES)
-
-
-def file_uses(source: str) -> list[int]:
-    """Lines where ``source`` names a way to open, read or write a file."""
-    lines: list[int] = []
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Name | ast.Attribute) and _opens(node):
-            lines.append(node.lineno)
-        elif isinstance(node, ast.Import):
-            names = [alias.name for alias in node.names]
-            lines += [node.lineno for name in names if name.split(".")[0] in FILE_MODULES]
-        elif isinstance(node, ast.ImportFrom):
-            if (node.module or "").split(".")[0] in FILE_MODULES:
-                lines.append(node.lineno)
-            lines += [node.lineno for alias in node.names if alias.name == "open"]
-    return lines
 
 
 # --- the guards on made-up modules ---------------------------------------------------------------

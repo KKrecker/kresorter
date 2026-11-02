@@ -2,7 +2,8 @@
 
 ``from safeclean import text`` is ``safeclean.text``, a relative import is taken from the
 module's package, and a literal name given to ``__import__`` or ``importlib.import_module``
-counts too. Shared by the guards of decisions 0013 and 0014.
+counts too. ``file_uses`` finds the ways a module opens, reads or writes a file. Shared by the
+guards of decisions 0013 and 0014.
 """
 
 from __future__ import annotations
@@ -11,6 +12,8 @@ import ast
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[2] / "src"
+FILE_MODULES = frozenset({"tempfile", "sqlite3", "shelve", "pickle"})
+FILE_PREFIXES = ("read_", "write_")  # Path.read_text, Path.write_bytes, ...
 
 
 def module_name(path: Path) -> str:
@@ -66,3 +69,26 @@ def ours(name: str) -> bool:
 
 def sources() -> list[tuple[str, Path]]:
     return [(module_name(path), path) for path in sorted((SRC / "safeclean").rglob("*.py"))]
+
+
+def _opens(node: ast.Name | ast.Attribute) -> bool:
+    """``open``, or ``.open`` / ``.read_*`` / ``.write_*`` on anything."""
+    if isinstance(node, ast.Name):
+        return node.id == "open"
+    return node.attr == "open" or node.attr.startswith(FILE_PREFIXES)
+
+
+def file_uses(source: str) -> list[int]:
+    """Lines where ``source`` names a way to open, read or write a file."""
+    lines: list[int] = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Name | ast.Attribute) and _opens(node):
+            lines.append(node.lineno)
+        elif isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+            lines += [node.lineno for name in names if name.split(".")[0] in FILE_MODULES]
+        elif isinstance(node, ast.ImportFrom):
+            if (node.module or "").split(".")[0] in FILE_MODULES:
+                lines.append(node.lineno)
+            lines += [node.lineno for alias in node.names if alias.name == "open"]
+    return lines

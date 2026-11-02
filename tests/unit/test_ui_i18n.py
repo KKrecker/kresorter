@@ -32,6 +32,7 @@ from safeclean.ui.i18n import (
     plural_problems,
     russian_form,
 )
+from safeclean.ui.settings import Unused
 
 SHOWN: tuple[type[StrEnum], ...] = (
     Level,
@@ -54,6 +55,7 @@ SHOWN: tuple[type[StrEnum], ...] = (
     Domain,
     Unavailable,
     SessionFailure,
+    Unused,
 )
 
 # --- the rules, on made-up catalogs [0014.28] ----------------------------------------------------
