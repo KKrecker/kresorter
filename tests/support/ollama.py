@@ -126,6 +126,25 @@ def silence(conn: socket.socket, stop: threading.Event) -> None:
     stop.wait(GIVE_UP)
 
 
+def held(gate: threading.Event, then: Answer) -> Answer:
+    """``then``, once the test sets ``gate``: the answer comes when the test says."""
+
+    def answer(conn: socket.socket, stop: threading.Event) -> None:
+        if gate.wait(GIVE_UP):
+            then(conn, stop)
+
+    return answer
+
+
+def generated(text: str) -> Answer:
+    """What ``generate`` answers: ``text``, done."""
+    return as_json({"response": text, "done": True})
+
+
+VERSION = as_json({"version": "0.6.2"})
+TAGS = as_json({"models": [{"name": "llama3.2:latest"}]})
+
+
 class ScriptedOllama:
     def __init__(self, *script: Answer, host: str = "127.0.0.1") -> None:
         self._script = list(script) or [as_json({"version": "0.6.2"})]

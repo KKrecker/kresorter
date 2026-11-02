@@ -4,7 +4,8 @@ answers, and the buttons that have neither a text nor an accessible name (decisi
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+import json
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from PySide6.QtWidgets import QAbstractButton, QWidget
@@ -14,6 +15,7 @@ from safeclean.autostart.registry import UserRegistry
 from safeclean.core.heuristics import Platform
 from safeclean.core.open_files import OpenFileChecker
 from safeclean.environment import Environment
+from safeclean.llm.transport import LIMITS, Limits
 from safeclean.ui.dialogs import Confirmation, Dialogs
 from safeclean.ui.i18n import Language, Translator
 from safeclean.ui.window import Window
@@ -29,15 +31,27 @@ def environment(
     platform: Platform = "linux",
     open_files: OpenFileChecker | None = None,
     registry: UserRegistry | None = None,
+    llm_env: Mapping[str, str] | None = None,
+    llm_limits: Limits = LIMITS,
 ) -> Environment:
     """The window's environment for tmp_path: ``zone`` the one scan zone, ``data_dir`` the data
-    directory, autostart under tmp_path (``registry`` on Windows), no setting of the local
-    AI."""
+    directory, autostart under tmp_path (``registry`` on Windows), the local AI's settings
+    ``llm_env`` (none by default)."""
     return Environment(
         scan_context=lambda: scan_context(tmp_path, zone, data_dir, open_files, platform=platform),
         autostart_context=lambda: autostart_context(platform, tmp_path, registry),
-        llm_env={},
+        llm_env={} if llm_env is None else llm_env,
+        llm_limits=llm_limits,
     )
+
+
+def settled(data_dir: Path, **values: object) -> Path:
+    """``settings.json`` in the data directory, as the window writes it, with ``values``."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.chmod(0o700)
+    path = data_dir / "settings.json"
+    path.write_text(json.dumps({"language": "system", "include_machine": False, **values}))
+    return path
 
 
 def junk_tree(zone: Path) -> dict[str, Path]:
