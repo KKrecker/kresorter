@@ -12,6 +12,49 @@ CATALOG: dict[str, dict[str, str]] = {
     "page.organize": {"en": "Organize", "ru": "Сортировка"},
     "page.autostart": {"en": "Autostart", "ru": "Автозагрузка"},
     "page.settings": {"en": "Settings", "ru": "Настройки"},
+    "head.overview": {
+        "en": "Report first: nothing moves until you confirm, and what moves can be put back.",
+        "ru": "Сначала отчёт: ничего не перемещается без вашего подтверждения, и всё"
+        " перемещённое можно вернуть.",
+    },
+    "head.findings": {
+        "en": "What the last scan found, grouped by its strongest reason.",
+        "ru": "Что нашло последнее сканирование, по главной причине.",
+    },
+    "head.organize": {
+        "en": "The files directly in one folder, sorted by kind; subfolders are never entered"
+        " or moved.",
+        "ru": "Файлы, лежащие прямо в одной папке, по типам; во вложенные папки сортировка не"
+        " заходит и не перемещает их.",
+    },
+    "head.autostart": {
+        "en": "Programs that start when you sign in. Turning one off keeps a record and can be"
+        " undone.",
+        "ru": "Программы, которые запускаются при входе в систему. Отключение записывается, и"
+        " его можно отменить.",
+    },
+    "head.quarantine": {
+        "en": "Files moved here can be put back where they were, or deleted for good.",
+        "ru": "Перемещённые сюда файлы можно вернуть на место или удалить навсегда.",
+    },
+    "head.settings": {
+        "en": "What the window remembers, and the local AI.",
+        "ru": "Что окно запоминает, и локальный ИИ.",
+    },
+    "sidebar.pages": {"en": "Pages", "ru": "Страницы"},
+    "sidebar.open_files": {
+        "en": "Open-file check: reliable",
+        "ru": "Открытые файлы: проверка надёжна",
+    },
+    "sidebar.no_open_files": {
+        "en": "Open-file check: not reliable",
+        "ru": "Открытые файлы: проверка ненадёжна",
+    },
+    "sidebar.ai": {"en": "AI explanations: {model}", "ru": "Объяснения ИИ: {model}"},
+    "sidebar.ai_refused": {
+        "en": "AI explanations: {name} is refused",
+        "ru": "Объяснения ИИ: значение {name} отклонено",
+    },
     "button.cancel": {"en": "Cancel", "ru": "Отмена"},
     "task.running": {"en": "Running: {task}", "ru": "Выполняется: {task}"},
     "task.failed": {"en": "{task} failed: {message}", "ru": "Ошибка ({task}): {message}"},

@@ -23,15 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QWidget
 
 from safeclean.organize.folders import FolderRefused
 from safeclean.organize.journal import Batch, BatchState, Summary
@@ -43,6 +35,7 @@ from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.explain import ExplainPanel
+from safeclean.ui.parts import Head, Note, button, hbox, page, rows, vbox
 from safeclean.ui.recovery import organize_lines
 from safeclean.ui.sessions import (
     Act,
@@ -69,13 +62,6 @@ _STAY = Qt.ItemDataRole.UserRole  # a file that stays keeps its place in the pla
 _COLUMNS = ("id", "time", "kind", "moved", "state", "folder")
 
 
-def _label(text: str = "") -> QLabel:
-    label = QLabel(text)
-    label.setWordWrap(True)
-    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-    return label
-
-
 def _moment(created_at_ns: int) -> str:
     return time.strftime("%Y-%m-%d %H:%M", time.localtime(created_at_ns / 1e9))
 
@@ -92,48 +78,49 @@ class OrganizePage(QWidget):
         found = blockers(context.platform, context.open_files)
         self._blocked = bool(found)
 
-        heading = QLabel(text("page.organize"))
-        heading.setProperty("role", "heading")
+        look = window.look
         why = [translator.label(blocker) for blocker in found]
-        self.blocked = _label("\n".join([text("organize.blocked"), *why]))
+        self.blocked = QLabel("\n".join([text("organize.blocked"), *why]))
+        self.blocked.setWordWrap(True)
         self.blocked.setHidden(not found)
         self.controls = QWidget()
         self.controls.setHidden(self._blocked)
 
-        self.choose_button = QPushButton(text("organize.choose"))
+        self.choose_button = button(look, text("organize.choose"), icon="folder")
         self.choose_button.clicked.connect(self._choose)
-        self.summary = _label()
+        self.summary = Note(self.controls)
         self.plan = QTreeWidget()
+        rows(self.plan, look)
         self.plan.setAccessibleName(text("organize.plan"))
         self.plan.setHeaderHidden(True)
         self.plan.currentItemChanged.connect(self._current)
-        self.detail = _label()
+        self.detail = Note(self.controls)
         self.explain = ExplainPanel(window)
-        self.move_button = QPushButton(text("organize.move"))
-        self.move_button.setProperty("role", "primary")
+        self.move_button = button(look, text("organize.move"), role="primary")
         self.move_button.clicked.connect(self._move)
         self.batches = QTreeWidget()
+        rows(self.batches, look)
         self.batches.setAccessibleName(text("batches.title"))
         self.batches.setRootIsDecorated(False)
         self.batches.setColumnCount(len(_COLUMNS))
         self.batches.setHeaderLabels([text(f"batches.{name}") for name in _COLUMNS])
         self.batches.itemSelectionChanged.connect(window.update_starters)
-        self.undo_button = QPushButton(text("organize.undo"))
+        self.undo_button = button(look, text("organize.undo"), icon="undo-2")
         self.undo_button.clicked.connect(self._undo)
-        self.result = _label()
+        self.result = Note(self.controls)
 
-        choose = QHBoxLayout()
+        choose = hbox(spacing=8)
         choose.addWidget(self.choose_button)
         choose.addStretch(1)
-        move = QHBoxLayout()
+        move = hbox(spacing=8)
         move.addStretch(1)
         move.addWidget(self.move_button)
-        undo = QHBoxLayout()
+        undo = hbox(spacing=8)
         undo.addStretch(1)
         undo.addWidget(self.undo_button)
         batches = QLabel(text("batches.title"))
-        inside = QVBoxLayout(self.controls)
-        inside.setContentsMargins(0, 0, 0, 0)
+        batches.setProperty("role", "strong")
+        inside = vbox(self.controls, spacing=12)
         inside.addLayout(choose)
         inside.addWidget(self.summary)
         inside.addWidget(self.plan, 1)
@@ -144,8 +131,7 @@ class OrganizePage(QWidget):
         inside.addWidget(self.batches, 1)
         inside.addLayout(undo)
         inside.addWidget(self.result)
-        layout = QVBoxLayout(self)
-        layout.addWidget(heading)
+        layout = page(self, Head(text("page.organize"), text("head.organize")))
         layout.addWidget(self.blocked)
         layout.addWidget(self.controls, 1)
         layout.addStretch(0)

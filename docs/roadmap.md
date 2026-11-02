@@ -256,9 +256,10 @@ src/safeclean/
 ├── autostart/    # step 4: readers, listing, XDG and HKCU Run changes, recover
 ├── organize/     # step 5: categories, planner, mover, journal, recovery, undo (decision 0012)
 ├── llm/          # step 6: settings, transport, client, prompt, clean, subjects, explain (0013)
-└── ui/           # step 7: launch, app, window, tasks, i18n, texts, labels, theme, settings,
-                  #   dialogs, sessions, overview, findings, quarantine, organize,
-                  #   autostart, recovery, explain, settings_page (0014)
+└── ui/           # step 7: launch, app, window, sidebar, tasks, i18n, texts, labels, theme,
+                  #   icons (and icons/, Lucide's), parts, settings, dialogs, sessions,
+                  #   overview, findings, organize, autostart, quarantine, recovery, explain,
+                  #   settings_page (0014)
 ```
 
 Directories are created only when their step starts.

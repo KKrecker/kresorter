@@ -13,12 +13,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QWidget
 
 from safeclean.llm.explain import Explanations, explain
 from safeclean.llm.subjects import Result, subjects
 from safeclean.ui.i18n import Translator
+from safeclean.ui.parts import Note, button, hbox, vbox
 from safeclean.ui.tasks import Task
 
 if TYPE_CHECKING:
@@ -42,17 +42,14 @@ class ExplainPanel(QWidget):
         super().__init__()
         self._window = window
         self._result: Result | None = None
-        self.button = QPushButton(window.translator.text("explain.button"))
+        self.button = button(window.look, window.translator.text("explain.button"), icon="sparkles")
         self.button.clicked.connect(self._ask)
-        self.answer = QLabel()
-        self.answer.setWordWrap(True)
-        self.answer.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        button = QHBoxLayout()
-        button.addWidget(self.button)
-        button.addStretch(1)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(button)
+        self.answer = Note(self)
+        line = hbox()
+        line.addWidget(self.button)
+        line.addStretch(1)
+        layout = vbox(self, spacing=8)
+        layout.addLayout(line)
         layout.addWidget(self.answer)
         window.add_starter(self.button, lambda: self._result is not None)
 

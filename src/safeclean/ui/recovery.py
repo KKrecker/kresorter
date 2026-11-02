@@ -15,7 +15,7 @@ from collections.abc import Collection
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton
 
 from safeclean.autostart.journal import ChangeRecovery, ChangeState
 from safeclean.organize import recovery as organize_recovery
@@ -25,6 +25,7 @@ from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.i18n import Translator
+from safeclean.ui.parts import hbox
 from safeclean.ui.sessions import (
     ORDER,
     Recovered,
@@ -116,7 +117,7 @@ class RecoveryBanner(QFrame):
         self.recover_button.clicked.connect(self._recover)
         self.hide_button = QPushButton(text("recover.hide"))
         self.hide_button.clicked.connect(self.hide)
-        layout = QHBoxLayout(self)
+        layout = hbox(self, margins=(16, 12, 16, 12), spacing=8)
         layout.addWidget(self.text, 1)
         layout.addWidget(self.recover_button)
         layout.addWidget(self.hide_button)

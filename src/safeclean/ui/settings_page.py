@@ -16,16 +16,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QLabel, QWidget
 
 from safeclean.llm.client import Status, status
 from safeclean.llm.failure import ExplanationUnavailable, SettingRefused, Unavailable
@@ -38,6 +29,7 @@ from safeclean.llm.settings import (
 )
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.i18n import Translator
+from safeclean.ui.parts import CheckBox, Choice, Head, Note, button, hbox, page
 from safeclean.ui.settings import LANGUAGE_SETTINGS, Loaded, Settings, save
 from safeclean.ui.tasks import Task
 
@@ -47,13 +39,6 @@ if TYPE_CHECKING:
 __all__ = ["SettingsPage", "check_lines"]
 
 _NOT_REACHED = frozenset({Unavailable.UNREACHABLE, Unavailable.TIMEOUT})
-
-
-def _label(text: str = "") -> QLabel:
-    label = QLabel(text)
-    label.setWordWrap(True)
-    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-    return label
 
 
 def check_lines(translator: Translator, found: Status, env: Mapping[str, str]) -> list[str]:
@@ -124,46 +109,43 @@ class SettingsPage(QWidget):
         text = translator.text
         environment = window.environment
 
-        heading = QLabel(text("page.settings"))
-        heading.setProperty("role", "heading")
+        look = window.look
         why = loaded.unused
-        self.unused = _label(
+        self.unused = Note(
+            self,
             ""
             if why is None
-            else text("settings.unused", reason=translator.reason(why, loaded.detail))
+            else text("settings.unused", reason=translator.reason(why, loaded.detail)),
         )
-        self.unused.setHidden(why is None)
         language = QLabel(text("settings.language"))
-        self.language = QComboBox()
+        self.language = Choice(look)
         self.language.setAccessibleName(text("settings.language"))
         for setting in LANGUAGE_SETTINGS:
             self.language.addItem(text(f"settings.{setting}"))
         language.setBuddy(self.language)
-        self.language_note = _label(text("settings.language_note"))
-        self.language_note.setProperty("role", "secondary")
-        self.machine = QCheckBox(text("settings.machine"))
+        self.language_note = Note(self, text("settings.language_note"), role="secondary")
+        self.machine = CheckBox(look, text("settings.machine"))
         self.machine.setHidden(environment.autostart_context().platform != "windows")
         self.machine.clicked.connect(self._machine)
         data_dir = environment.scan_context().policy.app_data_dir
-        self.data_dir = _label(text("settings.data_dir", path=data_dir))
+        self.data_dir = Note(self, text("settings.data_dir", path=data_dir))
         ai = QLabel(text("settings.ai"))
-        self.check_button = QPushButton(text("settings.check"))
+        self.check_button = button(look, text("settings.check"))
         self.check_button.clicked.connect(self._check)
-        self.check = _label()
-        self.result = _label()
+        self.check = Note(self)
+        self.result = Note(self)
         self._show()
         self.language.currentIndexChanged.connect(self._language)
 
-        choose = QHBoxLayout()
+        choose = hbox(spacing=12)
         choose.addWidget(language)
         choose.addWidget(self.language)
         choose.addStretch(1)
-        check = QHBoxLayout()
+        check = hbox(spacing=12)
         check.addWidget(ai)
         check.addStretch(1)
         check.addWidget(self.check_button)
-        layout = QVBoxLayout(self)
-        layout.addWidget(heading)
+        layout = page(self, Head(text("page.settings"), text("head.settings")))
         layout.addWidget(self.unused)
         layout.addLayout(choose)
         layout.addWidget(self.language_note)
@@ -212,7 +194,7 @@ class SettingsPage(QWidget):
             self.result.setText(translator.text("settings.not_saved", reason=reason))
             return
         self._settings = settings
-        self.unused.setHidden(True)
+        self.unused.clear()
         self.result.setText(translator.text("settings.saved"))
 
     def _check(self) -> None:
@@ -225,5 +207,6 @@ class SettingsPage(QWidget):
         def done(found: Status) -> None:
             lines = check_lines(window.translator, found, environment.llm_env)
             self.check.setText("\n".join(lines))
+            window.show_ai(found.failure is None)
 
         window.run(Task(window.translator.text("task.check"), work, done))

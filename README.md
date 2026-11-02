@@ -204,7 +204,6 @@ The sidebar opens six pages:
   detail of each. Only what is proposed at the Safe level is selected at first; a Review
   finding is selected only by its own check box, the copy a duplicate group keeps never. Move
   to quarantine moves the selection.
-- **Quarantine**: the quarantined files; Restore, or Delete permanently, the one red button.
 - **Organize**: a folder's plan by category and the files that stay, the move as one batch, the
   batches and their undo; where `organize` refuses (not Linux, or no reliable open-file check),
   the page says why. The Russian window names the categories in Russian, but the directories
@@ -212,6 +211,7 @@ The sidebar opens six pages:
   moves back what the window sorted, and the window what the command sorted.
 - **Autostart**: the entries by source, with their state, scope and location; Disable and Enable
   for those that can change.
+- **Quarantine**: the quarantined files; Restore, or Delete permanently, the one red button.
 - **Settings**: the language, on Windows the machine-wide autostart entries (off until you turn
   them on), a Check of the local AI and the data folder.
 

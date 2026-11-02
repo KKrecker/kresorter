@@ -16,15 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 
 from safeclean.quarantine.journal import QuarantinedItem
 from safeclean.quarantine.service import (
@@ -38,6 +30,7 @@ from safeclean.quarantine.service import (
 from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.parts import Head, Note, badge, button, hbox, page, rows
 from safeclean.ui.recovery import quarantine_lines
 from safeclean.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine
 from safeclean.ui.tasks import Task
@@ -59,9 +52,9 @@ class QuarantinePage(QWidget):
         self._rows: dict[int, QTreeWidgetItem] = {}
         text = window.translator.text
 
-        heading = QLabel(text("page.quarantine"))
-        heading.setProperty("role", "heading")
+        look = window.look
         self.items = QTreeWidget()
+        rows(self.items, look)
         self.items.setAccessibleName(text("quarantine.items"))
         self.items.setRootIsDecorated(False)
         self.items.setColumnCount(3)
@@ -69,29 +62,23 @@ class QuarantinePage(QWidget):
             [text(f"quarantine.{name}") for name in ("id", "original", "size")]
         )
         self.items.itemChanged.connect(window.update_starters)
-        self.total = QLabel()
-        self.refresh_button = QPushButton(text("quarantine.refresh"))
+        self.total = Note(self, role="secondary")
+        self.refresh_button = button(look, text("quarantine.refresh"), icon="refresh-cw")
         self.refresh_button.clicked.connect(self.load)
-        self.restore_button = QPushButton(text("quarantine.restore"))
-        self.restore_button.setProperty("role", "primary")
+        self.restore_button = button(look, text("quarantine.restore"), role="primary")
         self.restore_button.clicked.connect(self._restore)
-        self.purge_button = QPushButton(text("quarantine.purge"))
-        self.purge_button.setProperty("role", "danger")
+        self.purge_button = button(look, text("quarantine.purge"), role="danger")
         self.purge_button.clicked.connect(self._purge)
-        self.permanent = QLabel(text("quarantine.permanent"))
-        self.permanent.setProperty("badge", "danger")
-        self.result = QLabel()
-        self.result.setWordWrap(True)
-        self.result.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.permanent = badge(text("quarantine.permanent"), "danger")
+        self.result = Note(self)
 
-        buttons = QHBoxLayout()
-        buttons.addWidget(self.refresh_button)
+        buttons = hbox(spacing=8)
         buttons.addStretch(1)
         buttons.addWidget(self.restore_button)
-        buttons.addWidget(self.permanent)
+        buttons.addWidget(self.permanent, 0, Qt.AlignmentFlag.AlignVCenter)
         buttons.addWidget(self.purge_button)
-        layout = QVBoxLayout(self)
-        layout.addWidget(heading)
+        head = Head(text("page.quarantine"), text("head.quarantine"), self.refresh_button)
+        layout = page(self, head)
         layout.addWidget(self.items, 1)
         layout.addWidget(self.total)
         layout.addLayout(buttons)
@@ -156,6 +143,7 @@ class QuarantinePage(QWidget):
         files = translator.count("file", len(listed))
         size = translator.size(sum(item.size for item in listed))
         self.total.setText(translator.text("quarantine.total", files=files, size=size))
+        self._window.sidebar.set_count("quarantine", len(listed))
         self._window.update_starters()
 
     def _refusals(

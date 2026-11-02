@@ -19,15 +19,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QWidget
 
 from safeclean.autostart.journal import ChangeResult, ChangeState
 from safeclean.autostart.listing import AutostartContext, list_autostart
@@ -37,6 +29,7 @@ from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.explain import ExplainPanel
+from safeclean.ui.parts import Head, Note, button, hbox, page, rows
 from safeclean.ui.recovery import autostart_lines
 from safeclean.ui.sessions import (
     Action,
@@ -57,13 +50,6 @@ _INDEX = Qt.ItemDataRole.UserRole  # an entry's place in the listing
 _COLUMNS = ("name", "state", "scope", "location")
 
 
-def _label(text: str = "") -> QLabel:
-    label = QLabel(text)
-    label.setWordWrap(True)
-    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-    return label
-
-
 class AutostartPage(QWidget):
     def __init__(self, window: Window) -> None:
         super().__init__()
@@ -73,34 +59,34 @@ class AutostartPage(QWidget):
         self._windows = window.environment.autostart_context().platform == "windows"
         text = window.translator.text
 
-        heading = QLabel(text("page.autostart"))
-        heading.setProperty("role", "heading")
+        look = window.look
         self.entries = QTreeWidget()
+        rows(self.entries, look)
         self.entries.setAccessibleName(text("autostart.entries"))
         self.entries.setColumnCount(len(_COLUMNS))
         self.entries.setHeaderLabels([text(f"autostart.{name}") for name in _COLUMNS])
         self.entries.itemSelectionChanged.connect(self._selected)
-        self.total = QLabel()
-        self.machine = _label(text("autostart.machine"))
+        self.total = Note(self, role="secondary")
+        self.machine = QLabel(text("autostart.machine"))
+        self.machine.setWordWrap(True)
         self.machine.setHidden(True)
-        self.skipped = _label()
-        self.detail = _label()
+        self.skipped = Note(self, role="secondary")
+        self.detail = Note(self)
         self.explain = ExplainPanel(window)
-        self.refresh_button = QPushButton(text("autostart.refresh"))
+        self.refresh_button = button(look, text("autostart.refresh"), icon="refresh-cw")
         self.refresh_button.clicked.connect(self.load)
-        self.disable_button = QPushButton(text("autostart.disable"))
+        self.disable_button = button(look, text("autostart.disable"))
         self.disable_button.clicked.connect(lambda: self._confirm("disable"))
-        self.enable_button = QPushButton(text("autostart.enable"))
+        self.enable_button = button(look, text("autostart.enable"))
         self.enable_button.clicked.connect(lambda: self._confirm("enable"))
-        self.result = _label()
+        self.result = Note(self)
 
-        buttons = QHBoxLayout()
-        buttons.addWidget(self.refresh_button)
+        buttons = hbox(spacing=8)
         buttons.addStretch(1)
         buttons.addWidget(self.disable_button)
         buttons.addWidget(self.enable_button)
-        layout = QVBoxLayout(self)
-        layout.addWidget(heading)
+        head = Head(text("page.autostart"), text("head.autostart"), self.refresh_button)
+        layout = page(self, head)
         layout.addWidget(self.entries, 1)
         layout.addWidget(self.total)
         layout.addWidget(self.machine)

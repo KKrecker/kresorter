@@ -1,8 +1,10 @@
 """The window: a sidebar of six pages, the task that runs, closing, unfinished work (decision
-0014, items 16-18 and 25).
+0014, items 16-18, 25 and 45).
 
-The sidebar opens Overview, Findings, Quarantine, Organize, Autostart and Settings, in that order,
-the current page marked and every page reachable with the keyboard. Every control that starts a
+The sidebar (``ui.sidebar``) opens Overview, Findings, Organize, Autostart and Quarantine, in
+that order, and Settings apart at its bottom, the current page marked and every page reachable
+with the keyboard; its status lines say whether the open-file check is reliable and which model
+the local AI uses. Every control that starts a
 task is registered with ``add_starter``: it is disabled while a task runs, and otherwise enabled
 when its page's own condition holds. The window says what runs, shows a task's error with its
 message, and refuses to close while a task that acts runs; it closes once that task has ended.
@@ -19,17 +21,11 @@ from pathlib import Path
 from typing import TypeVar
 
 from PySide6.QtGui import QCloseEvent
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QMainWindow,
-    QStackedWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QMainWindow, QStackedWidget, QWidget
 
 from safeclean.environment import Environment
+from safeclean.llm.failure import SettingRefused
+from safeclean.llm.settings import model_from
 from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.autostart import AutostartPage
@@ -38,17 +34,19 @@ from safeclean.ui.findings import FindingsPage
 from safeclean.ui.i18n import Translator
 from safeclean.ui.organize import OrganizePage
 from safeclean.ui.overview import OverviewPage
+from safeclean.ui.parts import Note, hbox, vbox
 from safeclean.ui.quarantine import QuarantinePage
 from safeclean.ui.recovery import RecoveryBanner
 from safeclean.ui.sessions import NoReliableCheck, Unclosed, Unfinished, problem
 from safeclean.ui.settings import Loaded, load
 from safeclean.ui.settings_page import SettingsPage
+from safeclean.ui.sidebar import Sidebar
 from safeclean.ui.tasks import Task, Tasks
 from safeclean.ui.theme import Look
 
 __all__ = ["PAGES", "Window"]
 
-PAGES = ("overview", "findings", "quarantine", "organize", "autostart", "settings")
+PAGES = ("overview", "findings", "organize", "autostart", "quarantine", "settings")
 
 T = TypeVar("T")
 
@@ -81,7 +79,9 @@ class Window(QMainWindow):
         self.tasks = Tasks(self)
         self.tasks.busy.connect(self._busy)
         self.tasks.failed.connect(self._failed)
+        self.look = Look(self)
 
+        self.sidebar = Sidebar(translator, self.look, PAGES[:-1], PAGES[-1:])
         self.recovery = RecoveryBanner(self)
         self.settings = SettingsPage(self, loaded or load(environment.scan_context()))
         self.overview = OverviewPage(self)
@@ -92,43 +92,57 @@ class Window(QMainWindow):
         made: dict[str, QWidget] = {
             "overview": self.overview,
             "findings": self.findings,
-            "quarantine": self.quarantine,
             "organize": self.organize,
             "autostart": self.autostart,
+            "quarantine": self.quarantine,
             "settings": self.settings,
         }
-        self.sidebar = QListWidget()
-        self.sidebar.setObjectName("sidebar")
         self.pages = QStackedWidget()
+        stack = self.pages.layout()
+        assert stack is not None
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setSpacing(0)
         self._pages: list[QWidget] = []
         for name in PAGES:
-            title = translator.text(f"page.{name}")
-            self.sidebar.addItem(title)
             self._pages.append(made[name])
             self.pages.addWidget(self._pages[-1])
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.sidebar.currentRowChanged.connect(self._opened)
         self.sidebar.setCurrentRow(0)
+        self._show_status()
 
-        self.message = QLabel()
+        central = QWidget()
+        self.message = Note(central)
         self.message.setObjectName("message")
-        self.message.setWordWrap(True)
-        self.status = QLabel()
+        self.status = Note(central, role="secondary")
         self.status.setObjectName("task-status")
-        self.status.setProperty("role", "secondary")
-
-        right = QVBoxLayout()
+        right = vbox()
         right.addWidget(self.recovery)
         right.addWidget(self.pages, 1)
         right.addWidget(self.message)
         right.addWidget(self.status)
-        central = QWidget()
-        layout = QHBoxLayout(central)
+        layout = hbox(central)
         layout.addWidget(self.sidebar)
         layout.addLayout(right, 1)
         self.setCentralWidget(central)
-        Look(self)
         self.recovery.look()
+
+    def _show_status(self) -> None:
+        """The sidebar's status lines: the open-file check, and the local AI's model."""
+        text = self.translator.text
+        reliable = self.environment.scan_context().open_files_checked
+        key = "sidebar.open_files" if reliable else "sidebar.no_open_files"
+        self.sidebar.show_open_files(text(key), reliable=reliable)
+        self.show_ai(None)
+
+    def show_ai(self, checked: bool | None) -> None:
+        """The local AI's line: its model; ``checked`` as the Settings page last found it."""
+        text = self.translator.text
+        try:
+            line = text("sidebar.ai", model=model_from(self.environment.llm_env))
+        except SettingRefused as refused:
+            line = text("sidebar.ai_refused", name=refused.name)
+        self.sidebar.show_ai(line, checked=checked)
 
     def page(self, name: str) -> QWidget:
         return self._pages[PAGES.index(name)]

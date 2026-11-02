@@ -14,14 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QListWidget, QWidget
 
 from safeclean.analysis.report import AnalysisReport
 from safeclean.analysis.run import analyze_paths
@@ -29,6 +23,7 @@ from safeclean.analysis.score import Level
 from safeclean.analysis.size_age import Thresholds
 from safeclean.core.scanner import ScanReport
 from safeclean.environment import Environment
+from safeclean.ui.parts import Head, Note, badge, button, hbox, page, rows, vbox
 from safeclean.ui.tasks import Task
 
 if TYPE_CHECKING:
@@ -53,13 +48,6 @@ def scan(environment: Environment, roots: list[Path]) -> Scanned:
     return Scanned(report, analysis, context.open_files_checked)
 
 
-def _label(role: str = "") -> QLabel:
-    label = QLabel()
-    label.setWordWrap(True)
-    label.setProperty("role", role)
-    return label
-
-
 class OverviewPage(QWidget):
     def __init__(self, window: Window) -> None:
         super().__init__()
@@ -70,47 +58,43 @@ class OverviewPage(QWidget):
         ]
         self._added: list[Path] = []
 
-        heading = QLabel(text("page.overview"))
-        heading.setProperty("role", "heading")
+        look = window.look
         self.folders = QListWidget()
+        rows(self.folders, look)
         self.folders.setAccessibleName(text("overview.folders"))
         self.folders.addItems([str(zone) for zone in self._zones])
         self.folders.currentRowChanged.connect(self._current)
-        self.add_button = QPushButton(text("overview.add"))
+        self.add_button = button(look, text("overview.add"), icon="plus")
         self.add_button.clicked.connect(self._add)
-        self.remove_button = QPushButton(text("overview.remove"))
+        self.remove_button = button(look, text("overview.remove"), icon="x")
         self.remove_button.setEnabled(False)
         self.remove_button.clicked.connect(self._remove)
-        self.scan_button = QPushButton(text("overview.scan"))
-        self.scan_button.setProperty("role", "primary")
+        self.scan_button = button(look, text("overview.scan"), role="primary", icon="refresh-cw")
         self.scan_button.clicked.connect(self._scan)
         window.add_starter(self.scan_button)
 
-        self.state = _label("secondary")
-        self.state.setText(text("overview.none"))
+        self.state = Note(self, text("overview.none"), role="secondary")
         self.summary = QWidget()
-        self.levels = {level: _label() for level in Level}
-        self.duplicates = _label()
-        self.skipped = _label()
-        lines = QVBoxLayout(self.summary)
-        lines.setContentsMargins(0, 0, 0, 0)
-        for level, label in self.levels.items():
-            label.setProperty("badge", level.value)
-            lines.addWidget(label)
+        self.levels = {level: badge("", level.value) for level in Level}
+        self.duplicates = Note(self.summary)
+        self.skipped = Note(self.summary)
+        lines = vbox(self.summary, spacing=8)
+        for label in self.levels.values():
+            lines.addWidget(label, 0, Qt.AlignmentFlag.AlignLeft)
         lines.addWidget(self.duplicates)
         lines.addWidget(self.skipped)
         self.summary.hide()
-        self.unreliable = _label("accent")
-        self.unreliable.setText(text("overview.unreliable"))
+        self.unreliable = QLabel(text("overview.unreliable"))
+        self.unreliable.setWordWrap(True)
+        self.unreliable.setProperty("role", "accent")
         self.unreliable.hide()
 
-        buttons = QHBoxLayout()
+        buttons = hbox(spacing=8)
         buttons.addWidget(self.add_button)
         buttons.addWidget(self.remove_button)
         buttons.addStretch(1)
         buttons.addWidget(self.scan_button)
-        layout = QVBoxLayout(self)
-        layout.addWidget(heading)
+        layout = page(self, Head(text("page.overview"), text("head.overview")))
         layout.addWidget(self.folders, 1)
         layout.addLayout(buttons)
         layout.addWidget(self.state)

@@ -18,17 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QLabel, QLineEdit, QTreeWidget, QTreeWidgetItem, QWidget
 
 from safeclean.analysis.report import AnalysisReport, Finding
 from safeclean.analysis.score import Evidence, Level
@@ -37,6 +27,7 @@ from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.explain import ExplainPanel
+from safeclean.ui.parts import CheckBox, Head, Note, button, hbox, page, rows
 from safeclean.ui.recovery import quarantine_lines
 from safeclean.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine
 from safeclean.ui.tasks import Task
@@ -68,9 +59,8 @@ class FindingsPage(QWidget):
         translator = window.translator
         text = translator.text
 
-        heading = QLabel(text("page.findings"))
-        heading.setProperty("role", "heading")
-        self.filters = {level: QCheckBox(translator.label(level)) for level in Level}
+        look = window.look
+        self.filters = {level: CheckBox(look, translator.label(level)) for level in Level}
         for box in self.filters.values():
             box.setChecked(True)
             box.toggled.connect(self._filter)
@@ -79,44 +69,39 @@ class FindingsPage(QWidget):
         self.search.setAccessibleName(text("findings.search"))
         self.search.textChanged.connect(self._filter)
         self.tree = QTreeWidget()
+        rows(self.tree, look)
         self.tree.setAccessibleName(text("findings.tree"))
         self.tree.setColumnCount(3)
         self.tree.setHeaderLabels([text(f"findings.{name}") for name in ("path", "level", "size")])
         self.tree.itemChanged.connect(self._changed)
         self.tree.currentItemChanged.connect(self._current)
-        self.detail = QLabel()
-        self.detail.setWordWrap(True)
-        self.detail.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.detail = Note(self)
         self.explain = ExplainPanel(window)
         self.select_buttons = {
-            level: QPushButton(text("findings.select", level=translator.label(level)))
+            level: button(look, text("findings.select", level=translator.label(level)))
             for level in _SELECTABLE
         }
-        for level, button in self.select_buttons.items():
-            button.clicked.connect(lambda _=False, level=level: self._select(level))
-        self.clear_button = QPushButton(text("findings.clear"))
+        for level, chosen in self.select_buttons.items():
+            chosen.clicked.connect(lambda _=False, level=level: self._select(level))
+        self.clear_button = button(look, text("findings.clear"))
         self.clear_button.clicked.connect(self._clear)
         self.bar = QLabel()
-        self.move_button = QPushButton(text("findings.move"))
-        self.move_button.setProperty("role", "primary")
+        self.move_button = button(look, text("findings.move"), role="primary")
         self.move_button.clicked.connect(self._move)
-        self.result = QLabel()
-        self.result.setWordWrap(True)
-        self.result.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.result = Note(self)
 
-        filters = QHBoxLayout()
+        filters = hbox(spacing=16)
         for box in self.filters.values():
             filters.addWidget(box)
         filters.addWidget(self.search, 1)
-        selection = QHBoxLayout()
-        for button in self.select_buttons.values():
-            selection.addWidget(button)
+        selection = hbox(spacing=8)
+        for chosen in self.select_buttons.values():
+            selection.addWidget(chosen)
         selection.addWidget(self.clear_button)
         selection.addStretch(1)
         selection.addWidget(self.bar)
         selection.addWidget(self.move_button)
-        layout = QVBoxLayout(self)
-        layout.addWidget(heading)
+        layout = page(self, Head(text("page.findings"), text("head.findings")))
         layout.addLayout(filters)
         layout.addWidget(self.tree, 1)
         layout.addWidget(self.detail)
@@ -145,6 +130,7 @@ class FindingsPage(QWidget):
         self.result.clear()
         self._filter()
         self._refresh()
+        self._window.sidebar.set_count("findings", len(self._findings))
 
     def _add_group(self, evidence: Evidence, found: list[Finding]) -> None:
         translator = self._window.translator
@@ -336,3 +322,4 @@ class FindingsPage(QWidget):
         for key in gone:
             del self._findings[key]
             del self._items[key]
+        self._window.sidebar.set_count("findings", len(self._findings))

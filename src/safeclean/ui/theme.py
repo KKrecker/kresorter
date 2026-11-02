@@ -1,10 +1,12 @@
-"""The window's look (decision 0014, items 32-34).
+"""The window's look (decision 0014, items 32-34 and 47).
 
 The colours are the tokens of the decision's table, a light and a dark palette; the style sheet
-uses no other colour. ``accent`` marks the current page, the selection and the focus; accented
-text and the primary button use ``accent text``; a level's badge is its text on its background
-and its dot the level's colour; ``danger`` is the purge's alone. ``Look`` follows the colour
-scheme Qt reports, dark or not, and applies a change at once.
+uses no other colour. ``accent`` marks the selection and the focus, and a selected row or a chip
+that is on lies on ``selection``, the likely safe badge's background (the likely safe colour is
+the accent); accented text and the primary button use ``accent text``; a level's badge is its
+text on its background and its dot the level's colour; ``danger`` is the purge's alone. The
+parts of item 47 (cards, chips, fields, buttons, links, badges, lists, dots) have their rules
+here. ``Look`` follows the colour scheme Qt reports, dark or not, and applies a change at once.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QWidget
 
@@ -54,6 +56,11 @@ class Palette:
     danger: str
     danger_text: str
     danger_badge: Badge
+
+    @property
+    def selection(self) -> str:
+        """A selected row's and a chip's that is on: the accent's tint."""
+        return self.badges[Level.LIKELY_SAFE].background
 
     def colours(self) -> frozenset[str]:
         badges = [*self.badges.values(), self.danger_badge]
@@ -156,79 +163,90 @@ def tint(colour: str, *, over: str, amount: float) -> str:
 
 
 def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
+    field = {
+        "background-color": p.canvas,
+        "border": f"1px solid {p.border}",
+        "border-radius": "8px",
+        "padding": "0px 12px",
+        "min-height": "34px",
+    }
     rules: list[tuple[str, dict[str, str]]] = [
         ("QMainWindow, QDialog", {"background-color": p.canvas}),
-        ("QWidget", {"color": p.text}),
+        ("QWidget", {"color": p.text, "font-size": "14px"}),
         (
-            "QListWidget#sidebar",
+            "QFrame#sidebar",
             {
                 "background-color": p.surface,
                 "border": "none",
                 "border-right": f"1px solid {p.border}",
             },
         ),
-        ("QListWidget#sidebar::item", {"padding": "6px 12px", "color": p.text}),
-        (
-            "QListWidget#sidebar::item:selected",
-            {
-                "background-color": p.surface2,
-                "color": p.accent_text,
-                "border-left": f"3px solid {p.accent}",
-            },
-        ),
+        ("QLabel#brand", {"font-size": "16px", "font-weight": "600"}),
+        ("QLabel#title", {"font-size": "24px", "font-weight": "600"}),
+        ("QLabel#subtitle", {"color": p.secondary}),
         ('QLabel[role="secondary"]', {"color": p.secondary}),
         ('QLabel[role="accent"]', {"color": p.accent_text}),
+        ('QLabel[role="strong"]', {"font-weight": "600"}),
+        (
+            'QFrame[role="card"]',
+            {
+                "background-color": p.canvas,
+                "border": f"1px solid {p.border}",
+                "border-radius": "12px",
+            },
+        ),
+        ('QFrame[role="card"][tone="surface"]', {"background-color": p.surface}),
+        ('QFrame[role="divider"]', {"background-color": p.border, "border": "none"}),
         (
             'QFrame[role="banner"]',
             {
                 "background-color": p.surface2,
                 "border": f"1px solid {p.border}",
-                "border-radius": "6px",
+                "border-radius": "8px",
+                "margin": "16px 32px 0px 32px",
             },
         ),
+        ("QLabel#message, QLabel#task-status", {"margin": "0px 32px 8px 32px"}),
         (
             "QAbstractItemView",
             {
                 "background-color": p.canvas,
-                "alternate-background-color": p.surface,
-                "border": f"1px solid {p.border}",
-            },
-        ),
-        (
-            "QAbstractItemView::item:selected",
-            {
-                "background-color": p.surface2,
-                "color": p.text,
-                "border-top": f"1px solid {p.accent}",
-                "border-bottom": f"1px solid {p.accent}",
+                "border": f"1px solid {p.canvas}",
+                "selection-background-color": p.selection,
+                "selection-color": p.text,
+                "outline": "0px",
             },
         ),
         (
             "QHeaderView::section",
             {
-                "background-color": p.surface,
+                "background-color": p.canvas,
                 "color": p.secondary,
                 "border": "none",
                 "border-bottom": f"1px solid {p.border}",
-                "padding": "4px",
+                "padding": "8px 12px",
+                "font-size": "12px",
+                "font-weight": "600",
             },
         ),
+        ("QLineEdit, QComboBox", field),
         (
-            "QLineEdit, QComboBox, QTextBrowser, QPlainTextEdit",
+            "QTextBrowser, QPlainTextEdit",
             {
                 "background-color": p.canvas,
                 "border": f"1px solid {p.border}",
-                "border-radius": "4px",
+                "border-radius": "8px",
             },
         ),
         (
             "QPushButton",
             {
-                "background-color": p.surface2,
+                "background-color": p.canvas,
                 "color": p.text,
                 "border": f"1px solid {p.border}",
-                "border-radius": "4px",
-                "padding": "4px 12px",
+                "border-radius": "8px",
+                "padding": "0px 16px",
+                "min-height": "34px",
             },
         ),
         ("QPushButton:disabled", {"color": p.secondary}),
@@ -248,10 +266,69 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
                 "border": f"1px solid {p.danger}",
             },
         ),
+        ('QPushButton[role="chip"]', {"padding": "0px 12px"}),
+        (
+            'QPushButton[role="chip"]:checked',
+            {
+                "background-color": p.selection,
+                "color": p.accent_text,
+                "border": f"1px solid {p.accent}",
+            },
+        ),
         (
             "QPushButton:focus, QLineEdit:focus, QComboBox:focus, QAbstractItemView:focus",
             {"border": f"1px solid {p.accent}"},
         ),
+        (
+            'QPushButton[role="link"], QPushButton[role="link"]:focus',
+            {
+                "background-color": "transparent",
+                "color": p.accent_text,
+                "border": "none",
+                "padding": "0px",
+                "min-height": "20px",
+                "text-align": "left",
+            },
+        ),
+        ('QPushButton[role="link"]:focus', {"text-decoration": "underline"}),
+        (
+            'QListWidget[role="nav"], QListWidget[role="nav"]:focus',
+            {"background-color": p.surface, "border": "none"},
+        ),
+        ("QComboBox::drop-down", {"border": "none", "width": "24px"}),
+        ('QFrame#sidebar QLabel[role="secondary"]', {"font-size": "13px"}),
+        (
+            "QScrollBar:vertical",
+            {"background-color": p.canvas, "width": "12px", "margin": "0px", "border": "none"},
+        ),
+        (
+            "QScrollBar:horizontal",
+            {"background-color": p.canvas, "height": "12px", "margin": "0px", "border": "none"},
+        ),
+        (
+            "QScrollBar::handle:vertical",
+            {
+                "background-color": p.border,
+                "border-radius": "4px",
+                "margin": "2px",
+                "min-height": "24px",
+            },
+        ),
+        (
+            "QScrollBar::handle:horizontal",
+            {
+                "background-color": p.border,
+                "border-radius": "4px",
+                "margin": "2px",
+                "min-width": "24px",
+            },
+        ),
+        ("QScrollBar::handle:hover", {"background-color": p.secondary}),
+        (
+            "QScrollBar::add-line, QScrollBar::sub-line",
+            {"width": "0px", "height": "0px", "border": "none", "background": "none"},
+        ),
+        ("QScrollBar::add-page, QScrollBar::sub-page", {"background": "none"}),
         (
             "QProgressBar",
             {
@@ -273,7 +350,8 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
     for level in Level:
         badge = p.badges[level]
         rules.append((f'QLabel[badge="{level.value}"]', _badge(badge)))
-        rules.append((f'QLabel[dot="{level.value}"]', {"color": p.levels[level]}))
+        rules.append((f'QFrame[dot="{level.value}"]', _dot(p.levels[level])))
+    rules.append(('QFrame[dot="none"]', _dot(p.secondary)))
     rules.append(('QLabel[badge="danger"]', _badge(p.danger_badge)))
     return rules
 
@@ -282,9 +360,15 @@ def _badge(badge: Badge) -> dict[str, str]:
     return {
         "color": badge.text,
         "background-color": badge.background,
-        "border-radius": "4px",
-        "padding": "1px 6px",
+        "border-radius": "10px",
+        "padding": "0px 8px",
+        "font-size": "12px",
+        "font-weight": "600",
     }
+
+
+def _dot(colour: str) -> dict[str, str]:
+    return {"background-color": colour, "border": "none", "border-radius": "4px"}
 
 
 def style_sheet(palette: Palette) -> str:
@@ -300,7 +384,10 @@ def style_sheet(palette: Palette) -> str:
 
 class Look(QObject):
     """One window's palette: dark when Qt reports a dark colour scheme, light otherwise, and a
-    change of the system's scheme applied at once. It lives as long as its window."""
+    change of the system's scheme applied at once; ``changed`` then says which. It lives as long
+    as its window."""
+
+    changed = Signal(object)
 
     def __init__(self, window: QWidget) -> None:
         super().__init__(window)
@@ -313,3 +400,4 @@ class Look(QObject):
     def _follow(self, scheme: Qt.ColorScheme) -> None:
         self.palette = palette_for(dark=scheme == Qt.ColorScheme.Dark)
         self._window.setStyleSheet(style_sheet(self.palette))
+        self.changed.emit(self.palette)
