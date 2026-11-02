@@ -1,0 +1,35 @@
+"""Scan and analysis of the paths asked for, for the CLI and the window (decision 0014, 12)."""
+
+from pathlib import Path
+
+from safeclean.analysis.run import analyze_paths
+from safeclean.analysis.score import Level
+from safeclean.analysis.size_age import Thresholds
+from safeclean.core.scanner import ScanContext
+from support.files import snapshot, write
+
+
+def test_without_paths_the_safe_zones_are_analyzed(scan: ScanContext, zone: Path) -> None:
+    # [0014.12]
+    write(zone / "proj" / "__pycache__" / "m.cpython-313.pyc", b"bytecode")
+    before = snapshot(zone)
+
+    scanned, analysis = analyze_paths([], scan, Thresholds())
+
+    assert scanned.files_scanned == 1
+    assert [(f.entry.path.name, f.level) for f in analysis.findings] == [
+        ("m.cpython-313.pyc", Level.SAFE)
+    ]
+    assert snapshot(zone) == before
+
+
+def test_the_paths_given_are_analyzed_instead(
+    scan: ScanContext, zone: Path, tmp_path: Path
+) -> None:
+    # [0014.12]
+    write(zone / "a" / "notes.txt", b"hello")
+    write(zone / "b" / "notes.txt", b"other")
+
+    scanned, _ = analyze_paths([str(zone / "b")], scan, Thresholds())
+
+    assert [entry.path for entry in scanned.entries] == [zone / "b" / "notes.txt"]
