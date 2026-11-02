@@ -32,9 +32,9 @@ from safeclean.ui.parts import (
     EMPHASIS,
     QUIET,
     SECONDARY,
+    Field,
     Head,
     Note,
-    SearchField,
     badge,
     bar,
     button,
@@ -200,7 +200,7 @@ class FindingsPage(QWidget):
         for box in self.filters.values():
             box.setChecked(True)
             box.toggled.connect(self._filter)
-        self.search = SearchField(look, text("findings.search"))
+        self.search = Field(look, text("findings.search"), "search")
         self.search.setMinimumWidth(SEARCH_WIDTHS[0])
         self.search.setMaximumWidth(SEARCH_WIDTHS[1])
         self.search.textChanged.connect(self._filter)

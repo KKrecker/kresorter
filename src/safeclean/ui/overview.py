@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent, QMouseEvent
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QSizePolicy, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QWidget
 
 from safeclean.analysis.report import AnalysisReport
 from safeclean.analysis.run import analyze_paths
@@ -42,12 +42,15 @@ from safeclean.ui.parts import (
     hbox,
     link,
     page,
+    shares,
+    surface2_tile,
+    text_ink,
     vbox,
 )
 from safeclean.ui.shown import moment, shown_path
 from safeclean.ui.sidebar import ICONS
 from safeclean.ui.tasks import Task
-from safeclean.ui.theme import Look, Palette
+from safeclean.ui.theme import Look
 
 if TYPE_CHECKING:
     from safeclean.ui.window import Window
@@ -63,14 +66,6 @@ __all__ = [
 
 SERVICES = ("quarantine", "organize", "autostart")
 _OPENS = (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space)
-
-
-def _text(palette: Palette) -> str:
-    return palette.text
-
-
-def _surface2(palette: Palette) -> str:
-    return palette.surface2
 
 
 def _lower(label: str) -> str:
@@ -107,7 +102,7 @@ class FolderChip(QFrame):
         self.setProperty("role", "chip")
         self.setToolTip(str(path))
         self.setFixedHeight(36)
-        self.icon = Icon(look, "folder", _text, size=16)
+        self.icon = Icon(look, "folder", text_ink, size=16)
         self.label = QLabel(shown)
         self.remove: QPushButton | None = None
         layout = hbox(self, margins=(12, 0, 12 if removal is None else 8, 0), spacing=8)
@@ -121,12 +116,6 @@ class FolderChip(QFrame):
             layout.addWidget(self.remove)
 
 
-def _shares(shown: QFrame) -> None:
-    """A card of a row takes its share of the row, whatever it has to say: a long folder wraps
-    or is cut rather than widening its card."""
-    shown.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-
-
 class LevelCard(QFrame):
     """A level after a scan: its dot and label, its size (``amount``), its files and their
     strongest reasons, and the link that opens Findings with this level only."""
@@ -134,7 +123,7 @@ class LevelCard(QFrame):
     def __init__(self, translator: Translator, level: Level) -> None:
         super().__init__()
         self.setProperty("role", "card")
-        _shares(self)
+        shares(self)
         self.dot = dot(level.value)
         self.name = QLabel(translator.label(level))
         self.name.setProperty("role", "strong")
@@ -163,11 +152,11 @@ class ServiceCard(QFrame):
     def __init__(self, look: Look, name: str, icon: str) -> None:
         super().__init__()
         self.setProperty("role", "card")
-        _shares(self)
+        shares(self)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAccessibleName(name)
-        self.icon = Icon(look, icon, _text, size=18, tile=_surface2, side=32)
+        self.icon = Icon(look, icon, text_ink, size=18, tile=surface2_tile, side=32)
         self.name = QLabel(name)
         self.name.setProperty("role", "caption")
         self.main = QLabel()

@@ -13,6 +13,7 @@ palette, read from its ``Look`` when a part is drawn.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 
 from PySide6.QtCore import (
@@ -29,6 +30,7 @@ from PySide6.QtGui import (
     QColor,
     QFont,
     QFontMetrics,
+    QFontMetricsF,
     QIcon,
     QMouseEvent,
     QPainter,
@@ -44,6 +46,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSizePolicy,
     QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
@@ -68,11 +71,11 @@ __all__ = [
     "SECONDARY",
     "CheckBox",
     "Choice",
+    "Field",
     "Head",
     "Icon",
     "Note",
     "RowDelegate",
-    "SearchField",
     "badge",
     "badge_colours",
     "bar",
@@ -88,6 +91,9 @@ __all__ = [
     "page",
     "paint_check",
     "rows",
+    "shares",
+    "surface2_tile",
+    "text_ink",
     "vbox",
 ]
 
@@ -190,6 +196,22 @@ def card(*, surface: bool = False) -> tuple[QFrame, QVBoxLayout]:
     return frame, vbox(frame, margins=(24, 24, 24, 24), spacing=8)
 
 
+def shares(widget: QWidget) -> None:
+    """A card of a row takes its share of the row, whatever it has to say: a long text wraps
+    or is cut rather than widening its card."""
+    widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+
+
+def text_ink(palette: Palette) -> str:
+    """An icon in the text's colour."""
+    return palette.text
+
+
+def surface2_tile(palette: Palette) -> str:
+    """An icon's tile, on surface 2."""
+    return palette.surface2
+
+
 def bar() -> tuple[QFrame, QHBoxLayout]:
     """The bar at a page's bottom, across its width with a border above it, and its layout."""
     frame = QFrame()
@@ -276,22 +298,23 @@ def link(text: str) -> QPushButton:
     return made
 
 
-class SearchField(QLineEdit):
-    """A field to search in, named by its placeholder, the search icon at its left (``glass``)
-    in secondary text; the icon's button is named as the field is."""
+class Field(QLineEdit):
+    """A field named ``name``, its placeholder unless it is given one, its icon at its left
+    (``mark``) in secondary text; the icon's button is named as the field is."""
 
-    def __init__(self, look: Look, text: str) -> None:
+    def __init__(self, look: Look, name: str, icon: str, *, placeholder: str = "") -> None:
         super().__init__()
-        self.setPlaceholderText(text)
-        self.setAccessibleName(text)
-        self.glass = self.addAction(QIcon(), QLineEdit.ActionPosition.LeadingPosition)
-        self.glass.setText(text)
+        self._icon = icon
+        self.setPlaceholderText(placeholder or name)
+        self.setAccessibleName(name)
+        self.mark = self.addAction(QIcon(), QLineEdit.ActionPosition.LeadingPosition)
+        self.mark.setText(name)
         look.changed.connect(self._draw)
         self._draw(look.palette)
 
     def _draw(self, palette: Palette) -> None:
-        drawn = icons.pixmap("search", palette.secondary, 16, self.devicePixelRatioF())
-        self.glass.setIcon(QIcon(drawn))
+        drawn = icons.pixmap(self._icon, palette.secondary, 16, self.devicePixelRatioF())
+        self.mark.setIcon(QIcon(drawn))
 
 
 class Choice(QComboBox):
@@ -425,6 +448,11 @@ class CheckBox(QCheckBox):
 # --- lists -------------------------------------------------------------------------------------
 
 
+def _advance(font: QFont, text: str) -> int:
+    """How wide ``text`` is in ``font``, in whole pixels rounded up: given that, it is not cut."""
+    return math.ceil(QFontMetricsF(font).horizontalAdvance(text))
+
+
 def _small(font: QFont, *, bold: bool = False) -> QFont:
     small = QFont(font)
     small.setPixelSize(_SMALL)
@@ -470,13 +498,13 @@ class RowDelegate(QStyledItemDelegate):
         if kind:
             small = QFontMetrics(_small(font, bold=True))
             return QSize(2 * _PAD + small.horizontalAdvance(text) + 16, ROW_HEIGHT)
-        width = metrics.horizontalAdvance(text)
+        width = _advance(font, text)
         height = metrics.height()
         second = index.data(SECONDARY)
         if second:
-            small = QFontMetrics(_small(font))
-            width = max(width, small.horizontalAdvance(str(second)))
-            height += _LINE_GAP + small.height()
+            smaller = _small(font)
+            width = max(width, _advance(smaller, str(second)))
+            height += _LINE_GAP + QFontMetrics(smaller).height()
         if index.data(Qt.ItemDataRole.CheckStateRole) is not None:
             width += CHECK + _PAD
         return QSize(width + 2 * _PAD, max(ROW_HEIGHT, height + 2 * _PAD))
@@ -505,7 +533,7 @@ class RowDelegate(QStyledItemDelegate):
             state = Qt.CheckState(index.data(Qt.ItemDataRole.CheckStateRole))
             paint_check(painter, box, state, palette)
             left = box.right() + 1 + _PAD
-        space = QRect(left, rect.top(), rect.right() - _PAD - left, rect.height())
+        space = QRect(left, rect.top(), rect.right() + 1 - _PAD - left, rect.height())
         kind = index.data(BADGE)
         if kind:
             self._paint_badge(

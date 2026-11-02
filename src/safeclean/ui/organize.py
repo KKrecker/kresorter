@@ -1,16 +1,19 @@
 """The Organize page: a folder's plan, its batch carried out after confirmation, the batches and
-their undo (decision 0014, items 14, 23, 26 and 44).
+their undo (decision 0014, items 14, 23, 26, 44 and 52).
 
 Where organize does not move files (0012 item 37: not Linux, or no reliable open-file check), the
 page says why and offers nothing else, and reads no journal. Elsewhere each step is a session of its
-own (``ui.sessions``), as ``organize move``, ``list`` and ``undo`` run them: a folder's plan shows
-the moves by category (named in the window's language, with the directory on disk beside it when
-that is named otherwise; every path keeps the name on disk) and the files that stay, with their
-reasons, and the detail of a file that stays has Explain (local AI) (``ui.explain``); after
-confirmation the plan is made again inside the session and only the confirmed moves it still holds
-unchanged are carried out, as one batch, which the result names, with what changed since the plan,
-what was refused at move time and, when the batch stopped, its state and what is still sorted.
-Every session ends with the batches as they are then, newest first; they are read again each time
+own (``ui.sessions``), as ``organize move``, ``list`` and ``undo`` run them. The folder is shown in
+a field, from the home folder as ``~``, with Choose folder… or, once chosen, Change…, and the
+plan's state at the right. A folder's plan shows a card per category of its moves (named in the
+window's language, with the directory on disk beside it when that is named otherwise; every path
+keeps the name on disk), three to a row, and the files that stay, with their reasons; the detail
+of a file that stays has Explain (local AI) (``ui.explain``). The bar at the bottom says how many
+files move into how many folders, beside Sort…: after confirmation the plan is made again inside
+the session and only the confirmed moves it still holds unchanged are carried out, as one batch,
+which the result names, with what changed since the plan, what was refused at move time and,
+when the batch stopped, its state and what is still sorted. Every session ends with the batches
+as they are then, newest first, in the card of the recent batches; they are read again each time
 the page opens. Undo shows the undo's plan first and, confirmed, moves back only what its plan,
 made again, still holds.
 """
@@ -23,7 +26,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtWidgets import (
+    QAbstractScrollArea,
+    QFrame,
+    QGridLayout,
+    QHeaderView,
+    QLabel,
+    QScrollArea,
+    QSizePolicy,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QWidget,
+)
 
 from safeclean.organize.folders import FolderRefused
 from safeclean.organize.journal import Batch, BatchState, Summary
@@ -35,7 +49,23 @@ from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.explain import ExplainPanel
-from safeclean.ui.parts import Head, Note, button, hbox, page, rows, vbox
+from safeclean.ui.parts import (
+    QUIET,
+    SECONDARY,
+    Field,
+    Head,
+    Icon,
+    Note,
+    bar,
+    button,
+    card,
+    hbox,
+    rows,
+    shares,
+    surface2_tile,
+    text_ink,
+    vbox,
+)
 from safeclean.ui.recovery import organize_lines
 from safeclean.ui.sessions import (
     Act,
@@ -49,21 +79,74 @@ from safeclean.ui.sessions import (
     undo_batch,
     undo_plan,
 )
+from safeclean.ui.shown import moment, shown_path
 from safeclean.ui.tasks import Task
 
 if TYPE_CHECKING:
+    from safeclean.ui.i18n import Translator
+    from safeclean.ui.theme import Look
     from safeclean.ui.window import Window
 
-__all__ = ["OrganizePage"]
+__all__ = ["BATCHES_WIDTH", "CATEGORY_ICONS", "PER_ROW", "CategoryCard", "OrganizePage"]
 
 T = TypeVar("T")
 _NO_PLAN = Plan(Path(), (), ())
 _STAY = Qt.ItemDataRole.UserRole  # a file that stays keeps its place in the plan's stays
-_COLUMNS = ("id", "time", "kind", "moved", "state", "folder")
+_BATCH = Qt.ItemDataRole.UserRole  # a batch's row keeps its id
+_RIGHT = int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+PER_ROW = 3  # category cards to a row
+BATCHES_WIDTH = 320  # px: the card of the recent batches, at the right
+_NAMES = 3  # a category's card names its first three files
+CATEGORY_ICONS = {
+    "Images": "image",
+    "Videos": "square-play",
+    "Audio": "music",
+    "Documents": "file-text",
+    "Archives": "archive",
+    "Installers": "download",
+}  # a category the table names otherwise has the folder icon
 
 
-def _moment(created_at_ns: int) -> str:
-    return time.strftime("%Y-%m-%d %H:%M", time.localtime(created_at_ns / 1e9))
+def _fits(tree: QTreeWidget) -> None:
+    """A list as high as its rows: the page scrolls, not the list."""
+    tree.setSizeAdjustPolicy(QAbstractScrollArea.SizeAdjustPolicy.AdjustToContents)
+    tree.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    tree.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+    tree.setHeaderHidden(True)
+    tree.setRootIsDecorated(False)
+
+
+class CategoryCard(QFrame):
+    """A category of the plan: its icon, its files and their size, its name (item 44) and its
+    first three file names."""
+
+    def __init__(
+        self, look: Look, translator: Translator, category: str, moves: Sequence[Move]
+    ) -> None:
+        super().__init__()
+        self.setProperty("role", "card")
+        shares(self)
+        self.category = category
+        icon = CATEGORY_ICONS.get(category, "folder")
+        self.icon = Icon(look, icon, text_ink, size=18, tile=surface2_tile, side=32)
+        files = translator.count("file", len(moves))
+        size = translator.size(sum(move.size for move in moves))
+        self.amount = QLabel(translator.text("organize.amount", files=files, size=size))
+        self.amount.setProperty("role", "secondary")
+        label = translator.category(category)
+        named = translator.text("organize.named", label=label, category=category)
+        self.name = QLabel(label if label == category else named)
+        self.name.setProperty("role", "card-title")
+        self.names = QLabel(", ".join(move.source.name for move in moves[:_NAMES]))
+        self.names.setProperty("role", "secondary")
+        top = hbox(spacing=8)
+        top.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignTop)
+        top.addStretch(1)
+        top.addWidget(self.amount, 0, Qt.AlignmentFlag.AlignTop)
+        layout = vbox(self, margins=(20, 16, 20, 16), spacing=8)
+        layout.addLayout(top)
+        layout.addWidget(self.name)
+        layout.addWidget(self.names)
 
 
 class OrganizePage(QWidget):
@@ -72,6 +155,8 @@ class OrganizePage(QWidget):
         self._window = window
         self._plan = _NO_PLAN
         self._rows: dict[int, QTreeWidgetItem] = {}
+        self.cards: list[CategoryCard] = []
+        self.planned_at: float | None = None
         translator = window.translator
         text = translator.text
         context = window.environment.scan_context()
@@ -84,60 +169,125 @@ class OrganizePage(QWidget):
         self.blocked.setWordWrap(True)
         self.blocked.setHidden(not found)
         self.controls = QWidget()
-        self.controls.setHidden(self._blocked)
 
-        self.choose_button = button(look, text("organize.choose"), icon="folder")
+        self.folder = Field(
+            look, text("organize.folder"), "folder", placeholder=text("organize.no_folder")
+        )
+        self.folder.setReadOnly(True)
+        self.folder.setMaximumWidth(480)
+        self.choose_button = button(look, text("organize.choose"))
         self.choose_button.clicked.connect(self._choose)
+        self.state = Note(self.controls, role="caption")
+        self.state.setWordWrap(False)
         self.summary = Note(self.controls)
-        self.plan = QTreeWidget()
-        rows(self.plan, look)
-        self.plan.setAccessibleName(text("organize.plan"))
-        self.plan.setHeaderHidden(True)
-        self.plan.currentItemChanged.connect(self._current)
-        self.detail = Note(self.controls)
+        self.categories = QGridLayout()
+        self.categories.setContentsMargins(0, 0, 0, 0)
+        self.categories.setHorizontalSpacing(16)
+        self.categories.setVerticalSpacing(16)
+        for column in range(PER_ROW):
+            self.categories.setColumnStretch(column, 1)
+        self._fillers: list[QWidget] = []
+
+        self.staying = QWidget()
+        self.stays_title = QLabel(text("organize.stays_title"))
+        self.stays_title.setProperty("role", "strong")
+        self.stays_note = Note(self.staying, role="secondary")
+        self.stays_note.setWordWrap(False)
+        self.stays = QTreeWidget()
+        rows(self.stays, look)
+        self.stays.setAccessibleName(text("organize.stays_title"))
+        _fits(self.stays)
+        self.stays.setColumnCount(2)
+        header = self.stays.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.stays.currentItemChanged.connect(self._current)
+        self.detail = Note(self.staying)
         self.explain = ExplainPanel(window)
-        self.move_button = button(look, text("organize.move"), role="primary")
-        self.move_button.clicked.connect(self._move)
+        self.explain.hide()  # until a file that stays is selected
+
+        self.recent, recent = card()
+        self.recent.setFixedWidth(BATCHES_WIDTH)
+        self.recent_title = QLabel(text("batches.title"))
+        self.recent_title.setProperty("role", "caption")
+        self.undo_button = button(look, text("organize.undo"), icon="undo-2")
+        self.undo_button.clicked.connect(self._undo)
         self.batches = QTreeWidget()
         rows(self.batches, look)
         self.batches.setAccessibleName(text("batches.title"))
-        self.batches.setRootIsDecorated(False)
-        self.batches.setColumnCount(len(_COLUMNS))
-        self.batches.setHeaderLabels([text(f"batches.{name}") for name in _COLUMNS])
+        _fits(self.batches)
         self.batches.itemSelectionChanged.connect(window.update_starters)
-        self.undo_button = button(look, text("organize.undo"), icon="undo-2")
-        self.undo_button.clicked.connect(self._undo)
+        self.batches.hide()  # until the batches are read
+        self.no_batches = Note(self.recent, role="secondary")
         self.result = Note(self.controls)
 
-        choose = hbox(spacing=8)
-        choose.addWidget(self.choose_button)
-        choose.addStretch(1)
-        move = hbox(spacing=8)
-        move.addStretch(1)
-        move.addWidget(self.move_button)
-        undo = hbox(spacing=8)
-        undo.addStretch(1)
-        undo.addWidget(self.undo_button)
-        batches = QLabel(text("batches.title"))
-        batches.setProperty("role", "strong")
-        inside = vbox(self.controls, spacing=12)
-        inside.addLayout(choose)
+        self.will = QLabel()
+        self.will.setProperty("role", "strong")
+        self.safe = QLabel(text("organize.safe"))
+        self.safe.setProperty("role", "secondary")
+        self.safe.setWordWrap(True)
+        self.move_button = button(look, text("organize.sort"), role="primary")
+        self.move_button.clicked.connect(self._move)
+        self.bar, inside_bar = bar()
+        inside_bar.addWidget(self.will)
+        inside_bar.addWidget(self.safe, 1)
+        inside_bar.addWidget(self.move_button)
+
+        chosen = hbox(spacing=8)
+        chosen.addWidget(self.folder, 3)
+        chosen.addWidget(self.choose_button)
+        chosen.addStretch(1)
+        chosen.addWidget(self.state)
+        stays_head = hbox(spacing=12)
+        stays_head.addWidget(self.stays_title)
+        stays_head.addWidget(self.stays_note)
+        stays_head.addStretch(1)
+        staying = vbox(self.staying, spacing=8)
+        staying.addLayout(stays_head)
+        staying.addWidget(self.stays)
+        staying.addWidget(self.detail)
+        staying.addWidget(self.explain)
+        recent_head = hbox(spacing=8)
+        recent_head.addWidget(self.recent_title)
+        recent_head.addStretch(1)
+        recent_head.addWidget(self.undo_button)
+        recent.addLayout(recent_head)
+        recent.addWidget(self.batches)
+        recent.addWidget(self.no_batches)
+        lower = hbox(spacing=24)
+        lower.addWidget(self.staying, 1, Qt.AlignmentFlag.AlignTop)
+        lower.addStretch(0)
+        lower.addWidget(self.recent, 0, Qt.AlignmentFlag.AlignTop)
+        inside = vbox(self.controls, margins=(32, 16, 32, 16), spacing=16)
+        inside.addLayout(chosen)
         inside.addWidget(self.summary)
-        inside.addWidget(self.plan, 1)
-        inside.addWidget(self.detail)
-        inside.addWidget(self.explain)
-        inside.addLayout(move)
-        inside.addWidget(batches)
-        inside.addWidget(self.batches, 1)
-        inside.addLayout(undo)
+        inside.addLayout(self.categories)
+        inside.addLayout(lower)
         inside.addWidget(self.result)
-        layout = page(self, Head(text("page.organize"), text("head.organize")))
-        layout.addWidget(self.blocked)
-        layout.addWidget(self.controls, 1)
+        inside.addStretch(1)
+        self.area = QScrollArea()
+        self.area.setFrameShape(QFrame.Shape.NoFrame)
+        self.area.setWidgetResizable(True)
+        self.area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.area.setWidget(self.controls)
+        self.controls.setAutoFillBackground(False)  # setWidget fills it: the page shows through
+        self.area.viewport().setAutoFillBackground(False)
+        self.area.setHidden(self._blocked)
+
+        self.head = Head(text("page.organize"), text("head.organize"))
+        top = vbox(margins=(32, 32, 32, 0), spacing=16)
+        top.addWidget(self.head)
+        top.addWidget(self.blocked)
+        layout = vbox(self, spacing=0)
+        layout.addLayout(top)
+        layout.addWidget(self.area, 1)
         layout.addStretch(0)
+        layout.addWidget(self.bar)
         window.add_starter(self.choose_button)
         window.add_starter(self.move_button, lambda: bool(self._plan.moves))
         window.add_starter(self.undo_button, lambda: bool(self.batches.selectedItems()))
+        self._show_plan()
 
     def batch_row(self, batch_id: int) -> QTreeWidgetItem:
         return self._rows[batch_id]
@@ -172,21 +322,27 @@ class OrganizePage(QWidget):
         window.run(Task(window.translator.text(title), work, done, acts=True))
 
     def _list(self, batches: Sequence[Summary]) -> None:
+        """The batches, newest first: each with its id and time, then its files moved, kind and
+        state, and its folder in its tooltip; with none, that there is none."""
+        translator = self._window.translator
+        text = translator.text
         self.batches.clear()
         self._rows = {}
         for summary in batches:
             batch = summary.batch
-            cells = [
-                str(batch.batch_id),
-                _moment(batch.created_at_ns),
-                self._kind(batch),
-                str(summary.moved),
-                self._state(summary),
-                str(batch.folder),
-            ]
-            self._rows[batch.batch_id] = QTreeWidgetItem(self.batches, cells)
-        for column in range(self.batches.columnCount()):
-            self.batches.resizeColumnToContents(column)
+            when = moment(batch.created_at_ns / 1e9)
+            row = QTreeWidgetItem(
+                self.batches, [text("organize.batch", batch=batch.batch_id, moment=when)]
+            )
+            files = translator.count("file", summary.moved)
+            kind, state = self._kind(batch), self._state(summary)
+            note = text("organize.batch_note", files=files, kind=kind, state=state)
+            row.setData(0, SECONDARY, note)
+            row.setData(0, _BATCH, batch.batch_id)
+            row.setToolTip(0, shown_path(batch.folder, Path.home()))
+            self._rows[batch.batch_id] = row
+        self.batches.setHidden(not batches)
+        self.no_batches.setText("" if batches else text("organize.no_batches"))
         self._window.update_starters()
 
     def _kind(self, batch: Batch) -> str:
@@ -216,40 +372,69 @@ class OrganizePage(QWidget):
         self._session("task.plan", plan_folder(folder), self._planned)
 
     def _planned(self, found: Plan | FolderRefused) -> None:
-        translator = self._window.translator
-        self.plan.clear()
+        text = self._window.translator.text
         self.result.clear()
         self._plan = _NO_PLAN
+        self.planned_at = None
+        self.folder.setText(shown_path(found.folder, Path.home()))
+        self.choose_button.setText(text("organize.change"))
         if isinstance(found, FolderRefused):
             self._window.overview.show_plan(None)
+            self._show_plan()
             self.summary.setText(self._refused(found))
             return
         self._plan = found
+        self.planned_at = time.time()
         self._window.overview.show_plan(found)
-        amount = self._amount(found.moves)
-        key = "organize.would" if found.moves else "organize.nothing"
-        self.summary.setText(translator.text(key, folder=found.folder, **amount))
+        self._show_plan()
+
+    def _show_plan(self) -> None:
+        """The plan shown: a card per category, three to a row, the files that stay, the plan's
+        state and the bar; with no plan, none of them."""
+        window = self._window
+        translator = window.translator
+        text, count = translator.text, translator.count
+        found = self._plan
+        for widget in [*self.cards, *self._fillers]:
+            self.categories.removeWidget(widget)
+            widget.setParent(None)
         groups: dict[str, list[Move]] = {}
         for move in found.moves:
             groups.setdefault(move.category, []).append(move)
-        for category, moves in groups.items():
-            self._group(self._category(category, moves), [self._line(move) for move in moves])
-        if found.stays:
-            title = translator.text("organize.stays", n=len(found.stays))
-            rows = self._group(title, self._stays(found.stays, found.folder))
-            for index, row in enumerate(rows):
-                row.setData(0, _STAY, index)
-        self.plan.expandAll()
-
-    def _group(self, title: str, lines: Sequence[str]) -> list[QTreeWidgetItem]:
-        group = QTreeWidgetItem(self.plan, [title])
-        return [QTreeWidgetItem(group, [line]) for line in lines]
+        self.cards = [
+            CategoryCard(window.look, translator, category, moves)
+            for category, moves in groups.items()
+        ]
+        self._fillers = [QWidget() for _ in range(-len(self.cards) % PER_ROW)]
+        for filler in self._fillers:
+            shares(filler)
+        for index, widget in enumerate([*self.cards, *self._fillers]):
+            self.categories.addWidget(widget, *divmod(index, PER_ROW))
+        self.stays.clear()
+        self.staying.setHidden(not found.stays)  # shown first: its rows are measured in its font
+        for index, stay in enumerate(found.stays):
+            reason = translator.reason(stay.reason, stay.detail)
+            row = QTreeWidgetItem(self.stays, [str(stay.path.relative_to(found.folder)), reason])
+            row.setData(0, _STAY, index)
+            row.setTextAlignment(1, _RIGHT)
+            row.setData(1, QUIET, True)
+        self.stays_note.setText(text("organize.stays_note", files=count("file", len(found.stays))))
+        moves = bool(found.moves)
+        planned = self.planned_at
+        when = "" if planned is None else moment(planned)
+        self.state.setText(text("organize.state", moment=when) if moves else "")
+        nothing = planned is not None and not moves
+        self.summary.setText(text("organize.nothing", folder=found.folder) if nothing else "")
+        into = count("folders.into", len(groups))
+        self.will.setText(text("organize.will", files=count("file", len(found.moves)), into=into))
+        self.bar.setHidden(not moves)
+        window.update_starters()
 
     def _current(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
-        """The detail of a file that stays; a move and a group have none."""
-        index = None if current is None else current.data(0, _STAY)
-        stay = None if index is None else self._plan.stays[int(index)]
+        """The detail of the selected file that stays, and its Explain; with none, neither."""
+        stay = None if current is None else self._plan.stays[int(current.data(0, _STAY))]
         self.detail.setText("" if stay is None else "\n".join(self._detail(stay)))
+        self.explain.setHidden(stay is None)
         self.explain.show_for(stay)
 
     def _detail(self, stay: Stay) -> list[str]:
@@ -278,10 +463,10 @@ class OrganizePage(QWidget):
 
     def _sorted(self, carried: Carried | FolderRefused) -> None:
         text = self._window.translator.text
-        self.plan.clear()
         self._plan = _NO_PLAN
+        self.planned_at = None
         self._window.overview.show_plan(None)
-        self.summary.clear()
+        self._show_plan()
         if isinstance(carried, FolderRefused):
             self.result.setText(self._refused(carried))
             return
@@ -301,7 +486,7 @@ class OrganizePage(QWidget):
 
     def _undo(self) -> None:
         [row] = self.batches.selectedItems()  # enabled with one batch selected, the most there is
-        batch_id = int(row.text(0))
+        batch_id = int(row.data(0, _BATCH))
         self._session("task.plan_undo", undo_plan(batch_id), self._undo_planned)
 
     def _undo_planned(self, found: UndoPlan | UndoRefused) -> None:
@@ -392,14 +577,6 @@ class OrganizePage(QWidget):
         translator = self._window.translator
         files = translator.count("file", len(moves))
         return {"files": files, "size": translator.size(sum(move.size for move in moves))}
-
-    def _category(self, category: str, moves: Sequence[Move]) -> str:
-        """The group's title: the category in the window's language, and its directory on disk
-        when that is named otherwise (item 44)."""
-        translator = self._window.translator
-        label = translator.category(category)
-        key = "organize.category" if label == category else "organize.category.named"
-        return translator.text(key, label=label, category=category, **self._amount(moves))
 
     def _line(self, move: Move) -> str:
         text = self._window.translator.text

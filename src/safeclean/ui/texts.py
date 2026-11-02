@@ -224,25 +224,35 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "На этой системе сортировка не перемещает файлы:",
     },
     "organize.choose": {"en": "Choose folder…", "ru": "Выбрать папку…"},
-    "organize.plan": {"en": "The plan", "ru": "План"},
-    "organize.would": {
-        "en": "Would move {files}, {size} in {folder}.",
-        "ru": "Папка {folder}: будет перемещено {files}, {size}.",
+    "organize.change": {"en": "Change…", "ru": "Изменить…"},
+    "organize.folder": {"en": "Folder", "ru": "Папка"},
+    "organize.no_folder": {"en": "No folder chosen", "ru": "Папка не выбрана"},
+    "organize.state": {
+        "en": "Plan made {moment} · nothing moved yet",
+        "ru": "План составлен {moment} · ничего ещё не перемещено",
     },
+    "organize.amount": {"en": "{files} · {size}", "ru": "{files} · {size}"},
+    "organize.named": {"en": "{label} (folder {category})", "ru": "{label} (папка {category})"},
+    "organize.stays_title": {"en": "Stays in place", "ru": "Остаются на месте"},
+    "organize.stays_note": {
+        "en": "{files}, each with its reason",
+        "ru": "{files}, каждый — по своей причине",
+    },
+    "organize.will": {"en": "{files} will move {into}.", "ru": "Будет разложено: {files} {into}."},
+    "organize.safe": {
+        "en": "Nothing is renamed, overwritten or deleted; the batch can be undone.",
+        "ru": "Ничего не переименовывается, не перезаписывается и не удаляется; пакет можно"
+        " вернуть.",
+    },
+    "organize.sort": {"en": "Sort…", "ru": "Разложить…"},
     "organize.nothing": {
         "en": "Nothing to move in {folder}.",
         "ru": "Папка {folder}: перемещать нечего.",
     },
     "organize.refused": {"en": "Refused: {folder}: {reason}", "ru": "Отказано: {folder}: {reason}"},
-    "organize.category": {"en": "{category}: {files}, {size}", "ru": "{category}: {files}, {size}"},
-    "organize.category.named": {
-        "en": "{label} (folder {category}): {files}, {size}",
-        "ru": "{label} (папка {category}): {files}, {size}",
-    },
     "organize.line": {"en": "{name} → {category}/", "ru": "{name} → {category}/"},
-    "organize.stays": {"en": "Stay in place: {n}", "ru": "Остаются на месте: {n}"},
     "organize.stay": {"en": "{name} ({reason})", "ru": "{name} ({reason})"},
-    "organize.move": {"en": "Move files", "ru": "Переместить файлы"},
+    "organize.move": {"en": "Sort files", "ru": "Разложить файлы"},
     "organize.confirm": {
         "en": "Move {files} ({size}) into category folders in {folder}? Undo moves them back.",
         "ru": "Разложить {files} ({size}) по папкам категорий внутри {folder}? Их можно"
@@ -270,13 +280,13 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "Изменился после плана: {path}",
     },
     "organize.undo": {"en": "Undo…", "ru": "Вернуть файлы…"},
-    "batches.title": {"en": "Batches", "ru": "Пакеты"},
-    "batches.id": {"en": "Id", "ru": "№"},
-    "batches.time": {"en": "Time", "ru": "Время"},
-    "batches.kind": {"en": "Kind", "ru": "Вид"},
-    "batches.moved": {"en": "Files moved", "ru": "Перемещено файлов"},
-    "batches.state": {"en": "State", "ru": "Состояние"},
-    "batches.folder": {"en": "Folder", "ru": "Папка"},
+    "batches.title": {"en": "Recent batches", "ru": "Последние пакеты"},
+    "organize.batch": {"en": "Batch {batch} · {moment}", "ru": "Пакет {batch} · {moment}"},
+    "organize.batch_note": {
+        "en": "{files} moved · {kind} · {state}",
+        "ru": "{files} · {kind} · {state}",
+    },
+    "organize.no_batches": {"en": "No batches yet.", "ru": "Пакетов пока нет."},
     "batches.undo_of": {"en": "{kind} of batch {batch}", "ru": "{kind} пакета {batch}"},
     "batches.undone": {"en": "{state}, undone", "ru": "{state}, возвращён"},
     "batches.partly_undone": {
@@ -609,4 +619,8 @@ PLURALS: dict[str, dict[str, tuple[str, ...]]] = {
         "ru": ("{n} группа", "{n} группы", "{n} групп"),
     },
     "path": {"en": ("{n} path", "{n} paths"), "ru": ("{n} путь", "{n} пути", "{n} путей")},
+    "folders.into": {
+        "en": ("into {n} folder", "into {n} folders"),
+        "ru": ("по {n} папке", "по {n} папкам", "по {n} папкам"),
+    },
 }
