@@ -213,13 +213,15 @@ def test_llm_opens_no_file() -> None:
 
 
 def test_the_guards_see_llm_and_its_importers() -> None:
-    # [0013.21] The guards read something: the package, and the modules that use it.
+    # [0013.21] The guards read something: the package, and the modules that use it outside the
+    # window (the window's modules may, 0014 item 7, and which of them do grows with it).
     modules = dict(sources())
     assert {name for name in modules if _in_llm(name)} >= {LLM, f"{LLM}.explain"}
     importers = {
         module
         for module, path in modules.items()
         if not _in_llm(module)
+        and not (module == UI or module.startswith(f"{UI}."))
         and any(_in_llm(name) for _, name in imports(path.read_text(encoding="utf-8"), module))
     }
     assert importers == {
