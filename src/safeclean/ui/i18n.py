@@ -2,8 +2,9 @@
 
 Every text is looked up by key in ``texts.CATALOG``, every count in ``texts.PLURALS`` (English:
 one and other; Russian: one, few and many), every value of an enumeration the window shows in
-``labels.LABELS``. Values put into a text are inserted as they are: paths, names, details from
-the system and explanations are never translated. No Qt is needed here.
+``labels.LABELS``, every size in the units of ``texts.UNITS``. Values put into a text are
+inserted as they are: paths, names, details from the system and explanations are never
+translated. No Qt is needed here.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from string import Formatter
 from typing import Literal, TypeVar
 
 from safeclean.ui.labels import LABELS
-from safeclean.ui.texts import CATALOG, PLURALS
+from safeclean.ui.texts import CATALOG, DECIMAL, PLURALS, UNITS
 
 __all__ = [
     "CATALOG",
@@ -118,3 +119,15 @@ class Translator:
 
     def label(self, value: StrEnum) -> str:
         return LABELS[type(value)][value.value][self.language]
+
+    def size(self, n: int) -> str:
+        """Bytes as such, larger sizes in binary multiples with one decimal, as the CLI writes
+        them in English."""
+        units = UNITS[self.language]
+        value, index = float(n), 0
+        while value >= 1024 and index < len(units) - 1:
+            value /= 1024
+            index += 1
+        if index == 0:
+            return f"{n} {units[0]}"
+        return f"{value:.1f}".replace(".", DECIMAL[self.language]) + f" {units[index]}"

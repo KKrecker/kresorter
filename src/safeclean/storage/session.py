@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import TypeVar
+from typing import TypeAlias, TypeVar
 
 from safeclean.core.scanner import ScanContext
 from safeclean.storage.data_dir import PRIVATE, DataDirError, check_data_dir
@@ -26,6 +26,7 @@ from safeclean.storage.lock import InstanceLock, LockedError
 __all__ = [
     "JOURNAL_NAME",
     "LOCK_NAME",
+    "Journal",
     "SessionFailed",
     "SessionFailure",
     "run_session",
@@ -35,6 +36,9 @@ JOURNAL_NAME = "journal.db"
 LOCK_NAME = "safeclean.lock"
 
 T = TypeVar("T")
+
+# The journal as a body receives it: a module that only passes it on need not import sqlite3.
+Journal: TypeAlias = sqlite3.Connection
 
 
 class SessionFailure(StrEnum):

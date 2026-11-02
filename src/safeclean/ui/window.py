@@ -9,7 +9,9 @@ message, and refuses to close while a task that acts runs; it closes once that t
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Callable
+from pathlib import Path
 from typing import TypeVar
 
 from PySide6.QtGui import QCloseEvent
@@ -24,7 +26,10 @@ from PySide6.QtWidgets import (
 )
 
 from safeclean.environment import Environment
+from safeclean.ui.dialogs import Dialogs, choose_folder, confirm
+from safeclean.ui.findings import FindingsPage
 from safeclean.ui.i18n import Translator
+from safeclean.ui.overview import OverviewPage
 from safeclean.ui.tasks import Task, Tasks
 from safeclean.ui.theme import Look
 
@@ -50,10 +55,17 @@ def _placeholder(title: str) -> QWidget:
 
 
 class Window(QMainWindow):
-    def __init__(self, environment: Environment, translator: Translator) -> None:
+    def __init__(
+        self, environment: Environment, translator: Translator, dialogs: Dialogs | None = None
+    ) -> None:
+        """``dialogs``: the window's own, unless a test answers them."""
         super().__init__()
         self.environment = environment
         self.translator = translator
+        self.dialogs = dialogs or Dialogs(
+            confirm=functools.partial(confirm, self, translator),
+            choose_folder=functools.partial(choose_folder, self, translator, Path.home()),
+        )
         self.setWindowTitle(translator.text("app.title"))
         self._starters: list[tuple[QWidget, Callable[[], bool]]] = []
         self._close_when_done = False
@@ -62,6 +74,9 @@ class Window(QMainWindow):
         self.tasks.busy.connect(self._busy)
         self.tasks.failed.connect(self._failed)
 
+        self.overview = OverviewPage(self)
+        self.findings = FindingsPage(self)
+        made: dict[str, QWidget] = {"overview": self.overview, "findings": self.findings}
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
         self.pages = QStackedWidget()
@@ -69,7 +84,7 @@ class Window(QMainWindow):
         for name in PAGES:
             title = translator.text(f"page.{name}")
             self.sidebar.addItem(title)
-            self._pages.append(_placeholder(title))
+            self._pages.append(made.get(name) or _placeholder(title))
             self.pages.addWidget(self._pages[-1])
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.sidebar.setCurrentRow(0)
