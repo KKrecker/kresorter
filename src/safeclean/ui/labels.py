@@ -82,7 +82,7 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "app_data": _both("safeclean's own data", "Данные safeclean"),
     },
     SkipReason: {
-        "symlink": _both("A link, not followed", "Ссылка, не открывается"),
+        "symlink": _both("A link, not followed", "Ссылка, без перехода по ней"),
         "blocked": _both("Protected", "Защищено"),
         "special": _both("A special file", "Специальный файл"),
         "not_found": _both("Gone while scanning", "Исчез при сканировании"),
@@ -172,12 +172,12 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
     },
     ChangeRefusal: {
         "read_only": _both("This kind of entry is not changed", "Такие записи не изменяются"),
-        "changed": _both("Changed since it was listed", "Изменилась после списка"),
+        "changed": _both("Changed since it was listed", "Изменилась после показа списка"),
         "already": _both("Already so", "Уже так"),
         "pending": _both("Unfinished work first", "Сначала незавершённая работа"),
         "other_device": _both("The store is on another drive", "Хранилище на другом диске"),
         "too_large": _both("Too large", "Слишком большая"),
-        "foreign": _both("Not disabled by safeclean", "Отключена не safeclean"),
+        "foreign": _both("Not disabled by safeclean", "Отключена не через safeclean"),
         "original_changed": _both("Its original has changed", "Её оригинал изменился"),
     },
     Domain: {
@@ -198,8 +198,8 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "empty": _both("The answer is empty", "Ответ пустой"),
     },
     SessionFailure: {
-        "data_dir": _both("The data folder cannot be used here", "Папку данных нельзя здесь"),
-        "locked": _both("safeclean is busy elsewhere", "safeclean занят в другом окне"),
+        "data_dir": _both("The data folder cannot be used here", "Папка данных здесь недопустима"),
+        "locked": _both("safeclean is busy elsewhere", "safeclean уже занят другим процессом"),
         "data_dir_os": _both("The data folder cannot be used", "Папку данных нельзя использовать"),
         "journal_open": _both("The journal cannot be opened", "Журнал не открывается"),
         "stopped": _both("Stopped", "Остановлено"),
