@@ -88,7 +88,7 @@ __all__ = [
     "vbox",
 ]
 
-GRID = frozenset({0, 4, 8, 12, 16, 24, 32, 40})  # every margin and spacing of a layout
+GRID = frozenset({0, 4, 8, 12, 16, 20, 24, 32, 40})  # every margin and spacing of a layout
 PAGE_MARGIN = 32
 ROW_HEIGHT = 44
 CHECK = 16  # a check box's side

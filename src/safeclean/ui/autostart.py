@@ -156,6 +156,7 @@ class AutostartPage(QWidget):
         entries = translator.count("entry", len(listing.items))
         disabled = sum(not item.enabled for item in listing.items)
         self.total.setText(text("autostart.total", entries=entries, disabled=disabled))
+        self._window.overview.show_autostart((len(listing.items), disabled))
         skipped = [text("autostart.skipped", n=len(listing.skipped))]
         skipped += [
             text(

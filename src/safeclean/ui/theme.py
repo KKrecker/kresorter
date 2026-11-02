@@ -187,6 +187,9 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
         ('QLabel[role="secondary"]', {"color": p.secondary}),
         ('QLabel[role="accent"]', {"color": p.accent_text}),
         ('QLabel[role="strong"]', {"font-weight": "600"}),
+        ('QLabel[role="card-title"]', {"font-size": "16px", "font-weight": "600"}),
+        ('QLabel[role="figure"]', {"font-size": "28px", "font-weight": "600"}),
+        ('QLabel[role="caption"]', {"color": p.secondary, "font-size": "13px"}),
         (
             'QFrame[role="card"]',
             {
@@ -196,6 +199,15 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
             },
         ),
         ('QFrame[role="card"][tone="surface"]', {"background-color": p.surface}),
+        ('QFrame[role="card"]:focus', {"border": f"1px solid {p.accent}"}),
+        (
+            'QFrame[role="chip"]',
+            {
+                "background-color": p.canvas,
+                "border": f"1px solid {p.border}",
+                "border-radius": "8px",
+            },
+        ),
         ('QFrame[role="divider"]', {"background-color": p.border, "border": "none"}),
         (
             'QFrame[role="banner"]',
@@ -256,6 +268,7 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
                 "background-color": p.accent_text,
                 "color": p.primary_text,
                 "border": f"1px solid {p.accent_text}",
+                "font-weight": "600",
             },
         ),
         (
@@ -264,6 +277,7 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
                 "background-color": p.danger,
                 "color": p.danger_text,
                 "border": f"1px solid {p.danger}",
+                "font-weight": "600",
             },
         ),
         ('QPushButton[role="chip"]', {"padding": "0px 12px"}),
@@ -291,6 +305,30 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
             },
         ),
         ('QPushButton[role="link"]:focus', {"text-decoration": "underline"}),
+        (
+            'QPushButton[role="plain"]',
+            {
+                "background-color": "transparent",
+                "color": p.text,
+                "border": "none",
+                "padding": "0px 8px",
+                "min-height": "36px",
+            },
+        ),
+        (
+            'QPushButton[role="icon"]',
+            {
+                "background-color": "transparent",
+                "border": "none",
+                "border-radius": "4px",
+                "padding": "0px",
+                "min-height": "20px",
+            },
+        ),
+        (
+            'QPushButton[role="plain"]:focus, QPushButton[role="icon"]:focus',
+            {"border": f"1px solid {p.accent}"},
+        ),
         (
             'QListWidget[role="nav"], QListWidget[role="nav"]:focus',
             {"background-color": p.surface, "border": "none"},

@@ -144,6 +144,7 @@ class QuarantinePage(QWidget):
         size = translator.size(sum(item.size for item in listed))
         self.total.setText(translator.text("quarantine.total", files=files, size=size))
         self._window.sidebar.set_count("quarantine", len(listed))
+        self._window.overview.show_quarantine((len(listed), sum(item.size for item in listed)))
         self._window.update_starters()
 
     def _refusals(

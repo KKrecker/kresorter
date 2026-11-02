@@ -149,6 +149,12 @@ class FindingsPage(QWidget):
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
             self._items[path] = item
 
+    def show_only(self, level: Level) -> None:
+        """Only the findings of ``level``, and no search (item 48)."""
+        self.search.clear()
+        for shown, box in self.filters.items():
+            box.setChecked(shown is level)
+
     def item(self, path: Path) -> QTreeWidgetItem:
         return self._items[str(path)]
 

@@ -221,9 +221,11 @@ class OrganizePage(QWidget):
         self.result.clear()
         self._plan = _NO_PLAN
         if isinstance(found, FolderRefused):
+            self._window.overview.show_plan(None)
             self.summary.setText(self._refused(found))
             return
         self._plan = found
+        self._window.overview.show_plan(found)
         amount = self._amount(found.moves)
         key = "organize.would" if found.moves else "organize.nothing"
         self.summary.setText(translator.text(key, folder=found.folder, **amount))
@@ -278,6 +280,7 @@ class OrganizePage(QWidget):
         text = self._window.translator.text
         self.plan.clear()
         self._plan = _NO_PLAN
+        self._window.overview.show_plan(None)
         self.summary.clear()
         if isinstance(carried, FolderRefused):
             self.result.setText(self._refused(carried))

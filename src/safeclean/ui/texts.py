@@ -64,13 +64,53 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "overview.folder": {"en": "Folder {folder}", "ru": "Папка {folder}"},
     "overview.folders": {"en": "Folders to scan", "ru": "Папки для сканирования"},
-    "overview.add": {"en": "Add folder…", "ru": "Добавить папку…"},
-    "overview.remove": {"en": "Remove folder", "ru": "Убрать папку"},
-    "overview.scan": {"en": "Scan", "ru": "Сканировать"},
+    "overview.add": {"en": "Add folder", "ru": "Добавить папку"},
+    "overview.remove": {"en": "Remove folder {folder}", "ru": "Убрать папку {folder}"},
+    "overview.scan_title": {"en": "Scan", "ru": "Сканирование"},
+    "overview.read_only": {
+        "en": "Read-only: a scan never changes anything on the disk.",
+        "ru": "Только чтение: сканирование ничего не меняет на диске.",
+    },
+    "overview.scan": {"en": "Scan now", "ru": "Сканировать"},
     "overview.none": {"en": "Not scanned yet.", "ru": "Сканирования ещё не было."},
-    "overview.level": {"en": "{level}: {files}, {size}", "ru": "{level}: {files}, {size}"},
-    "overview.duplicates": {"en": "Duplicate groups: {n}", "ru": "Групп дубликатов: {n}"},
-    "overview.skipped": {"en": "Skipped paths: {n}", "ru": "Пропущено путей: {n}"},
+    "overview.last": {
+        "en": "Last scan {moment} · {files} scanned · duplicates: {groups} · skipped: {paths}",
+        "ru": "Последнее сканирование {moment} · просканировано: {files} · дубликаты: {groups}"
+        " · пропущено: {paths}",
+    },
+    "overview.reasons": {"en": "{files}: {reasons}", "ru": "{files}: {reasons}"},
+    "overview.never": {
+        "en": "{files}. Never proposed: you decide one by one.",
+        "ru": "{files}. Никогда не предлагается: решаете вы, по одному.",
+    },
+    "overview.open_level": {"en": "Review findings →", "ru": "Посмотреть находки →"},
+    "overview.open_review": {"en": "Look at them →", "ru": "Посмотреть их →"},
+    "overview.quarantine": {"en": "Moved files wait here", "ru": "Здесь ждут перемещённые файлы"},
+    "overview.quarantine_read": {"en": "{files} · {size}", "ru": "{files} · {size}"},
+    "overview.quarantine_note": {
+        "en": "Each can be put back where it was",
+        "ru": "Каждый можно вернуть на место",
+    },
+    "overview.organize": {"en": "Sort one folder by kind", "ru": "Разложить папку по типам"},
+    "overview.organize_note": {
+        "en": "Nothing is renamed, overwritten or deleted",
+        "ru": "Ничего не переименовывается, не перезаписывается и не удаляется",
+    },
+    "overview.organize_read": {"en": "{files} in {folder}", "ru": "{files} в {folder}"},
+    "overview.organize_into": {
+        "en": "Can be sorted into {folders}",
+        "ru": "Можно разложить: {folders}",
+    },
+    "overview.organize_nothing": {"en": "Nothing to sort", "ru": "Раскладывать нечего"},
+    "overview.autostart": {
+        "en": "Programs that start at sign-in",
+        "ru": "Программы, которые запускаются при входе",
+    },
+    "overview.autostart_note": {
+        "en": "Turning one off can be undone",
+        "ru": "Отключение можно отменить",
+    },
+    "overview.autostart_off": {"en": "{n} turned off", "ru": "отключено: {n}"},
     "overview.unreliable": {
         "en": "Files in use cannot be recognized on this system, so nothing can be moved to the"
         " quarantine.",
