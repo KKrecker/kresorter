@@ -23,6 +23,7 @@ COMPLETED: frozenset[int] = frozenset(
     {
         1,
         4,
+        5,
         7,
         8,
         9,
@@ -36,6 +37,7 @@ COMPLETED: frozenset[int] = frozenset(
         19,
         20,
         21,
+        22,
         28,
         29,
         30,

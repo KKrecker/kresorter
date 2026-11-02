@@ -1,0 +1,297 @@
+"""The Quarantine page: the quarantined files from the journal, Restore, and Delete
+permanently, the one action drawn in the danger colour (decision 0014, items 5 and 22)."""
+
+from pathlib import Path
+
+import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget
+from pytestqt.qtbot import QtBot
+
+from fakes import UnreliableOpenFiles
+from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.window import Window
+from support.cli import run
+from support.files import write
+from support.journal import query
+from support.window import FakeDialogs, environment, junk_tree, make_window, scanned, wait_idle
+
+
+@pytest.fixture
+def tree(zone: Path) -> dict[str, Path]:
+    return junk_tree(zone)
+
+
+@pytest.fixture
+def dialogs() -> FakeDialogs:
+    return FakeDialogs()
+
+
+def _opened(qtbot: QtBot, window: Window) -> None:
+    window.show_page("quarantine")
+    wait_idle(qtbot, window)
+
+
+def _moved(qtbot: QtBot, window: Window) -> None:
+    """Scan and move what is selected at first: n, m and copy, items 1, 2 and 3."""
+    scanned(qtbot, window)
+    window.findings.move_button.click()
+    wait_idle(qtbot, window)
+
+
+@pytest.fixture
+def window(
+    qtbot: QtBot,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    tree: dict[str, Path],
+    dialogs: FakeDialogs,
+) -> Window:
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir), dialogs=dialogs)
+    _moved(qtbot, window)
+    dialogs.asked.clear()
+    _opened(qtbot, window)
+    return window
+
+
+def _rows(window: Window) -> list[tuple[str, str, str]]:
+    root = window.quarantine.items.invisibleRootItem()
+    rows: list[tuple[str, str, str]] = []
+    for index in range(root.childCount()):
+        row = root.child(index)
+        assert row is not None
+        rows.append((row.text(0), row.text(1), row.text(2)))
+    return rows
+
+
+def _ids(window: Window) -> list[str]:
+    return [row[0] for row in _rows(window)]
+
+
+def _check(window: Window, *item_ids: int) -> None:
+    for item_id in item_ids:
+        window.quarantine.row(item_id).setCheckState(0, Qt.CheckState.Checked)
+
+
+def _states(data_dir: Path) -> list[tuple[object, ...]]:
+    return list(query(data_dir, "SELECT id, state FROM items ORDER BY id"))
+
+
+# --- the list [0014.22] --------------------------------------------------------------------------
+
+
+def test_the_page_lists_the_quarantined_files_by_id(window: Window, tree: dict[str, Path]) -> None:
+    # [0014.22]
+    page = window.quarantine
+    assert _rows(window) == [
+        ("1", str(tree["n"]), "15 B"),
+        ("2", str(tree["m"]), "8 B"),
+        ("3", str(tree["copy"]), "4 B"),
+    ]
+    header = page.items.headerItem()
+    assert [header.text(column) for column in range(3)] == ["Id", "Original path", "Size"]
+    assert page.total.text() == "In the quarantine: 3 files, 27 B"
+    assert page.selected() == []
+    assert not page.restore_button.isEnabled()
+    assert not page.purge_button.isEnabled()
+    _check(window, 2)
+    assert page.selected() == [2]
+    assert page.restore_button.isEnabled()
+    assert page.purge_button.isEnabled()
+
+
+def test_the_list_is_read_again_each_time_the_page_opens(
+    qtbot: QtBot, window: Window, tree: dict[str, Path]
+) -> None:
+    # [0014.22]
+    window.show_page("findings")
+    window.findings.item(tree["backup"]).setCheckState(0, Qt.CheckState.Checked)
+    window.findings.move_button.click()
+    wait_idle(qtbot, window)
+    _opened(qtbot, window)
+    assert _rows(window)[-1] == ("4", str(tree["backup"]), "10 B")
+    assert window.quarantine.total.text() == "In the quarantine: 4 files, 37 B"
+
+
+def test_refresh_reads_what_another_session_changed(
+    qtbot: QtBot, window: Window, tree: dict[str, Path]
+) -> None:
+    # [0014.22]
+    code, _, _ = run(["quarantine", "restore", "2"], window.environment.scan_context())
+    assert code == 0
+    assert _ids(window) == ["1", "2", "3"]
+    window.quarantine.refresh_button.click()
+    wait_idle(qtbot, window)
+    assert _ids(window) == ["1", "3"]
+
+
+def test_without_a_reliable_open_file_check_the_page_says_so(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0014.22] As `quarantine list`: no session without a reliable open-file check.
+    unreliable = environment(tmp_path, zone, data_dir, open_files=UnreliableOpenFiles())
+    window = make_window(qtbot, unreliable)
+    _opened(qtbot, window)
+    assert window.quarantine.result.text() == (
+        "No reliable open-file check on this system: the quarantine cannot be used."
+    )
+    assert _rows(window) == []
+
+
+def test_the_page_in_russian(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
+) -> None:
+    # [0014.22]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
+    _moved(qtbot, window)
+    _opened(qtbot, window)
+    page = window.quarantine
+    header = page.items.headerItem()
+    assert [header.text(column) for column in range(3)] == ["№", "Исходный путь", "Размер"]
+    assert page.total.text() == "Сейчас в карантине: 3 файла, 27 Б"
+    assert [b.text() for b in (page.refresh_button, page.restore_button, page.purge_button)] == [
+        "Обновить",
+        "Восстановить",
+        "Удалить навсегда",
+    ]
+
+
+# --- restore [0014.22] ---------------------------------------------------------------------------
+
+
+def test_restoring_asks_first_and_a_cancel_restores_nothing(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path], data_dir: Path
+) -> None:
+    # [0014.22]
+    dialogs.answer = False
+    _check(window, 1, 3)
+    window.quarantine.restore_button.click()
+    wait_idle(qtbot, window)
+    assert dialogs.asked == [
+        Confirmation(
+            title="Restore",
+            text="Restore 2 files (19 B) to where they were?",
+            details=(str(tree["n"]), str(tree["copy"])),
+            action="Restore",
+        )
+    ]
+    assert not tree["n"].exists()
+    assert _states(data_dir) == [(1, "quarantined"), (2, "quarantined"), (3, "quarantined")]
+    assert window.quarantine.result.text() == ""
+
+
+def test_the_confirmed_files_are_restored_and_leave_the_list(
+    qtbot: QtBot, window: Window, tree: dict[str, Path], data_dir: Path
+) -> None:
+    # [0014.22]
+    _check(window, 1, 3)
+    window.quarantine.restore_button.click()
+    assert window.tasks.holding() is not None
+    wait_idle(qtbot, window)
+    assert window.quarantine.result.text() == "Restored: 2 files"
+    assert tree["n"].read_bytes() == b"other bytecode!"
+    assert tree["copy"].read_bytes() == b"same"
+    assert _rows(window) == [("2", str(tree["m"]), "8 B")]
+    assert window.quarantine.total.text() == "In the quarantine: 1 file, 8 B"
+    assert _states(data_dir) == [(1, "restored"), (2, "quarantined"), (3, "restored")]
+
+
+def test_a_refused_restore_says_why_and_stays_selected(
+    qtbot: QtBot, window: Window, tree: dict[str, Path]
+) -> None:
+    # [0014.22] Something is in its place now: it is never written over.
+    write(tree["n"], b"a new file")
+    _check(window, 1)
+    window.quarantine.restore_button.click()
+    wait_idle(qtbot, window)
+    assert window.quarantine.result.text().splitlines() == [
+        "Restored: 0 files",
+        f"Refused: [1] {tree['n']} (Its place is taken: {tree['n']})",
+    ]
+    assert tree["n"].read_bytes() == b"a new file"
+    assert window.quarantine.selected() == [1]
+
+
+# --- delete permanently [0014.5] [0014.22] -------------------------------------------------------
+
+
+def test_deleting_shows_its_plan_first_and_a_cancel_deletes_nothing(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path], data_dir: Path
+) -> None:
+    # [0014.5] [0014.22]
+    dialogs.answer = False
+    _check(window, 1, 2)
+    window.quarantine.purge_button.click()
+    wait_idle(qtbot, window)
+    assert dialogs.asked == [
+        Confirmation(
+            title="Delete permanently",
+            text="Delete 2 files (23 B) permanently? They cannot be restored.",
+            details=(str(tree["n"]), str(tree["m"])),
+            action="Delete permanently",
+            danger=True,
+        )
+    ]
+    assert _states(data_dir) == [(1, "quarantined"), (2, "quarantined"), (3, "quarantined")]
+    assert _ids(window) == ["1", "2", "3"]
+
+
+def test_the_confirmed_files_are_deleted_and_the_space_freed(
+    qtbot: QtBot, window: Window, tree: dict[str, Path], data_dir: Path
+) -> None:
+    # [0014.22]
+    _check(window, 1, 2)
+    window.quarantine.purge_button.click()
+    wait_idle(qtbot, window)
+    assert window.quarantine.result.text() == "Deleted permanently: 2 files, freed 23 B"
+    assert _rows(window) == [("3", str(tree["copy"]), "4 B")]
+    assert _states(data_dir) == [(1, "purged"), (2, "purged"), (3, "quarantined")]
+    assert not tree["n"].exists()
+
+
+def test_a_copy_changed_in_the_quarantine_is_not_deleted(
+    qtbot: QtBot, window: Window, tree: dict[str, Path], data_dir: Path
+) -> None:
+    # [0014.22]
+    [(vault,)] = query(data_dir, "SELECT vault_path FROM items WHERE id = 1")
+    write(Path(str(vault)), b"changed in the vault")
+    _check(window, 1)
+    window.quarantine.purge_button.click()
+    wait_idle(qtbot, window)
+    assert window.quarantine.result.text().splitlines() == [
+        "Deleted permanently: 0 files, freed 0 B",
+        f"Refused: [1] {tree['n']} (Its copy in the quarantine has changed: {vault})",
+    ]
+    assert Path(str(vault)).read_bytes() == b"changed in the vault"
+    assert _ids(window) == ["2", "3"]
+
+
+def test_nothing_left_to_delete_asks_nothing(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path]
+) -> None:
+    # [0014.22] Restored by another session since the list was read.
+    run(["quarantine", "restore", "1"], window.environment.scan_context())
+    _check(window, 1)
+    window.quarantine.purge_button.click()
+    wait_idle(qtbot, window)
+    assert dialogs.asked == []
+    assert window.quarantine.result.text().splitlines() == [
+        "Nothing to delete.",
+        f"Refused: [1] {tree['n']} (Not in the quarantine: restored)",
+    ]
+    assert _ids(window) == ["2", "3"]
+    assert tree["n"].exists()
+
+
+def test_only_deleting_permanently_is_drawn_as_danger(window: Window) -> None:
+    # [0014.5] Its button and its badge, and nothing else in the window.
+    page = window.quarantine
+    danger = {
+        widget
+        for widget in window.findChildren(QWidget)
+        if "danger" in (widget.property("role"), widget.property("badge"))
+    }
+    assert danger == {page.purge_button, page.permanent}
+    assert page.purge_button.text() == "Delete permanently"
+    assert page.permanent.text() == "Cannot be undone"
