@@ -1,6 +1,6 @@
 # 0012. Organize: sort one folder by kind, journaled, reversible, never overwriting
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-01
 - Builds on: 0001, 0002 (section 3), 0004, 0005, 0007 (rename race), 0008 (single deletion
   point), 0010 (plan, then `--yes`), 0011 (items 57, 124-127), the pre-step-5 audit
