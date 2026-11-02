@@ -1,16 +1,18 @@
 """The Organize page: a folder's plan, its batch carried out after confirmation, the batches and
-their undo (decision 0014, items 14, 23 and 26).
+their undo (decision 0014, items 14, 23, 26 and 44).
 
 Where organize does not move files (0012 item 37: not Linux, or no reliable open-file check), the
 page says why and offers nothing else, and reads no journal. Elsewhere each step is a session of its
 own (``ui.sessions``), as ``organize move``, ``list`` and ``undo`` run them: a folder's plan shows
-the moves by category and the files that stay, with their reasons, and the detail of a file that
-stays has Explain (local AI) (``ui.explain``); after confirmation the plan is made again inside the
-session and only the confirmed moves it still holds unchanged are carried out, as one batch, which
-the result names, with what changed since the plan, what was refused at move time and, when the
-batch stopped, its state and what is still sorted. Every session ends with the batches as they are
-then, newest first; they are read again each time the page opens. Undo shows the undo's plan first
-and, confirmed, moves back only what its plan, made again, still holds.
+the moves by category (named in the window's language, with the directory on disk beside it when
+that is named otherwise; every path keeps the name on disk) and the files that stay, with their
+reasons, and the detail of a file that stays has Explain (local AI) (``ui.explain``); after
+confirmation the plan is made again inside the session and only the confirmed moves it still holds
+unchanged are carried out, as one batch, which the result names, with what changed since the plan,
+what was refused at move time and, when the batch stopped, its state and what is still sorted.
+Every session ends with the batches as they are then, newest first; they are read again each time
+the page opens. Undo shows the undo's plan first and, confirmed, moves back only what its plan,
+made again, still holds.
 """
 
 from __future__ import annotations
@@ -243,8 +245,7 @@ class OrganizePage(QWidget):
         for move in found.moves:
             groups.setdefault(move.category, []).append(move)
         for category, moves in groups.items():
-            title = translator.text("organize.category", category=category, **self._amount(moves))
-            self._group(title, [self._line(move) for move in moves])
+            self._group(self._category(category, moves), [self._line(move) for move in moves])
         if found.stays:
             title = translator.text("organize.stays", n=len(found.stays))
             rows = self._group(title, self._stays(found.stays, found.folder))
@@ -402,6 +403,14 @@ class OrganizePage(QWidget):
         translator = self._window.translator
         files = translator.count("file", len(moves))
         return {"files": files, "size": translator.size(sum(move.size for move in moves))}
+
+    def _category(self, category: str, moves: Sequence[Move]) -> str:
+        """The group's title: the category in the window's language, and its directory on disk
+        when that is named otherwise (item 44)."""
+        translator = self._window.translator
+        label = translator.category(category)
+        key = "organize.category" if label == category else "organize.category.named"
+        return translator.text(key, label=label, category=category, **self._amount(moves))
 
     def _line(self, move: Move) -> str:
         text = self._window.translator.text

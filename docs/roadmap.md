@@ -223,16 +223,20 @@ Scanner core and `safeclean scan` (read-only report).
   `ui.explain` (Explain (local AI) on request), `ui.app`.
 - Tests: `pytest-qt` offscreen with the real worker thread, no live system, and the window and
   the CLI compared on the same trees. 2493 tests, 100 % line and branch coverage.
+- Then decision 0012 accepted as it is, and organize's categories named in the window's
+  language (0014 item 44): a plan's group shows the label and, in Russian, the directory beside
+  it; the directories, every path, the journal and the CLI keep the English names. 2500 tests,
+  100 % line and branch coverage.
 
 ### Accepted limitations carried into step 8
 - Everything from steps 2 to 6 still holds.
 - **Window** (decision 0014): a task cannot be cancelled, and a scan that only reads is left
   behind when the window closes; the folders added on Overview are not remembered; a new
   language applies the next time the window opens; organize's category directories keep their
-  English names, and the model answers in its own words, in the Russian window too; the
-  machine scope is read only on Windows and only listed, as with `--include-machine`; the
-  window is tested offscreen on Linux only (B11), with no screen reader; there are no
-  screenshots yet (step 8).
+  English names on disk (only their labels are translated), and the model answers in its own
+  words, in the Russian window too; the machine scope is read only on Windows and only listed,
+  as with `--include-machine`; the window is tested offscreen on Linux only (B11), with no
+  screen reader; there are no screenshots yet (step 8).
 
 ### Left for later
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).

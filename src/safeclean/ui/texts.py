@@ -134,6 +134,10 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "organize.refused": {"en": "Refused: {folder}: {reason}", "ru": "Отказано: {folder}: {reason}"},
     "organize.category": {"en": "{category}: {files}, {size}", "ru": "{category}: {files}, {size}"},
+    "organize.category.named": {
+        "en": "{label} (folder {category}): {files}, {size}",
+        "ru": "{label} (папка {category}): {files}, {size}",
+    },
     "organize.line": {"en": "{name} → {category}/", "ru": "{name} → {category}/"},
     "organize.stays": {"en": "Stay in place: {n}", "ru": "Остаются на месте: {n}"},
     "organize.stay": {"en": "{name} ({reason})", "ru": "{name} ({reason})"},

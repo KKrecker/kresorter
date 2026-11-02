@@ -207,7 +207,9 @@ The sidebar opens six pages:
 - **Quarantine**: the quarantined files; Restore, or Delete permanently, the one red button.
 - **Organize**: a folder's plan by category and the files that stay, the move as one batch, the
   batches and their undo; where `organize` refuses (not Linux, or no reliable open-file check),
-  the page says why.
+  the page says why. The Russian window names the categories in Russian, but the directories
+  keep their English names (`Images`, `Documents`, ...) in every language, so `organize undo`
+  moves back what the window sorted, and the window what the command sorted.
 - **Autostart**: the entries by source, with their state, scope and location; Disable and Enable
   for those that can change.
 - **Settings**: the language, on Windows the machine-wide autostart entries (off until you turn

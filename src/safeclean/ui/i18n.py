@@ -2,8 +2,9 @@
 
 Every text is looked up by key in ``texts.CATALOG``, every count in ``texts.PLURALS`` (English:
 one and other; Russian: one, few and many), every value of an enumeration the window shows in
-``labels.LABELS``, every size in the units of ``texts.UNITS``. Values put into a text are
-inserted as they are: paths, names, details from the system and explanations are never
+``labels.LABELS``, every category of organize's table in ``labels.CATEGORIES``, every size in
+the units of ``texts.UNITS``. Values put into a text are inserted as they are: paths (with the
+category directories in them), names, details from the system and explanations are never
 translated. No Qt is needed here.
 """
 
@@ -14,11 +15,12 @@ from enum import StrEnum
 from string import Formatter
 from typing import Literal, TypeVar
 
-from safeclean.ui.labels import LABELS
+from safeclean.ui.labels import CATEGORIES, LABELS
 from safeclean.ui.texts import CATALOG, DECIMAL, PLURALS, UNITS
 
 __all__ = [
     "CATALOG",
+    "CATEGORIES",
     "LABELS",
     "LANGUAGES",
     "PLURALS",
@@ -119,6 +121,11 @@ class Translator:
 
     def label(self, value: StrEnum) -> str:
         return LABELS[type(value)][value.value][self.language]
+
+    def category(self, name: str) -> str:
+        """What the window calls organize's category ``name``; a name without a label as it
+        is."""
+        return CATEGORIES.get(name, {}).get(self.language, name)
 
     def reason(self, value: StrEnum, detail: str = "") -> str:
         """A value's label, and its detail, as it is, when there is one."""

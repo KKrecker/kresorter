@@ -1,6 +1,7 @@
 """A label in English and Russian for every value of an enumeration the window shows
-(decision 0014, item 31). Details that come with a value (a path, a rule, the system's own
-message) are shown after its label, as they are."""
+(decision 0014, item 31), and for each category of organize's table (item 44). Details that
+come with a value (a path, a rule, the system's own message) are shown after its label, as they
+are; a category's directory keeps its name on disk, which is its English label."""
 
 from __future__ import annotations
 
@@ -23,7 +24,7 @@ from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailure
 from safeclean.ui.settings import Unused
 
-__all__ = ["LABELS"]
+__all__ = ["CATEGORIES", "LABELS"]
 
 
 def _both(en: str, ru: str) -> dict[str, str]:
@@ -38,6 +39,16 @@ _ITEM_REFUSALS = {
     "vault_changed": _both(
         "Its copy in the quarantine has changed", "Его копия в карантине изменилась"
     ),
+}
+
+# By the name on disk (``organize/categories.toml``), which the English label repeats.
+CATEGORIES: dict[str, dict[str, str]] = {
+    "Images": _both("Images", "Изображения"),
+    "Videos": _both("Videos", "Видео"),
+    "Audio": _both("Audio", "Аудио"),
+    "Documents": _both("Documents", "Документы"),
+    "Archives": _both("Archives", "Архивы"),
+    "Installers": _both("Installers", "Установщики"),
 }
 
 LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
