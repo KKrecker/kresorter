@@ -1,10 +1,13 @@
-"""The window: a sidebar of six pages, the task that runs, closing (decision 0014, items 16-18).
+"""The window: a sidebar of six pages, the task that runs, closing, unfinished work (decision
+0014, items 16-18 and 25).
 
 The sidebar opens Overview, Findings, Quarantine, Organize, Autostart and Settings, in that order,
 the current page marked and every page reachable with the keyboard. Every control that starts a
 task is registered with ``add_starter``: it is disabled while a task runs, and otherwise enabled
 when its page's own condition holds. The window says what runs, shows a task's error with its
 message, and refuses to close while a task that acts runs; it closes once that task has ended.
+Above the pages, the recovery banner offers Recover when the window opens on a journal with
+unfinished work, and whenever a session finds some (``refusal``).
 """
 
 from __future__ import annotations
@@ -26,12 +29,17 @@ from PySide6.QtWidgets import (
 )
 
 from safeclean.environment import Environment
+from safeclean.storage.pending import Domain
+from safeclean.storage.session import SessionFailed
+from safeclean.ui.autostart import AutostartPage
 from safeclean.ui.dialogs import Dialogs, choose_folder, confirm
 from safeclean.ui.findings import FindingsPage
 from safeclean.ui.i18n import Translator
 from safeclean.ui.organize import OrganizePage
 from safeclean.ui.overview import OverviewPage
 from safeclean.ui.quarantine import QuarantinePage
+from safeclean.ui.recovery import RecoveryBanner
+from safeclean.ui.sessions import NoReliableCheck, Unclosed, Unfinished, problem
 from safeclean.ui.tasks import Task, Tasks
 from safeclean.ui.theme import Look
 
@@ -76,15 +84,18 @@ class Window(QMainWindow):
         self.tasks.busy.connect(self._busy)
         self.tasks.failed.connect(self._failed)
 
+        self.recovery = RecoveryBanner(self)
         self.overview = OverviewPage(self)
         self.findings = FindingsPage(self)
         self.quarantine = QuarantinePage(self)
         self.organize = OrganizePage(self)
+        self.autostart = AutostartPage(self)
         made: dict[str, QWidget] = {
             "overview": self.overview,
             "findings": self.findings,
             "quarantine": self.quarantine,
             "organize": self.organize,
+            "autostart": self.autostart,
         }
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
@@ -107,6 +118,7 @@ class Window(QMainWindow):
         self.status.setProperty("role", "secondary")
 
         right = QVBoxLayout()
+        right.addWidget(self.recovery)
         right.addWidget(self.pages, 1)
         right.addWidget(self.message)
         right.addWidget(self.status)
@@ -116,6 +128,7 @@ class Window(QMainWindow):
         layout.addLayout(right, 1)
         self.setCentralWidget(central)
         Look(self)
+        self.recovery.look()
 
     def page(self, name: str) -> QWidget:
         return self._pages[PAGES.index(name)]
@@ -124,11 +137,30 @@ class Window(QMainWindow):
         self.sidebar.setCurrentRow(PAGES.index(name))
 
     def _opened(self, row: int) -> None:
-        """The Quarantine and Organize pages read the journal each time they open."""
-        loads = {"quarantine": self.quarantine.load, "organize": self.organize.load}
+        """The Quarantine and Organize pages read the journal each time they open, the
+        Autostart page its entries."""
+        loads = {
+            "quarantine": self.quarantine.load,
+            "organize": self.organize.load,
+            "autostart": self.autostart.load,
+        }
         load = loads.get(PAGES[row])
         if load is not None:
             load()
+
+    def refusal(
+        self,
+        outcome: Unfinished | NoReliableCheck | Unclosed | SessionFailed,
+        *,
+        no_check: str = "session.no_check",
+    ) -> str:
+        """Why a page's session did not act (``sessions.problem``); unfinished work it found is
+        offered to Recover."""
+        if isinstance(outcome, Unfinished):
+            self.recovery.offer(outcome.domains)
+        if isinstance(outcome, Unclosed):  # what else is unfinished is not known yet
+            self.recovery.offer(self.recovery.offered | {Domain.AUTOSTART})
+        return problem(self.translator, outcome, no_check=no_check)
 
     def add_starter(self, control: QWidget, when: Callable[[], bool] = _always) -> None:
         """``control`` starts a task: enabled only while none runs and ``when()`` holds."""

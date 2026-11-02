@@ -1,23 +1,34 @@
-"""The window's sessions in the journal, run in a task's worker (decision 0014, items 11, 14, 21
-and 23).
+"""The window's sessions in the journal, run in a task's worker (decision 0014, items 11, 13, 14,
+21, 23-25).
 
 A session runs as the CLI's does: the data directory is checked, the lock taken and the journal
 opened (``storage.session``); the domain's own unfinished work is recovered first, and
 unfinished work of another domain refuses an action before anything is changed (a listing goes
 on, as ``quarantine list`` and ``organize list``). A quarantine session needs a reliable
 open-file check. Each one ends with the domain's state then: the quarantined files, organize's
-batches. Organize's acts make their plan again inside the session and carry out only the
-confirmed moves it still holds unchanged (item 14). What could not run is a value the page shows
-in its words (``problem``). No Qt is needed here.
+batches, the autostart entries. Organize's acts make their plan again inside the session and
+carry out only the confirmed moves it still holds unchanged (item 14); an autostart change is
+refused by its changer when the entry is no longer the one listed. Recover runs what
+``safeclean recover`` runs, for every domain, and looking for unfinished work opens only a
+journal that is already there (item 2). What could not run is a value the page shows in its
+words (``problem``). No Qt is needed here.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
+from safeclean.autostart.changers import changes_for
+from safeclean.autostart.changes import XdgChanges
+from safeclean.autostart.entries import BrokenEntryError
+from safeclean.autostart.journal import ChangeRecovery, ChangeRefusal, ChangeResult, refused
+from safeclean.autostart.listing import AutostartContext, list_autostart
+from safeclean.autostart.models import AutostartItem, AutostartListing
+from safeclean.autostart.registry import RegistryError
+from safeclean.autostart.run_changes import RunKeyChanges
 from safeclean.core.preflight import Refused, UnreliableCheckerError
 from safeclean.core.scanner import ScanContext
 from safeclean.organize import recovery as organize_recovery
@@ -26,33 +37,47 @@ from safeclean.organize.journal import Summary, summaries
 from safeclean.organize.mover import BatchResult, Planned, carry_out, check
 from safeclean.organize.planner import Move, Plan, plan
 from safeclean.organize.undo import UndoMove, UndoPlan, UndoRefused, plan_undo
+from safeclean.quarantine import recovery as quarantine_recovery
 from safeclean.quarantine.journal import QuarantinedItem, quarantined
 from safeclean.quarantine.recovery import RecoveryReport
 from safeclean.quarantine.service import QuarantineService
+from safeclean.storage.data_dir import DataDirError, check_data_dir
 from safeclean.storage.pending import Domain, pending_domains
-from safeclean.storage.session import Journal, SessionFailed, run_session
+from safeclean.storage.session import JOURNAL_NAME, Journal, SessionFailed, run_session
 from safeclean.ui.i18n import Translator
 
 __all__ = [
+    "ORDER",
     "Act",
+    "Action",
     "Carried",
+    "Changed",
     "Done",
     "NoReliableCheck",
+    "NotChanged",
     "Organized",
+    "Recovered",
+    "Unclosed",
     "Unfinished",
+    "change_entry",
+    "domains",
     "in_organize",
     "in_quarantine",
     "no_act",
     "plan_folder",
     "problem",
+    "recover_all",
     "sort_folder",
     "undo_batch",
     "undo_plan",
+    "unfinished_work",
 ]
 
 T = TypeVar("T")
 M = TypeVar("M", Move, UndoMove)
 Act = Callable[[ScanContext, Journal], T]  # what an organize session does, inside it
+Action = Literal["disable", "enable"]
+ORDER = (Domain.QUARANTINE, Domain.ORGANIZE, Domain.AUTOSTART)  # as ``safeclean recover`` goes
 
 
 @dataclass(frozen=True)
@@ -222,18 +247,129 @@ def _carry(
     return Carried(folder, batch, tuple(cleared), tuple(refused), changed)
 
 
+@dataclass(frozen=True)
+class Unclosed:
+    """An unfinished autostart change that cannot be checked (its entry or flag cannot be read)
+    or closed (what it has to move cannot be moved): Recover again once what is there is
+    fixed."""
+
+    kind: Literal["unchecked", "unclosed"]
+    detail: str
+
+
+@dataclass(frozen=True)
+class NotChanged:
+    """A check before the change failed: nothing was journaled, nothing changed."""
+
+    detail: str
+
+
+@dataclass(frozen=True)
+class Changed:
+    recovered: ChangeRecovery  # autostart's own unfinished changes, closed first
+    result: ChangeResult | NotChanged | Unclosed
+    listing: AutostartListing  # the entries after ``result``
+
+
+def change_entry(
+    scan: ScanContext, auto: AutostartContext, action: Action, item: AutostartItem
+) -> Changed | Unclosed | Unfinished | SessionFailed:
+    """``action`` on ``item``, as it was listed, inside the session, as ``autostart disable``
+    and ``enable`` with ``--yes`` change it; or why it did not run."""
+
+    def body(conn: Journal, data_dir: Path) -> Changed | Unclosed | Unfinished:
+        changes = changes_for(auto, conn, data_dir)
+        recovered = _recover_changes(changes)
+        if isinstance(recovered, Unclosed):
+            return recovered
+        others = pending_domains(conn)
+        if others:  # its own was recovered above (0011 item 127)
+            return Unfinished(frozenset(others))
+        result = _change(changes, action, item)
+        return Changed(recovered, result, list_autostart(auto, include_machine=False))
+
+    return run_session(scan, body)
+
+
+def _change(
+    changes: XdgChanges | RunKeyChanges | None, action: Action, item: AutostartItem
+) -> ChangeResult | NotChanged | Unclosed:
+    if changes is None:  # nothing is written on this system (0011)
+        return refused(ChangeRefusal.READ_ONLY, f"{item.source} entries are read-only")
+    act = changes.disable if action == "disable" else changes.enable
+    try:
+        return act(item)
+    except (BrokenEntryError, RegistryError) as error:  # read back: left unfinished (item 90)
+        return Unclosed("unchecked", str(error))
+    except OSError as error:  # a check before acting: nothing is journaled (items 111, 113)
+        return NotChanged(str(error))
+
+
+def _recover_changes(changes: XdgChanges | RunKeyChanges | None) -> ChangeRecovery | Unclosed:
+    """The autostart ``recover()``, as ``cli_autostart.recovered`` runs it."""
+    try:
+        return ChangeRecovery() if changes is None else changes.recover()
+    except (BrokenEntryError, RegistryError) as error:
+        return Unclosed("unchecked", str(error))
+    except OSError as error:  # what it has to move cannot be moved (0011 items 96, 113)
+        return Unclosed("unclosed", str(error))
+
+
+@dataclass(frozen=True)
+class Recovered:
+    """What Recover closed in each domain, and the domains still unfinished after it."""
+
+    quarantine: RecoveryReport
+    organize: organize_recovery.RecoveryReport
+    autostart: ChangeRecovery | Unclosed
+    left: frozenset[Domain]
+
+
+def recover_all(scan: ScanContext, auto: AutostartContext) -> Recovered | SessionFailed:
+    """What ``safeclean recover`` runs: the quarantine first, then organize's moves, then the
+    autostart changes of this platform."""
+
+    def body(conn: Journal, data_dir: Path) -> Recovered:
+        found = quarantine_recovery.recover(conn)
+        organized = organize_recovery.recover(conn)
+        changed = _recover_changes(changes_for(auto, conn, data_dir))
+        return Recovered(found, organized, changed, frozenset(pending_domains(conn)))
+
+    return run_session(scan, body)
+
+
+def unfinished_work(context: ScanContext) -> frozenset[Domain]:
+    """The domains with unfinished work in the journal, if there is one: without one, nothing
+    is opened and nothing created (items 2, 25). A journal that cannot be read now says
+    nothing; the session that needs it will say why."""
+    try:
+        journal = check_data_dir(context.policy, context.classifier) / JOURNAL_NAME
+    except DataDirError:
+        return frozenset()
+    if not journal.is_file():
+        return frozenset()
+    found = run_session(context, lambda conn, data_dir: frozenset(pending_domains(conn)))
+    return frozenset() if isinstance(found, SessionFailed) else found
+
+
+def domains(translator: Translator, found: Collection[Domain]) -> str:
+    """``found``'s labels, in the order ``safeclean recover`` recovers them."""
+    return ", ".join(translator.label(domain) for domain in ORDER if domain in found)
+
+
 def problem(
     translator: Translator,
-    outcome: Unfinished | NoReliableCheck | SessionFailed,
+    outcome: Unfinished | NoReliableCheck | Unclosed | SessionFailed,
     *,
     no_check: str = "session.no_check",
 ) -> str:
     """Why a session did not act, in the window's words; ``no_check`` the key of what a page
     says without a reliable open-file check."""
     if isinstance(outcome, Unfinished):
-        domains = ", ".join(translator.label(d) for d in Domain if d in outcome.domains)
-        return translator.text("session.unfinished", domains=domains)
+        return translator.text("session.unfinished", domains=domains(translator, outcome.domains))
     if isinstance(outcome, NoReliableCheck):
         return translator.text(no_check)
+    if isinstance(outcome, Unclosed):
+        return translator.text(f"autostart.{outcome.kind}", detail=outcome.detail)
     failure = translator.label(outcome.failure)
     return translator.text("session.failed", failure=failure, detail=outcome.detail)

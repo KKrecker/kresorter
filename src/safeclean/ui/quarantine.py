@@ -35,9 +35,11 @@ from safeclean.quarantine.service import (
     RestoreRefused,
     RestoreResult,
 )
+from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
-from safeclean.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine, problem
+from safeclean.ui.recovery import quarantine_lines
+from safeclean.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine
 from safeclean.ui.tasks import Task
 
 if TYPE_CHECKING:
@@ -127,9 +129,11 @@ class QuarantinePage(QWidget):
 
         def done(outcome: Done[T] | Unfinished | NoReliableCheck | SessionFailed) -> None:
             if not isinstance(outcome, Done):
-                no_check = "quarantine.no_check"
-                self.result.setText(problem(window.translator, outcome, no_check=no_check))
+                self.result.setText(window.refusal(outcome, no_check="quarantine.no_check"))
                 return
+            window.recovery.report(
+                Domain.QUARANTINE, quarantine_lines(window.translator, outcome.recovered)
+            )
             show(outcome.result)
             self._list(outcome.listed)
 

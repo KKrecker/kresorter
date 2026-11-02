@@ -37,8 +37,10 @@ from safeclean.organize.mover import BatchResult, Planned
 from safeclean.organize.planner import Move, Plan, Stay
 from safeclean.organize.platforms import blockers
 from safeclean.organize.undo import UndoPlan, UndoRefused
+from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.recovery import organize_lines
 from safeclean.ui.sessions import (
     Act,
     Carried,
@@ -47,7 +49,6 @@ from safeclean.ui.sessions import (
     in_organize,
     no_act,
     plan_folder,
-    problem,
     sort_folder,
     undo_batch,
     undo_plan,
@@ -165,8 +166,11 @@ class OrganizePage(QWidget):
 
         def done(outcome: Organized[T] | Unfinished | SessionFailed) -> None:
             if not isinstance(outcome, Organized):
-                self.result.setText(problem(window.translator, outcome))
+                self.result.setText(window.refusal(outcome))
                 return
+            window.recovery.report(
+                Domain.ORGANIZE, organize_lines(window.translator, outcome.recovered)
+            )
             show(outcome.result)
             self._list(outcome.batches)
 

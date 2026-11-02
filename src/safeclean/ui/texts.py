@@ -212,6 +212,151 @@ CATALOG: dict[str, dict[str, str]] = {
     "task.organize": {"en": "Moving files", "ru": "Перемещение файлов"},
     "task.plan_undo": {"en": "Planning the undo", "ru": "Подготовка возврата"},
     "task.undo": {"en": "Moving files back", "ru": "Возврат файлов"},
+    "autostart.entries": {"en": "Autostart entries", "ru": "Записи автозагрузки"},
+    "autostart.name": {"en": "Name", "ru": "Название"},
+    "autostart.state": {"en": "State", "ru": "Состояние"},
+    "autostart.scope": {"en": "Scope", "ru": "Область"},
+    "autostart.location": {"en": "Location", "ru": "Расположение"},
+    "autostart.group": {"en": "{source}: {n}", "ru": "{source}: {n}"},
+    "autostart.total": {
+        "en": "{entries}, {disabled} disabled",
+        "ru": "{entries}, отключено: {disabled}",
+    },
+    "autostart.skipped": {"en": "Skipped: {n}", "ru": "Пропущено: {n}"},
+    "autostart.skip": {
+        "en": "{source}: {location} ({detail})",
+        "ru": "{source}: {location} ({detail})",
+    },
+    "autostart.refresh": {"en": "Refresh", "ru": "Обновить"},
+    "autostart.disable": {"en": "Disable…", "ru": "Отключить…"},
+    "autostart.enable": {"en": "Enable…", "ru": "Включить…"},
+    "autostart.unchecked": {
+        "en": "An unfinished autostart change cannot be checked: {detail}. Fix or move what is"
+        " there, then use Recover again.",
+        "ru": "Незавершённое изменение автозагрузки нельзя проверить: {detail}. Исправьте или"
+        " переместите то, что там находится, и снова используйте «Восстановить после сбоя».",
+    },
+    "autostart.unclosed": {
+        "en": "An unfinished autostart change cannot be closed: {detail}. Fix or move what is"
+        " there, then use Recover again.",
+        "ru": "Незавершённое изменение автозагрузки нельзя закрыть: {detail}. Исправьте или"
+        " переместите то, что там находится, и снова используйте «Восстановить после сбоя».",
+    },
+    "entry.enabled": {"en": "Enabled", "ru": "Включена"},
+    "entry.disabled": {"en": "Disabled", "ru": "Отключена"},
+    "change.disable_title": {"en": "Disable {name}", "ru": "Отключить {name}"},
+    "change.enable_title": {"en": "Enable {name}", "ru": "Включить {name}"},
+    "change.disable_confirm": {
+        "en": "Disable {name} ({source}, {scope})?",
+        "ru": "Отключить {name} ({source}, {scope})?",
+    },
+    "change.enable_confirm": {
+        "en": "Enable {name} ({source}, {scope})?",
+        "ru": "Включить {name} ({source}, {scope})?",
+    },
+    "change.location": {"en": "Location: {location}", "ru": "Расположение: {location}"},
+    "change.disable": {"en": "Disable", "ru": "Отключить"},
+    "change.enable": {"en": "Enable", "ru": "Включить"},
+    "how.run_key_disable": {
+        "en": "Its StartupApproved flag is set to disabled, as the Task Manager does; the Run"
+        " value is never written.",
+        "ru": "Её флаг StartupApproved получает значение «отключено», как это делает диспетчер"
+        " задач; значение Run не изменяется.",
+    },
+    "how.run_key_enable": {
+        "en": "Its StartupApproved flag is set to enabled; the Run value is never written.",
+        "ru": "Её флаг StartupApproved получает значение «включено»; значение Run не изменяется.",
+    },
+    "how.enable": {
+        "en": "If safeclean disabled it, what it changed is put back (the original from the"
+        " store, or the stub moved to the store); nothing is deleted.",
+        "ru": "Если её отключил safeclean, изменённое возвращается (оригинал из хранилища, или"
+        " заглушка переносится в хранилище); ничего не удаляется.",
+    },
+    "how.user_disable": {
+        "en": "Its file is replaced by a copy with Hidden=true; the original is kept in the"
+        " autostart store.",
+        "ru": "Её файл заменяется копией с Hidden=true; оригинал сохраняется в хранилище"
+        " автозагрузки.",
+    },
+    "how.system_disable": {
+        "en": "A stub with Hidden=true is created in {folder}; the system file is never written.",
+        "ru": "В {folder} создаётся заглушка с Hidden=true; системный файл не изменяется.",
+    },
+    "change.disabled": {
+        "en": "Disabled {name} (change {change}).",
+        "ru": "Отключено: {name} (изменение {change}).",
+    },
+    "change.enabled": {
+        "en": "Enabled {name} (change {change}).",
+        "ru": "Включено: {name} (изменение {change}).",
+    },
+    "change.refused": {"en": "Refused: {reason}.", "ru": "Отказано: {reason}."},
+    "change.rolled_back": {
+        "en": "Not changed: {detail}; it was rolled back (change {change}).",
+        "ru": "Не изменено: {detail}; всё возвращено как было (изменение {change}).",
+    },
+    "change.failed": {
+        "en": "Change {change} failed: {detail}. Use Recover.",
+        "ru": "Изменение {change} не удалось: {detail}. Используйте «Восстановить после сбоя».",
+    },
+    "change.not_changed": {
+        "en": "Cannot change {name}: {detail}; nothing was changed.",
+        "ru": "Нельзя изменить {name}: {detail}; ничего не изменено.",
+    },
+    "task.autostart": {"en": "Reading autostart", "ru": "Чтение автозагрузки"},
+    "task.disable": {"en": "Disabling", "ru": "Отключение"},
+    "task.enable": {"en": "Enabling", "ru": "Включение"},
+    "recover.found": {"en": "Unfinished work: {domains}.", "ru": "Прерванная работа: {domains}."},
+    "recover.button": {"en": "Recover…", "ru": "Восстановить после сбоя…"},
+    "recover.hide": {"en": "Hide", "ru": "Скрыть"},
+    "recover.action": {"en": "Recover", "ru": "Восстановить"},
+    "recover.confirm": {
+        "en": "Finish the unfinished work ({domains}) by what is on the disk now?",
+        "ru": "Завершить прерванную работу ({domains}) по тому, что сейчас на диске?",
+    },
+    "recover.quarantine": {
+        "en": "Quarantine: each interrupted move, restore or deletion is closed by where its"
+        " files are now.",
+        "ru": "Карантин: каждое прерванное перемещение, возврат или удаление закрывается по"
+        " тому, где сейчас находятся его файлы.",
+    },
+    "recover.organize": {
+        "en": "Organize: each interrupted batch is closed by where its files are now; no file"
+        " is moved.",
+        "ru": "Сортировка: каждый прерванный пакет закрывается по тому, где сейчас находятся"
+        " его файлы; файлы не перемещаются.",
+    },
+    "recover.autostart": {
+        "en": "Autostart: each interrupted change is completed or put back, by what its entry"
+        " holds now.",
+        "ru": "Автозагрузка: каждое прерванное изменение доводится до конца или отменяется по"
+        " тому, что сейчас в записи.",
+    },
+    "recovered.quarantine": {
+        "en": "Recovered an interrupted quarantine operation ({files}).",
+        "ru": "Восстановлена прерванная операция карантина ({files}).",
+    },
+    "recovered.organize": {
+        "en": "Recovered interrupted organize batches: {n}",
+        "ru": "Восстановлено прерванных пакетов сортировки: {n}",
+    },
+    "recovered.batch": {"en": "Batch {batch}: {state}.", "ru": "Пакет {batch}: {state}."},
+    "recovered.undo": {
+        "en": "Batch {batch} (undo of batch {undoing}): {state}.",
+        "ru": "Пакет {batch} (возврат пакета {undoing}): {state}.",
+    },
+    "recovered.autostart": {
+        "en": "Recovered interrupted autostart changes: {n}",
+        "ru": "Восстановлено прерванных изменений автозагрузки: {n}",
+    },
+    "recovered.change": {
+        "en": "Change {change}: {state}.",
+        "ru": "Изменение {change}: {state}.",
+    },
+    "recovered.nothing": {"en": "Nothing to recover.", "ru": "Восстанавливать нечего."},
+    "task.look": {"en": "Looking for unfinished work", "ru": "Поиск прерванной работы"},
+    "task.recover": {"en": "Recovering", "ru": "Восстановление после сбоя"},
     "folder.title": {"en": "Choose a folder", "ru": "Выберите папку"},
     "folder.path": {"en": "Folder", "ru": "Папка"},
     "folder.choose": {"en": "Choose", "ru": "Выбрать"},

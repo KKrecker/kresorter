@@ -32,9 +32,11 @@ from PySide6.QtWidgets import (
 from safeclean.analysis.report import AnalysisReport, Finding
 from safeclean.analysis.score import Evidence, Level
 from safeclean.quarantine.service import QuarantineResult
+from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
-from safeclean.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine, problem
+from safeclean.ui.recovery import quarantine_lines
+from safeclean.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine
 from safeclean.ui.tasks import Task
 
 if TYPE_CHECKING:
@@ -293,10 +295,11 @@ class FindingsPage(QWidget):
         window.run(Task(translator.text("task.quarantine"), work, self._moved, acts=True))
 
     def _moved(self, outcome: Moving) -> None:
-        translator = self._window.translator
+        window, translator = self._window, self._window.translator
         if not isinstance(outcome, Done):
-            self.result.setText(problem(translator, outcome))
+            self.result.setText(window.refusal(outcome))
             return
+        window.recovery.report(Domain.QUARANTINE, quarantine_lines(translator, outcome.recovered))
         result = outcome.result
         gone = {str(moved.original) for moved in result.moved}
         lines = [

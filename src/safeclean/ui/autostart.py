@@ -1,0 +1,263 @@
+"""The Autostart page: the entries grouped by source, Disable and Enable after confirmation
+(decision 0014, items 3, 13 and 24).
+
+The entries are read each time the page opens, and on Refresh, as ``autostart list`` reads
+them: nothing is opened, created or changed. Each group names its source and its count; each
+entry shows its state, scope and location. Disable or Enable is offered for an entry that can
+change (``disableable``) and is not in that state already; the confirmation says what is
+written, as ``autostart disable`` without ``--yes`` does. Confirmed, the change runs in a
+session (``ui.sessions``) that recovers autostart's own unfinished changes first, and its
+changer refuses an entry that is no longer the one listed. The result says done, refused,
+rolled back or failed; a failed change, and one left unfinished, names Recover, which the
+banner offers.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from safeclean.autostart.journal import ChangeResult, ChangeState
+from safeclean.autostart.listing import AutostartContext, list_autostart
+from safeclean.autostart.models import AutostartItem, AutostartListing, Scope, Source
+from safeclean.autostart.xdg import autostart_dirs
+from safeclean.storage.pending import Domain
+from safeclean.storage.session import SessionFailed
+from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.recovery import autostart_lines
+from safeclean.ui.sessions import (
+    Action,
+    Changed,
+    NotChanged,
+    Unclosed,
+    Unfinished,
+    change_entry,
+)
+from safeclean.ui.tasks import Task
+
+if TYPE_CHECKING:
+    from safeclean.ui.window import Window
+
+__all__ = ["AutostartPage"]
+
+_INDEX = Qt.ItemDataRole.UserRole  # an entry's place in the listing
+_COLUMNS = ("name", "state", "scope", "location")
+
+
+def _label(text: str = "") -> QLabel:
+    label = QLabel(text)
+    label.setWordWrap(True)
+    label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    return label
+
+
+class AutostartPage(QWidget):
+    def __init__(self, window: Window) -> None:
+        super().__init__()
+        self._window = window
+        self._items: tuple[AutostartItem, ...] = ()
+        self._rows: list[QTreeWidgetItem] = []
+        text = window.translator.text
+
+        heading = QLabel(text("page.autostart"))
+        heading.setProperty("role", "heading")
+        self.entries = QTreeWidget()
+        self.entries.setAccessibleName(text("autostart.entries"))
+        self.entries.setColumnCount(len(_COLUMNS))
+        self.entries.setHeaderLabels([text(f"autostart.{name}") for name in _COLUMNS])
+        self.entries.itemSelectionChanged.connect(window.update_starters)
+        self.total = QLabel()
+        self.skipped = _label()
+        self.refresh_button = QPushButton(text("autostart.refresh"))
+        self.refresh_button.clicked.connect(self.load)
+        self.disable_button = QPushButton(text("autostart.disable"))
+        self.disable_button.clicked.connect(lambda: self._confirm("disable"))
+        self.enable_button = QPushButton(text("autostart.enable"))
+        self.enable_button.clicked.connect(lambda: self._confirm("enable"))
+        self.result = _label()
+
+        buttons = QHBoxLayout()
+        buttons.addWidget(self.refresh_button)
+        buttons.addStretch(1)
+        buttons.addWidget(self.disable_button)
+        buttons.addWidget(self.enable_button)
+        layout = QVBoxLayout(self)
+        layout.addWidget(heading)
+        layout.addWidget(self.entries, 1)
+        layout.addWidget(self.total)
+        layout.addWidget(self.skipped)
+        layout.addLayout(buttons)
+        layout.addWidget(self.result)
+        window.add_starter(self.refresh_button)
+        window.add_starter(self.disable_button, lambda: self._can("disable"))
+        window.add_starter(self.enable_button, lambda: self._can("enable"))
+
+    def row(self, name: str) -> QTreeWidgetItem:
+        """The first entry named ``name``."""
+        return next(row for row in self._rows if row.text(0) == name)
+
+    def selected(self) -> AutostartItem | None:
+        rows = self.entries.selectedItems()
+        return self._item(rows[0]) if rows else None
+
+    def _can(self, action: Action) -> bool:
+        item = self.selected()
+        return item is not None and item.disableable and item.enabled is (action == "disable")
+
+    # --- the listing ---------------------------------------------------------------------------
+
+    def load(self) -> None:
+        """Read the entries again; no journal is opened."""
+        window = self._window
+        environment = window.environment
+
+        def work() -> AutostartListing:
+            return list_autostart(environment.autostart_context(), include_machine=False)
+
+        def done(listing: AutostartListing) -> None:
+            self.result.clear()
+            self._list(listing)
+
+        window.run(Task(window.translator.text("task.autostart"), work, done))
+
+    def _list(self, listing: AutostartListing) -> None:
+        """Show ``listing``, grouped by source; the entry selected stays selected while one of
+        the same source and name is there."""
+        translator = self._window.translator
+        text = translator.text
+        chosen = self.selected()
+        self.entries.clear()
+        self._items, self._rows = listing.items, []
+        groups: dict[Source, QTreeWidgetItem] = {}
+        for index, item in enumerate(listing.items):
+            group = groups.get(item.source)
+            if group is None:
+                group = groups[item.source] = QTreeWidgetItem(self.entries)
+                group.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                group.setFirstColumnSpanned(True)
+                group.setExpanded(True)
+            row = QTreeWidgetItem(group, self._cells(item))
+            row.setData(0, _INDEX, index)
+            self._rows.append(row)
+        for source, group in groups.items():
+            found = group.childCount()
+            group.setText(0, text("autostart.group", source=translator.label(source), n=found))
+        for column in range(self.entries.columnCount()):
+            self.entries.resizeColumnToContents(column)
+        entries = translator.count("entry", len(listing.items))
+        disabled = sum(not item.enabled for item in listing.items)
+        self.total.setText(text("autostart.total", entries=entries, disabled=disabled))
+        skipped = [text("autostart.skipped", n=len(listing.skipped))]
+        skipped += [
+            text(
+                "autostart.skip",
+                source=translator.label(skip.source),
+                location=skip.location,
+                detail=skip.detail,
+            )
+            for skip in listing.skipped
+        ]
+        self.skipped.setText("\n".join(skipped))
+        again = [row for row in self._rows if chosen is not None and _same(self._item(row), chosen)]
+        if again:
+            again[0].setSelected(True)
+        self._window.update_starters()
+
+    def _cells(self, item: AutostartItem) -> list[str]:
+        translator = self._window.translator
+        state = translator.text("entry.enabled" if item.enabled else "entry.disabled")
+        return [item.name, state, translator.label(item.scope), item.location]
+
+    def _item(self, row: QTreeWidgetItem) -> AutostartItem:
+        return self._items[int(row.data(0, _INDEX))]
+
+    # --- a change ------------------------------------------------------------------------------
+
+    def _confirm(self, action: Action) -> None:
+        window, translator = self._window, self._window.translator
+        text = translator.text
+        [row] = self.entries.selectedItems()  # enabled with one entry selected, the most there is
+        item = self._item(row)
+        context = window.environment.autostart_context()
+        named = {"name": item.name, "source": translator.label(item.source)}
+        asked = Confirmation(
+            title=text(f"change.{action}_title", name=item.name),
+            text=text(f"change.{action}_confirm", scope=translator.label(item.scope), **named),
+            details=(
+                text("change.location", location=item.location),
+                self._how(action, item, context),
+            ),
+            action=text(f"change.{action}"),
+        )
+        if not window.dialogs.confirm(asked):
+            return
+        scan = window.environment.scan_context
+
+        def work() -> Changed | Unclosed | Unfinished | SessionFailed:
+            return change_entry(scan(), context, action, item)
+
+        def done(outcome: Changed | Unclosed | Unfinished | SessionFailed) -> None:
+            self._changed(outcome, action, item)
+
+        window.run(Task(text(f"task.{action}"), work, done, acts=True))
+
+    def _how(self, action: Action, item: AutostartItem, context: AutostartContext) -> str:
+        """What the change writes, as ``autostart disable`` and ``enable`` say it."""
+        text = self._window.translator.text
+        if item.source is Source.RUN_KEY:
+            return text(f"how.run_key_{action}")
+        if action == "enable":
+            return text("how.enable")
+        if item.scope is Scope.USER:
+            return text("how.user_disable")
+        user, _ = autostart_dirs(context.env, context.home)
+        return text("how.system_disable", folder=user)
+
+    def _changed(
+        self,
+        outcome: Changed | Unclosed | Unfinished | SessionFailed,
+        action: Action,
+        item: AutostartItem,
+    ) -> None:
+        window = self._window
+        if not isinstance(outcome, Changed):
+            self.result.setText(window.refusal(outcome))
+            return
+        window.recovery.report(
+            Domain.AUTOSTART, autostart_lines(window.translator, outcome.recovered)
+        )
+        self._list(outcome.listing)
+        self.result.setText(self._result(outcome.result, action, item))
+
+    def _result(
+        self, result: ChangeResult | NotChanged | Unclosed, action: Action, item: AutostartItem
+    ) -> str:
+        window = self._window
+        translator, text = window.translator, window.translator.text
+        if isinstance(result, NotChanged):
+            return text("change.not_changed", name=item.name, detail=result.detail)
+        if isinstance(result, Unclosed):
+            return window.refusal(result)
+        if result.refusal is not None:
+            return text("change.refused", reason=translator.label(result.refusal))
+        change = result.change_id
+        if result.state is ChangeState.DONE:
+            return text(f"change.{action}d", name=item.name, change=change)
+        if result.state is ChangeState.ROLLED_BACK:
+            return text("change.rolled_back", detail=result.detail, change=change)
+        window.recovery.offer(window.recovery.offered | {Domain.AUTOSTART})
+        return text("change.failed", detail=result.detail, change=change)
+
+
+def _same(one: AutostartItem, other: AutostartItem) -> bool:
+    return (one.source, one.name) == (other.source, other.name)
