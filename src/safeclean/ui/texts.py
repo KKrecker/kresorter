@@ -118,6 +118,8 @@ CATALOG: dict[str, dict[str, str]] = {
         " переместить в карантин.",
     },
     "task.scan": {"en": "Scanning", "ru": "Сканирование"},
+    "selected.files": {"en": "{files} selected", "ru": "Выбрано: {files}"},
+    "selected.size": {"en": "· {size}", "ru": "· {size}"},
     "findings.tree": {"en": "Findings", "ru": "Находки"},
     "findings.scan_of": {
         "en": "Scan of {folders}, {moment}",
@@ -137,8 +139,6 @@ CATALOG: dict[str, dict[str, str]] = {
     "findings.search": {"en": "Search the paths", "ru": "Поиск по путям"},
     "findings.select": {"en": "Select all: {level}", "ru": "Выбрать все: {level}"},
     "findings.clear": {"en": "Clear selection", "ru": "Снять выбор"},
-    "findings.selected": {"en": "{files} selected", "ru": "Выбрано: {files}"},
-    "findings.selected_size": {"en": "· {size}", "ru": "· {size}"},
     "findings.move": {"en": "Move to quarantine", "ru": "Переместить в карантин"},
     "findings.move_ask": {"en": "Move to quarantine…", "ru": "Переместить в карантин…"},
     "detail.none": {
@@ -180,9 +180,10 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "session.failed": {"en": "{failure}: {detail}", "ru": "{failure}: {detail}"},
     "quarantine.items": {"en": "Quarantined files", "ru": "Файлы в карантине"},
-    "quarantine.id": {"en": "Id", "ru": "№"},
-    "quarantine.original": {"en": "Original path", "ru": "Исходный путь"},
+    "quarantine.name": {"en": "Name", "ru": "Имя"},
     "quarantine.size": {"en": "Size", "ru": "Размер"},
+    "quarantine.id": {"en": "ID", "ru": "№"},
+    "quarantine.empty": {"en": "The quarantine is empty.", "ru": "Карантин пуст."},
     "quarantine.total": {
         "en": "In the quarantine: {files}, {size}",
         "ru": "Сейчас в карантине: {files}, {size}",

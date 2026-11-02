@@ -435,10 +435,10 @@ class FindingsPage(QWidget):
             box.setText(translator.text("findings.chip", level=translator.label(level), n=n))
         chosen = self.selected()
         self.chosen.setText(
-            translator.text("findings.selected", files=translator.count("file", len(chosen)))
+            translator.text("selected.files", files=translator.count("file", len(chosen)))
         )
         size = translator.size(sum(finding.entry.size for finding in chosen))
-        self.chosen_size.setText(translator.text("findings.selected_size", size=size))
+        self.chosen_size.setText(translator.text("selected.size", size=size))
         self._window.update_starters()
 
     def _about(self, evidence: Evidence, found: list[Finding]) -> str:

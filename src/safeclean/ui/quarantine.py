@@ -1,12 +1,15 @@
 """The Quarantine page: the files in the quarantine, Restore and Delete permanently (decision
-0014, items 5 and 22).
+0014, items 5, 22 and 51).
 
-The list is read from the journal each time the page opens, and on Refresh, in a session of
-its own (``ui.sessions``), as ``quarantine list`` reads it; every session ends with the list as
-it is then. Restore and Delete permanently act on the files checked, after a confirmation: a
-deletion's plan, with its total size, is made first and shown in the dialog, and the deletion
-plans again inside its own session, so that only the confirmed files the plan still holds are
-deleted (item 14). Delete permanently is the one action drawn in the danger colour.
+A row per file: its name and under it its original folder, its size and its id; with no file,
+that the quarantine is empty. The bar at the bottom says how many files are checked and their
+size, beside Restore and Delete permanently. The list is read from the journal each time the
+page opens, and on Refresh, in a session of its own (``ui.sessions``), as ``quarantine list``
+reads it; every session ends with the list as it is then. Restore and Delete permanently act on
+the files checked, after a confirmation: a deletion's plan, with its total size, is made first
+and shown in the dialog, and the deletion plans again inside its own session, so that only the
+confirmed files the plan still holds are deleted (item 14). Delete permanently is the one action
+drawn in the danger colour.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QWidget
 
 from safeclean.quarantine.journal import QuarantinedItem
 from safeclean.quarantine.service import (
@@ -30,9 +33,10 @@ from safeclean.quarantine.service import (
 from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
-from safeclean.ui.parts import Head, Note, badge, button, hbox, page, rows
+from safeclean.ui.parts import QUIET, SECONDARY, Head, Note, badge, bar, button, hbox, rows, vbox
 from safeclean.ui.recovery import quarantine_lines
 from safeclean.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine
+from safeclean.ui.shown import shown_path
 from safeclean.ui.tasks import Task
 
 if TYPE_CHECKING:
@@ -42,6 +46,8 @@ __all__ = ["QuarantinePage"]
 
 T = TypeVar("T")
 _CHECKED, _UNCHECKED = Qt.CheckState.Checked, Qt.CheckState.Unchecked
+_NAME, _SIZE, _ID = range(3)  # the columns
+_RIGHT = int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
 
 class QuarantinePage(QWidget):
@@ -58,10 +64,10 @@ class QuarantinePage(QWidget):
         self.items.setAccessibleName(text("quarantine.items"))
         self.items.setRootIsDecorated(False)
         self.items.setColumnCount(3)
-        self.items.setHeaderLabels(
-            [text(f"quarantine.{name}") for name in ("id", "original", "size")]
-        )
-        self.items.itemChanged.connect(window.update_starters)
+        self.items.setHeaderLabels([text(f"quarantine.{name}") for name in ("name", "size", "id")])
+        self.items.headerItem().setTextAlignment(_SIZE, _RIGHT)
+        self.items.itemChanged.connect(self._chosen)
+        self.empty = Note(self, role="secondary")
         self.total = Note(self, role="secondary")
         self.refresh_button = button(look, text("quarantine.refresh"), icon="refresh-cw")
         self.refresh_button.clicked.connect(self.load)
@@ -71,28 +77,52 @@ class QuarantinePage(QWidget):
         self.purge_button.clicked.connect(self._purge)
         self.permanent = badge(text("quarantine.permanent"), "danger")
         self.result = Note(self)
+        self.chosen = QLabel()
+        self.chosen.setProperty("role", "strong")
+        self.chosen_size = QLabel()
+        self.chosen_size.setProperty("role", "secondary")
 
-        buttons = hbox(spacing=8)
+        amount = hbox(spacing=4)
+        amount.addWidget(self.chosen)
+        amount.addWidget(self.chosen_size)
+        self.bar, buttons = bar()
+        buttons.addLayout(amount)
         buttons.addStretch(1)
         buttons.addWidget(self.restore_button)
         buttons.addWidget(self.permanent, 0, Qt.AlignmentFlag.AlignVCenter)
         buttons.addWidget(self.purge_button)
-        head = Head(text("page.quarantine"), text("head.quarantine"), self.refresh_button)
-        layout = page(self, head)
-        layout.addWidget(self.items, 1)
-        layout.addWidget(self.total)
-        layout.addLayout(buttons)
-        layout.addWidget(self.result)
+        self.head = Head(text("page.quarantine"), text("head.quarantine"), self.refresh_button)
+        inside = vbox(margins=(32, 32, 32, 16), spacing=16)
+        inside.addWidget(self.head)
+        inside.addWidget(self.items, 1)
+        inside.addWidget(self.empty)
+        inside.addWidget(self.total)
+        inside.addWidget(self.result)
+        inside.addStretch(0)  # the room the list leaves, when there is none
+        layout = vbox(self, spacing=0)
+        layout.addLayout(inside, 1)
+        layout.addWidget(self.bar)
         window.add_starter(self.refresh_button)
         window.add_starter(self.restore_button, lambda: bool(self.selected()))
         window.add_starter(self.purge_button, lambda: bool(self.selected()))
+        self._chosen()
 
     def row(self, item_id: int) -> QTreeWidgetItem:
         return self._rows[item_id]
 
     def selected(self) -> list[int]:
         """The ids checked, in order."""
-        return [item_id for item_id, row in self._rows.items() if row.checkState(0) == _CHECKED]
+        return [item_id for item_id, row in self._rows.items() if row.checkState(_NAME) == _CHECKED]
+
+    def _chosen(self) -> None:
+        """The files checked, and their size."""
+        translator = self._window.translator
+        chosen = [self._listed[item_id] for item_id in self.selected()]
+        files = translator.count("file", len(chosen))
+        size = translator.size(sum(item.size for item in chosen))
+        self.chosen.setText(translator.text("selected.files", files=files))
+        self.chosen_size.setText(translator.text("selected.size", size=size))
+        self._window.update_starters()
 
     # --- sessions ------------------------------------------------------------------------------
 
@@ -127,25 +157,40 @@ class QuarantinePage(QWidget):
         window.run(Task(window.translator.text(title), work, done, acts=True))
 
     def _list(self, listed: Sequence[QuarantinedItem]) -> None:
-        """Show ``listed``; what was checked and is still there stays checked."""
+        """Show ``listed``, or that the quarantine is empty; what was checked and is still there
+        stays checked."""
         translator = self._window.translator
         checked = set(self.selected())
+        self.items.blockSignals(True)
         self.items.clear()
         self._listed = {item.item_id: item for item in listed}
         self._rows = {}
+        home = Path.home()
         for item in listed:
+            original = item.original
             size = translator.size(item.size)
-            row = QTreeWidgetItem(self.items, [str(item.item_id), str(item.original), size])
-            row.setCheckState(0, _CHECKED if item.item_id in checked else _UNCHECKED)
+            row = QTreeWidgetItem(self.items, [original.name, size, str(item.item_id)])
+            row.setData(_NAME, SECONDARY, shown_path(original.parent, home))
+            row.setTextAlignment(_SIZE, _RIGHT)
+            for column in (_SIZE, _ID):
+                row.setData(column, QUIET, True)
+            row.setCheckState(_NAME, _CHECKED if item.item_id in checked else _UNCHECKED)
             self._rows[item.item_id] = row
-        for column in range(self.items.columnCount()):
+        self.items.blockSignals(False)
+        header = self.items.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(_NAME, header.ResizeMode.Stretch)
+        for column in (_SIZE, _ID):
             self.items.resizeColumnToContents(column)
+        self.items.setHidden(not listed)
+        self.empty.setText("" if listed else translator.text("quarantine.empty"))
         files = translator.count("file", len(listed))
         size = translator.size(sum(item.size for item in listed))
-        self.total.setText(translator.text("quarantine.total", files=files, size=size))
+        total = translator.text("quarantine.total", files=files, size=size)
+        self.total.setText(total if listed else "")
         self._window.sidebar.set_count("quarantine", len(listed))
         self._window.overview.show_quarantine((len(listed), sum(item.size for item in listed)))
-        self._window.update_starters()
+        self._chosen()
 
     def _refusals(
         self, refused: Sequence[RestoreRefused | PurgeRefused], paths: Mapping[int, Path]
