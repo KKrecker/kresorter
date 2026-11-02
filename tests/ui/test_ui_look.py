@@ -184,7 +184,7 @@ def _off_the_grid(window: Window) -> list[tuple[str, list[int]]]:
 
 def test_every_margin_and_spacing_is_on_the_grid(window: Window) -> None:
     # [0014.46]
-    assert sorted(GRID) == [0, 4, 8, 12, 16, 24, 32, 40]
+    assert sorted(GRID) == [0, 4, 8, 12, 16, 20, 24, 32, 40]
     assert _off_the_grid(window) == []
 
 
@@ -232,14 +232,21 @@ def test_every_check_box_and_every_choice_is_drawn_by_the_parts(window: Window) 
 def test_chips_fields_and_buttons_are_at_least_36_px_high(
     scanned_window: Window, name: str
 ) -> None:
-    # [0014.47] A link is text, not a button to the eye.
+    # [0014.47] A link is text, not a button to the eye, and a chip's remove button is inside
+    # its chip, which is as high as any.
     low = [
         widget
         for widget in _shown(scanned_window, name)
         if isinstance(widget, QPushButton | QLineEdit | QComboBox)
-        and widget.property("role") != "link"
+        and widget.property("role") not in ("link", "icon")
         and widget.height() < _MINIMUM
     ]
+    chips = [
+        widget
+        for widget in _shown(scanned_window, name)
+        if widget.property("role") == "chip" and widget.height() < _MINIMUM
+    ]
+    assert chips == []
     assert low == []
 
 
@@ -272,8 +279,9 @@ def test_badges_are_pills_20_px_high(scanned_window: Window) -> None:
     assert BADGE_HEIGHT == 20
     badges = [
         widget
-        for widget in _shown(scanned_window, "overview")
+        for name in PAGES
+        for widget in _shown(scanned_window, name)
         if isinstance(widget, QLabel) and widget.property("badge")
     ]
-    assert len(badges) == 3
+    assert badges
     assert all(badge.height() == BADGE_HEIGHT for badge in badges)

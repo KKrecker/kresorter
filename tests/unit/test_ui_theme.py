@@ -1,5 +1,5 @@
-"""The window's look: the tokens, the contrast, the style sheet (decision 0014, items 32, 33, 46
-and 47)."""
+"""The window's look: the tokens, the contrast, the style sheet (decision 0014, items 32, 33 and
+46-48)."""
 
 import re
 from pathlib import Path
@@ -190,8 +190,11 @@ def test_the_accent_marks_the_selection_and_the_focus(palette: Palette) -> None:
             "background-color": palette.accent_text,
             "color": palette.primary_text,
             "border": f"1px solid {palette.accent_text}",
+            "font-weight": "600",
         }
     ]
+    danger = [d for s, d in rules if s == 'QPushButton[role="danger"]']
+    assert [d["font-weight"] for d in danger] == ["600"]
 
 
 def test_the_dark_selection_is_a_12_percent_tint_of_the_accent() -> None:
@@ -250,6 +253,31 @@ def test_cards_chips_fields_buttons_links_and_badges(palette: Palette) -> None:
     assert views["background-color"] == palette.canvas
     assert rules["QScrollBar::handle:vertical"]["background-color"] == palette.border
     assert rules["QFrame#sidebar"]["border-right"] == f"1px solid {palette.border}"
+
+
+@pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
+def test_the_overview_s_chips_figures_captions_and_cards_that_open_a_page(
+    palette: Palette,
+) -> None:
+    # [0014.48] A folder's chip is bordered on the canvas; Add folder has no border; a card
+    # that opens a page shows the focus on the accent.
+    rules = dict(_rules(style_sheet(palette)))
+    assert rules['QFrame[role="chip"]'] == {
+        "background-color": palette.canvas,
+        "border": f"1px solid {palette.border}",
+        "border-radius": "8px",
+    }
+    plain = rules['QPushButton[role="plain"]']
+    assert (plain["background-color"], plain["border"], plain["color"]) == (
+        "transparent",
+        "none",
+        palette.text,
+    )
+    assert rules['QPushButton[role="icon"]']["border"] == "none"
+    assert rules['QLabel[role="figure"]'] == {"font-size": "28px", "font-weight": "600"}
+    assert rules['QLabel[role="caption"]'] == {"color": palette.secondary, "font-size": "13px"}
+    assert rules['QLabel[role="card-title"]'] == {"font-size": "16px", "font-weight": "600"}
+    assert rules['QFrame[role="card"]:focus'] == {"border": f"1px solid {palette.accent}"}
 
 
 @pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])

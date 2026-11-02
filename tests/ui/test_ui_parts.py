@@ -92,7 +92,7 @@ def test_a_layout_s_margins_and_spacing_are_always_given(holder: QWidget) -> Non
     assert [layout.spacing() for layout in made] == [0, 0, 24, 40]
     assert [layout.contentsMargins().top() for layout in made] == [0, 0, 8, 32]
     assert holder.layout() is made[2]
-    assert {0, 4, 8, 12, 16, 24, 32, 40} == GRID
+    assert {0, 4, 8, 12, 16, 20, 24, 32, 40} == GRID
 
 
 def test_a_head_has_its_title_what_the_page_does_and_its_controls_at_the_right(
