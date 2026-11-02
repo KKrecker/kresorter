@@ -44,6 +44,7 @@ from safeclean.ui.parts import (
     page,
     vbox,
 )
+from safeclean.ui.shown import moment, shown_path
 from safeclean.ui.sidebar import ICONS
 from safeclean.ui.tasks import Task
 from safeclean.ui.theme import Look, Palette
@@ -58,18 +59,10 @@ __all__ = [
     "Scanned",
     "ServiceCard",
     "scan",
-    "shown_path",
 ]
 
 SERVICES = ("quarantine", "organize", "autostart")
 _OPENS = (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space)
-
-
-def shown_path(path: Path, home: Path) -> str:
-    """``path`` from the home folder, as ``~``; any other path as it is."""
-    if path.is_relative_to(home):
-        return str(Path("~") / path.relative_to(home))
-    return str(path)
 
 
 def _text(palette: Palette) -> str:
@@ -80,23 +73,20 @@ def _surface2(palette: Palette) -> str:
     return palette.surface2
 
 
-def _moment(at: float) -> str:
-    return time.strftime("%Y-%m-%d %H:%M", time.localtime(at))
-
-
 def _lower(label: str) -> str:
     return label[:1].lower() + label[1:]
 
 
 @dataclass(frozen=True)
 class Scanned:
-    """What one scan found; ``checked``: open files are recognized on this system; ``at``: when
-    the scan started, in seconds since the epoch."""
+    """What one scan of ``roots`` found; ``checked``: open files are recognized on this system;
+    ``at``: when the scan started, in seconds since the epoch."""
 
     report: ScanReport
     analysis: AnalysisReport
     checked: bool
     at: float
+    roots: list[Path]
 
 
 def scan(environment: Environment, roots: list[Path]) -> Scanned:
@@ -104,7 +94,7 @@ def scan(environment: Environment, roots: list[Path]) -> Scanned:
     at = time.time()
     context = environment.scan_context()
     report, analysis = analyze_paths([str(root) for root in roots], context, Thresholds())
-    return Scanned(report, analysis, context.open_files_checked, at)
+    return Scanned(report, analysis, context.open_files_checked, at, list(roots))
 
 
 class FolderChip(QFrame):
@@ -238,7 +228,7 @@ class OverviewPage(QWidget):
         self.scan_text.setProperty("role", "secondary")
         self.scan_text.setWordWrap(True)
         self.scan_button = button(look, text("overview.scan"), role="primary", icon="refresh-cw")
-        self.scan_button.clicked.connect(self._scan)
+        self.scan_button.clicked.connect(self.start_scan)
         window.add_starter(self.scan_button)
         self.add_button = button(look, text("overview.add"), role="plain", icon="plus")
         self.add_button.clicked.connect(self._add)
@@ -328,7 +318,8 @@ class OverviewPage(QWidget):
 
     # --- the scan ------------------------------------------------------------------------------
 
-    def _scan(self) -> None:
+    def start_scan(self) -> None:
+        """Scan the folders shown, as Scan now does."""
         window, roots = self._window, self.roots()
         title = window.translator.text("task.scan")
         window.run(Task(title, lambda: scan(window.environment, roots), self._scanned))
@@ -341,7 +332,7 @@ class OverviewPage(QWidget):
         self.last.setText(
             text(
                 "overview.last",
-                moment=_moment(scanned.at),
+                moment=moment(scanned.at),
                 files=count("file", report.files_scanned),
                 groups=count("group", len(analysis.duplicates)),
                 paths=count("path", len(report.skipped)),
@@ -353,7 +344,7 @@ class OverviewPage(QWidget):
             shown.files.setText(_files(translator, analysis, total.level, total.files))
         self.level_cards.show()
         self.unreliable.setHidden(scanned.checked)
-        self._window.findings.show_analysis(analysis)
+        self._window.findings.show_analysis(analysis, scanned.roots, scanned.at)
 
     def _open_level(self, level: Level) -> None:
         self._window.findings.show_only(level)

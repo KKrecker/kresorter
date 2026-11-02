@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QStyle,
     QStyledItemDelegate,
@@ -71,8 +72,10 @@ __all__ = [
     "Icon",
     "Note",
     "RowDelegate",
+    "SearchField",
     "badge",
     "badge_colours",
+    "bar",
     "button",
     "card",
     "cell_colours",
@@ -187,6 +190,13 @@ def card(*, surface: bool = False) -> tuple[QFrame, QVBoxLayout]:
     return frame, vbox(frame, margins=(24, 24, 24, 24), spacing=8)
 
 
+def bar() -> tuple[QFrame, QHBoxLayout]:
+    """The bar at a page's bottom, across its width with a border above it, and its layout."""
+    frame = QFrame()
+    frame.setProperty("role", "bar")
+    return frame, hbox(frame, margins=(PAGE_MARGIN, 12, PAGE_MARGIN, 12), spacing=16)
+
+
 def divider() -> QFrame:
     line = QFrame()
     line.setProperty("role", "divider")
@@ -264,6 +274,24 @@ def link(text: str) -> QPushButton:
     made.setCursor(Qt.CursorShape.PointingHandCursor)
     made.setFlat(True)
     return made
+
+
+class SearchField(QLineEdit):
+    """A field to search in, named by its placeholder, the search icon at its left (``glass``)
+    in secondary text; the icon's button is named as the field is."""
+
+    def __init__(self, look: Look, text: str) -> None:
+        super().__init__()
+        self.setPlaceholderText(text)
+        self.setAccessibleName(text)
+        self.glass = self.addAction(QIcon(), QLineEdit.ActionPosition.LeadingPosition)
+        self.glass.setText(text)
+        look.changed.connect(self._draw)
+        self._draw(look.palette)
+
+    def _draw(self, palette: Palette) -> None:
+        drawn = icons.pixmap("search", palette.secondary, 16, self.devicePixelRatioF())
+        self.glass.setIcon(QIcon(drawn))
 
 
 class Choice(QComboBox):

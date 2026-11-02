@@ -215,6 +215,18 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
         ),
         ('QFrame[role="divider"]', {"background-color": p.border, "border": "none"}),
         (
+            'QFrame[role="bar"]',
+            {"background-color": p.canvas, "border": "none", "border-top": f"1px solid {p.border}"},
+        ),
+        (
+            'QFrame[role="side"]',
+            {
+                "background-color": p.canvas,
+                "border": "none",
+                "border-left": f"1px solid {p.border}",
+            },
+        ),
+        (
             'QFrame[role="banner"]',
             {
                 "background-color": p.surface2,
@@ -395,6 +407,7 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
         rules.append((f'QLabel[badge="{level.value}"]', _badge(badge)))
         rules.append((f'QFrame[dot="{level.value}"]', _dot(p.levels[level])))
     rules.append(('QFrame[dot="none"]', _dot(p.secondary)))
+    rules.append(('QLabel[badge="advisory"]', _badge(Badge(p.text, p.surface2))))
     rules.append(('QLabel[badge="danger"]', _badge(p.danger_badge)))
     return rules
 
