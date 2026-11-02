@@ -119,14 +119,14 @@ def test_the_folder_dialog_starts_where_it_is_told(
     # [0014.38]
     dialog = FolderDialog(parent, Translator("en"), tmp_path)
     qtbot.addWidget(dialog)
-    assert dialog.windowTitle() == "Choose a folder to scan"
+    assert dialog.windowTitle() == "Choose a folder"
     assert dialog.path.text() == str(tmp_path)
     assert dialog.path.accessibleName() == "Folder"
-    assert dialog.add.text() == "Add"
-    assert dialog.add.isEnabled()
+    assert dialog.choose.text() == "Choose"
+    assert dialog.choose.isEnabled()
 
 
-def test_only_an_existing_folder_can_be_added(
+def test_only_an_existing_folder_can_be_chosen(
     qtbot: QtBot, parent: QWidget, tmp_path: Path
 ) -> None:
     # [0014.38]
@@ -134,16 +134,16 @@ def test_only_an_existing_folder_can_be_added(
     dialog = FolderDialog(parent, Translator("en"), tmp_path)
     qtbot.addWidget(dialog)
     dialog.path.setText(str(tmp_path / "missing"))
-    assert not dialog.add.isEnabled()
+    assert not dialog.choose.isEnabled()
     dialog.path.setText(str(tmp_path / "file.txt"))
-    assert not dialog.add.isEnabled()
+    assert not dialog.choose.isEnabled()
     dialog.path.setText("")
-    assert not dialog.add.isEnabled()
+    assert not dialog.choose.isEnabled()
     dialog.path.setText(str(tmp_path))
-    assert dialog.add.isEnabled()
+    assert dialog.choose.isEnabled()
 
 
-def test_a_folder_picked_in_the_tree_is_the_one_added(
+def test_a_folder_picked_in_the_tree_is_the_one_chosen(
     qtbot: QtBot, parent: QWidget, tmp_path: Path
 ) -> None:
     # [0014.38]
@@ -163,7 +163,7 @@ def test_choosing_gives_the_folder_or_nothing(parent: QWidget, tmp_path: Path) -
     def pick(dialog: QWidget) -> None:
         assert isinstance(dialog, FolderDialog)
         dialog.path.setText(str(inner))
-        dialog.add.click()
+        dialog.choose.click()
 
     _once_open(pick)
     assert choose_folder(parent, Translator("en"), tmp_path) == inner

@@ -1,5 +1,5 @@
-"""The window's dialogs: a confirmation before every action and a folder to scan (decision
-0014, item 38).
+"""The window's dialogs: a confirmation before every action and the choice of a folder
+(decision 0014, item 38).
 
 A page never opens a dialog itself: it receives ``Dialogs``, two functions, which the window
 binds to the dialogs below and a test answers in their place. A confirmation names its action
@@ -87,10 +87,10 @@ class FolderDialog(QDialog):
         self.tree.setCurrentIndex(self.model.index(str(start)))
         self.tree.scrollTo(self.tree.currentIndex())
         self.tree.selectionModel().currentChanged.connect(self._picked)
-        self.add = QPushButton(translator.text("folder.add"))
-        self.add.setProperty("role", "primary")
-        self.add.setDefault(True)
-        self.add.clicked.connect(self.accept)
+        self.choose = QPushButton(translator.text("folder.choose"))
+        self.choose.setProperty("role", "primary")
+        self.choose.setDefault(True)
+        self.choose.clicked.connect(self.accept)
         cancel = QPushButton(translator.text("button.cancel"))
         cancel.clicked.connect(self.reject)
         self.path.textChanged.connect(self._typed)
@@ -99,7 +99,7 @@ class FolderDialog(QDialog):
         buttons = QHBoxLayout()
         buttons.addStretch(1)
         buttons.addWidget(cancel)
-        buttons.addWidget(self.add)
+        buttons.addWidget(self.choose)
         layout = QVBoxLayout(self)
         layout.addWidget(self.path)
         layout.addWidget(self.tree, 1)
@@ -115,11 +115,11 @@ class FolderDialog(QDialog):
 
     def _typed(self, text: str) -> None:
         folder = Path(text)
-        self.add.setEnabled(folder.is_absolute() and folder.is_dir())
+        self.choose.setEnabled(folder.is_absolute() and folder.is_dir())
 
 
 def choose_folder(parent: QWidget, translator: Translator, start: Path) -> Path | None:
-    """The folder added, or ``None`` when the dialog was cancelled or closed."""
+    """The folder chosen, or ``None`` when the dialog was cancelled or closed."""
     dialog = FolderDialog(parent, translator, start)
     accepted = dialog.exec() == QDialog.DialogCode.Accepted
     folder = Path(dialog.path.text()) if accepted else None

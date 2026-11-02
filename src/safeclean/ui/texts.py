@@ -118,9 +118,9 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Refused: [{item}] {path} ({reason})",
         "ru": "Отказано: [{item}] {path} ({reason})",
     },
-    "folder.title": {"en": "Choose a folder to scan", "ru": "Выберите папку для сканирования"},
+    "folder.title": {"en": "Choose a folder", "ru": "Выберите папку"},
     "folder.path": {"en": "Folder", "ru": "Папка"},
-    "folder.add": {"en": "Add", "ru": "Добавить"},
+    "folder.choose": {"en": "Choose", "ru": "Выбрать"},
 }
 
 # Sizes: bytes, then binary multiples; the decimal separator of each language.
