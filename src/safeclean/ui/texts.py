@@ -12,6 +12,12 @@ CATALOG: dict[str, dict[str, str]] = {
     "page.autostart": {"en": "Autostart", "ru": "Автозагрузка"},
     "page.settings": {"en": "Settings", "ru": "Настройки"},
     "button.cancel": {"en": "Cancel", "ru": "Отмена"},
+    "task.running": {"en": "Running: {task}", "ru": "Выполняется: {task}"},
+    "task.failed": {"en": "{task} failed: {message}", "ru": "Ошибка ({task}): {message}"},
+    "close.wait": {
+        "en": "{task} is still running; the window closes when it ends.",
+        "ru": "Ещё выполняется: {task}. Окно закроется, когда это завершится.",
+    },
     "overview.folder": {"en": "Folder {folder}", "ru": "Папка {folder}"},
 }
 
