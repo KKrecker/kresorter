@@ -103,12 +103,14 @@ def test_the_organize_plan_is_that_of_organize_move_without_yes(
     write(folder / "old" / "inside.jpg", b"inside")
     write(folder / ".hidden", b"hidden")
     write(folder / "old.tmp", b"old")
-    window = make_window(
-        qtbot, environment(tmp_path, zone, data_dir), dialogs=FakeDialogs(folders=[folder])
-    )
+    dialogs = FakeDialogs(confirm=False, folders=[folder])
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir), dialogs=dialogs)
     window.show_page("organize")
     wait_idle(qtbot, window)
-    window.organize.choose_button.click()
+    page = window.organize
+    page.choose_button.click()
+    wait_idle(qtbot, window)
+    page.move_button.click()  # its confirmation names every move; cancelled
     wait_idle(qtbot, window)
 
     code, out, _ = run(["organize", "move", str(folder)], scan_context(tmp_path, zone, data_dir))
@@ -118,22 +120,23 @@ def test_the_organize_plan_is_that_of_organize_move_without_yes(
     moves = [(m["name"], m["category"]) for m in map(_MOVE.match, lines) if m]
     stay_at = lines.index("Stays 3:")
     stays = [
-        f"{m['path']} ({EN.reason(StayReason(m['reason']), m['detail'] or '')})"
+        (m["path"], EN.reason(StayReason(m["reason"]), m["detail"] or ""))
         for m in map(_STAY.match, lines[stay_at + 1 : stay_at + 4])
         if m
     ]
     assert len(moves) == 3
     assert len(stays) == 3
-    *categories, (stays_title, shown_stays) = _groups(window.organize.plan)
-    shown_moves = [
-        (match["name"], match["category"])
-        for _, rows in categories
-        for [row] in rows
-        if (match := re.fullmatch(r"(?P<name>.+) → (?P<category>[^/]+)/", row))
+    [asked] = dialogs.asked
+    assert asked.details == tuple(f"{name} → {category}/" for name, category in moves)
+    by_category: dict[str, list[str]] = {}
+    for name, category in moves:
+        by_category.setdefault(category, []).append(name)
+    assert [(card.category, card.names.text()) for card in page.cards] == [
+        (category, ", ".join(names)) for category, names in by_category.items()
     ]
-    assert shown_moves == moves
-    assert stays_title == "Stay in place: 3"
-    assert [row for [row] in shown_stays] == stays
+    shown_stays = [_child(page.stays.invisibleRootItem(), i) for i in range(len(stays))]
+    assert [(row.text(0), row.text(1)) for row in shown_stays] == stays
+    assert page.stays.topLevelItemCount() == len(stays)
     assert not (folder / "Images").exists()
 
 

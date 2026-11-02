@@ -196,7 +196,7 @@ def test_a_chip_per_level_with_its_count_and_the_search_with_its_icon(
     assert all(box.isCheckable() for box in page.filters.values())
     assert page.search.placeholderText() == "Search the paths"
     assert page.search.accessibleName() == "Search the paths"
-    assert not page.search.glass.icon().isNull()
+    assert not page.search.mark.icon().isNull()
     assert page.search.minimumWidth() == SEARCH_WIDTHS[0] == 160
     assert page.search.maximumWidth() == SEARCH_WIDTHS[1] == 240
     window.resize(1200, 780)

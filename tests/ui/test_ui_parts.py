@@ -3,9 +3,25 @@ the lists' rows (decision 0014, items 46 and 47)."""
 
 import pytest
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
-from PySide6.QtGui import QFont, QIcon, QImage, QStandardItem, QStandardItemModel
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QIcon,
+    QImage,
+    QPainter,
+    QStandardItem,
+    QStandardItemModel,
+)
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QListView, QPushButton, QTreeView, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QListView,
+    QPushButton,
+    QSizePolicy,
+    QStyleOptionViewItem,
+    QTreeView,
+    QWidget,
+)
 from pytestqt.qtbot import QtBot
 
 from safeclean.analysis.score import Level
@@ -20,11 +36,11 @@ from safeclean.ui.parts import (
     SECONDARY,
     CheckBox,
     Choice,
+    Field,
     Head,
     Icon,
     Note,
     RowDelegate,
-    SearchField,
     badge,
     badge_colours,
     bar,
@@ -39,6 +55,9 @@ from safeclean.ui.parts import (
     link,
     page,
     rows,
+    shares,
+    surface2_tile,
+    text_ink,
     vbox,
 )
 from safeclean.ui.theme import DARK, LIGHT, Look, Palette
@@ -243,19 +262,39 @@ def test_a_bar_across_a_page_s_bottom() -> None:
     assert inside.parentWidget() is frame
 
 
-def test_a_search_field_is_named_by_its_placeholder_its_icon_in_secondary_text(
+def test_a_field_is_named_its_placeholder_unless_given_one_its_icon_in_secondary_text(
     qapp: QApplication, look: Look
 ) -> None:
-    # [0014.49] The icon's button says what the field is for, as the field does.
-    field = SearchField(look, "Search the paths")
-    assert field.placeholderText() == field.accessibleName() == "Search the paths"
-    assert field.glass.text() == "Search the paths"
+    # [0014.49] [0014.52] The icon's button says what the field is for, as the field does.
+    search = Field(look, "Search the paths", "search")
+    assert search.placeholderText() == search.accessibleName() == "Search the paths"
+    assert search.mark.text() == "Search the paths"
+    folder = Field(look, "Folder", "folder", placeholder="No folder chosen")
+    assert (folder.accessibleName(), folder.placeholderText()) == ("Folder", "No folder chosen")
+    assert folder.mark.text() == "Folder"
     for palette in (LIGHT, DARK):
         if palette is DARK:
             _dark(qapp)
-        shown = field.glass.icon().pixmap(QSize(16, 16), 2.0).toImage()
-        assert inked_in(shown, palette.secondary)
+        for field in (search, folder):
+            shown = field.mark.icon().pixmap(QSize(16, 16), 2.0).toImage()
+            assert inked_in(shown, palette.secondary)
     _light(qapp)
+    assert _ink(search) != _ink(folder)
+
+
+def _ink(field: Field) -> QImage:
+    return field.mark.icon().pixmap(QSize(16, 16), 2.0).toImage()
+
+
+@pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
+def test_a_card_of_a_row_takes_its_share_and_an_icon_can_be_in_the_text_s_colour_on_surface_2(
+    palette: Palette,
+) -> None:
+    # [0014.48] [0014.52]
+    card = QWidget()
+    shares(card)
+    assert card.sizePolicy().horizontalPolicy() == QSizePolicy.Policy.Ignored
+    assert (text_ink(palette), surface2_tile(palette)) == (palette.text, palette.surface2)
 
 
 def _icon(made: QPushButton, mode: QIcon.Mode = QIcon.Mode.Normal) -> QImage:
@@ -473,6 +512,32 @@ def test_a_row_is_divided_by_the_border_colour_and_selected_on_the_accent_s_tint
         _colour(drawn, danger.left() + 12 + 3, danger.center().y() + 1)
         == LIGHT.danger_badge.background
     )
+
+
+def test_a_cell_as_wide_as_its_size_hint_shows_its_text_whole(look: Look) -> None:
+    # [0014.47] A column sized to its contents cuts none of them.
+    model = QStandardItemModel()
+    for text, second in (("Not a regular file", ""), ("a.jpg", "Downloads/Images")):
+        item = QStandardItem(text)
+        if second:
+            item.setData(second, SECONDARY)
+        model.appendRow(item)
+    delegate = RowDelegate(look, rows(QTreeView(), look))
+
+    def drawn(row: int, width: int, shown: int) -> QImage:
+        index = model.index(row, 0)
+        option = QStyleOptionViewItem()
+        option.rect = QRect(0, 0, width, 2 * ROW_HEIGHT)
+        image = QImage(width, 2 * ROW_HEIGHT, QImage.Format.Format_RGB32)
+        image.fill(QColor(LIGHT.canvas))
+        painter = QPainter(image)
+        delegate.paint(painter, option, index)
+        painter.end()
+        return image.copy(0, 0, shown, 2 * ROW_HEIGHT - 1)
+
+    for row in range(2):
+        hint = delegate.sizeHint(QStyleOptionViewItem(), model.index(row, 0)).width()
+        assert drawn(row, hint, hint) == drawn(row, hint + 40, hint)
 
 
 def test_check_boxes_in_a_list_are_on_the_accent_when_checked(listed: QTreeView) -> None:

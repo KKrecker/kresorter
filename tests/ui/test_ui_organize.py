@@ -8,7 +8,8 @@ import time
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PySide6.QtCore import QModelIndex, Qt
+from PySide6.QtWidgets import QGridLayout, QTreeWidget, QTreeWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeOpenFiles, UnreliableOpenFiles
@@ -18,6 +19,10 @@ from safeclean.organize.mover import carry_out
 from safeclean.organize.planner import StayReason
 from safeclean.ui import sessions
 from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.organize import BATCHES_WIDTH, CATEGORY_ICONS, OrganizePage
+from safeclean.ui.parts import QUIET, SECONDARY, Field
+from safeclean.ui.shown import moment
+from safeclean.ui.theme import LIGHT
 from safeclean.ui.window import Window
 from support.cli import run, scan_context
 from support.files import write
@@ -29,16 +34,17 @@ UNSORTED = {A: b"a.jpg", B: b"b.pdf", C: b"c.mp3"}
 SORTED = {f"Images/{A}": b"a.jpg", f"Documents/{B}": b"b.pdf", f"Audio/{C}": b"c.mp3"}
 STAYING = {"old/inside.jpg": b"inside", ".hidden": b"hidden", "old.tmp": b"old"}
 STAYS = [
-    "old (Not a regular file)",
-    ".hidden (The folder's own file)",
-    "old.tmp (Junk: for the cleanup: temp-files)",
+    ("old", "Not a regular file"),
+    (".hidden", "The folder's own file"),
+    ("old.tmp", "Junk: for the cleanup: temp-files"),
 ]
-PLAN = [
-    ("Images: 1 file, 5 B", ["a.jpg → Images/"]),
-    ("Audio: 1 file, 5 B", ["c.mp3 → Audio/"]),
-    ("Documents: 1 file, 5 B", ["b.pdf → Documents/"]),
-    ("Stay in place: 3", STAYS),
+CARDS = [
+    ("Images", "1 file · 5 B", "Images", "a.jpg"),
+    ("Audio", "1 file · 5 B", "Audio", "c.mp3"),
+    ("Documents", "1 file · 5 B", "Documents", "b.pdf"),
 ]
+PLAN = (CARDS, STAYS)
+NO_PLAN: tuple[list[tuple[str, str, str, str]], list[tuple[str, str]]] = ([], [])
 
 
 @pytest.fixture
@@ -110,21 +116,40 @@ def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
     return child
 
 
-def _tree(tree: QTreeWidget) -> list[tuple[str, list[str]]]:
-    """Each group of ``tree``, with the texts of its items."""
+def _rows(tree: QTreeWidget) -> list[QTreeWidgetItem]:
     root = tree.invisibleRootItem()
-    groups = [_child(root, index) for index in range(root.childCount())]
+    return [_child(root, index) for index in range(root.childCount())]
+
+
+def _at(grid: QGridLayout, row: int, column: int) -> QWidget | None:
+    item = grid.itemAtPosition(row, column)
+    return None if item is None else item.widget()
+
+
+def _cards(window: Window) -> list[tuple[str, str, str, str]]:
+    """Each category's card: its category, its files and size, its name, its first names."""
     return [
-        (group.text(0), [_child(group, index).text(0) for index in range(group.childCount())])
-        for group in groups
+        (card.category, card.amount.text(), card.name.text(), card.names.text())
+        for card in window.organize.cards
     ]
 
 
-def _batches(window: Window) -> list[list[str]]:
-    tree = window.organize.batches
-    root = tree.invisibleRootItem()
-    rows = [_child(root, index) for index in range(root.childCount())]
-    return [[row.text(column) for column in range(tree.columnCount())] for row in rows]
+def _stays(window: Window) -> list[tuple[str, str]]:
+    """Each file that stays: its name, its reason."""
+    return [(row.text(0), row.text(1)) for row in _rows(window.organize.stays)]
+
+
+def _plan(window: Window) -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str]]]:
+    return _cards(window), _stays(window)
+
+
+def _batches(window: Window) -> list[tuple[str, str]]:
+    """Each batch: its id and time, then its files moved, kind and state."""
+    return [(row.text(0), row.data(0, SECONDARY)) for row in _rows(window.organize.batches)]
+
+
+def _batch(data_dir: Path, batch_id: int, note: str) -> tuple[str, str]:
+    return (f"Batch {batch_id} · {_when(data_dir, batch_id)}", note)
 
 
 def _when(data_dir: Path, batch_id: int) -> str:
@@ -189,16 +214,17 @@ def test_where_organize_does_not_move_files_the_page_says_why_and_nothing_else(
 def test_a_folder_s_plan_shows_the_moves_by_category_and_what_stays(
     qtbot: QtBot, window: Window, folder: Path, data_dir: Path
 ) -> None:
-    # [0014.23]
+    # [0014.23] [0014.52]
     page = window.organize
     assert not page.blocked.isVisible()
     assert page.controls.isVisible()
     assert page.choose_button.text() == "Choose folder…"
     assert not page.move_button.isEnabled()
     _planned(qtbot, window)
-    assert page.summary.text() == f"Would move 3 files, 15 B in {folder}."
-    assert _tree(page.plan) == PLAN
-    assert page.move_button.text() == "Move files"
+    assert page.summary.text() == ""
+    assert _plan(window) == PLAN
+    assert page.will.text() == "3 files will move into 3 folders."
+    assert page.move_button.text() == "Sort…"
     assert page.move_button.isEnabled()
     assert files(folder) == {**UNSORTED, **STAYING}
     assert _no_batch(data_dir)
@@ -207,25 +233,27 @@ def test_a_folder_s_plan_shows_the_moves_by_category_and_what_stays(
 def test_a_folder_where_every_file_moves_has_nothing_that_stays(
     qtbot: QtBot, window: Window, dialogs: FakeDialogs, zone: Path
 ) -> None:
-    # [0014.23]
+    # [0014.23] [0014.52]
     plain = three_files(zone / "Plain")
     dialogs.folders = [plain]
     _planned(qtbot, window)
-    assert window.organize.summary.text() == f"Would move 3 files, 15 B in {plain}."
-    assert _tree(window.organize.plan) == PLAN[:3]
+    assert _plan(window) == (CARDS, [])
+    assert not window.organize.staying.isVisible()
+    assert window.organize.bar.isVisible()
 
 
 def test_a_folder_with_nothing_to_move_says_so(
     qtbot: QtBot, window: Window, dialogs: FakeDialogs, zone: Path
 ) -> None:
-    # [0014.23]
+    # [0014.23] [0014.52]
     quiet = zone / "Quiet"
     write(quiet / ".hidden", b"hidden")
     dialogs.folders = [quiet]
     _planned(qtbot, window)
     page = window.organize
     assert page.summary.text() == f"Nothing to move in {quiet}."
-    assert _tree(page.plan) == [("Stay in place: 1", [".hidden (The folder's own file)"])]
+    assert _plan(window) == ([], [(".hidden", "The folder's own file")])
+    assert (page.state.text(), page.bar.isVisible()) == ("", False)
     assert not page.move_button.isEnabled()
 
 
@@ -235,33 +263,35 @@ def test_a_refused_folder_is_planned_nothing(qtbot: QtBot, window: Window, folde
     _planned(qtbot, window)
     page = window.organize
     assert page.summary.text() == f"Refused: {folder}: A project: Makefile"
-    assert _tree(page.plan) == []
+    assert _plan(window) == NO_PLAN
     assert not page.move_button.isEnabled()
 
 
 def test_a_folder_dialog_closed_plans_nothing(
     qtbot: QtBot, window: Window, dialogs: FakeDialogs
 ) -> None:
-    # [0014.23]
+    # [0014.23] [0014.52]
     dialogs.folders = [None]
     _planned(qtbot, window)
-    assert window.organize.summary.text() == ""
-    assert _tree(window.organize.plan) == []
+    page = window.organize
+    assert page.summary.text() == ""
+    assert _plan(window) == NO_PLAN
+    assert (page.folder.text(), page.choose_button.text()) == ("", "Choose folder…")
 
 
 def test_a_plan_made_again_replaces_the_one_shown(
     qtbot: QtBot, window: Window, dialogs: FakeDialogs, folder: Path, zone: Path
 ) -> None:
-    # [0014.23]
+    # [0014.23] [0014.52]
     quiet = zone / "Quiet"
     write(quiet / ".hidden", b"hidden")
     dialogs.folders = [folder, quiet]
     _planned(qtbot, window)
     _planned(qtbot, window)
-    assert _tree(window.organize.plan) == [
-        ("Stay in place: 1", [".hidden (The folder's own file)"])
-    ]
-    assert not window.organize.move_button.isEnabled()
+    page = window.organize
+    assert _plan(window) == ([], [(".hidden", "The folder's own file")])
+    assert page.categories.count() == 0
+    assert not page.move_button.isEnabled()
 
 
 # --- the batch [0014.14] [0014.23] ---------------------------------------------------------------
@@ -277,15 +307,15 @@ def test_moving_asks_first_and_a_cancel_moves_nothing(
     wait_idle(qtbot, window)
     assert dialogs.asked == [
         Confirmation(
-            title="Move files",
+            title="Sort files",
             text=f"Move 3 files (15 B) into category folders in {folder}? Undo moves them back.",
             details=("a.jpg → Images/", "c.mp3 → Audio/", "b.pdf → Documents/"),
-            action="Move files",
+            action="Sort files",
         )
     ]
     assert files(folder) == {**UNSORTED, **STAYING}
     assert _no_batch(data_dir)
-    assert _tree(window.organize.plan) == PLAN
+    assert _plan(window) == PLAN
 
 
 def test_the_confirmed_batch_is_carried_out_and_named(
@@ -300,9 +330,10 @@ def test_the_confirmed_batch_is_carried_out_and_named(
     assert _lines(window) == [f"Moved 3 files, 15 B in {folder} (batch 1)."]
     assert files(folder) == {**SORTED, **STAYING}
     assert page.summary.text() == ""
-    assert _tree(page.plan) == []
+    assert _plan(window) == NO_PLAN
+    assert (page.state.text(), page.bar.isVisible()) == ("", False)
     assert not page.move_button.isEnabled()
-    assert _batches(window) == [["1", _when(data_dir, 1), "Sorted", "3", "Done", str(folder)]]
+    assert _batches(window) == [_batch(data_dir, 1, "3 files moved · Sorted · Done")]
 
 
 def test_only_the_confirmed_moves_the_plan_still_holds_are_carried_out(
@@ -403,7 +434,7 @@ def test_a_batch_that_stops_says_what_is_still_sorted(
         "Undo batch 1 moves them back.",
     ]
     assert files(folder) == {f"Images/{A}": b"a.jpg", B: b"b.pdf", C: b"c.mp3", **STAYING}
-    assert _batches(window) == [["1", _when(data_dir, 1), "Sorted", "1", "Failed", str(folder)]]
+    assert _batches(window) == [_batch(data_dir, 1, "1 file moved · Sorted · Failed")]
 
 
 def test_a_batch_rolled_back_has_nothing_still_sorted(
@@ -431,7 +462,7 @@ def test_unfinished_work_of_another_domain_comes_first(
     assert _lines(window) == [
         "Unfinished work (Quarantine) comes first: nothing was changed. Use Recover."
     ]
-    assert _tree(window.organize.plan) == []
+    assert _plan(window) == NO_PLAN
     assert files(folder) == {**UNSORTED, **STAYING}
 
 
@@ -441,18 +472,11 @@ def test_unfinished_work_of_another_domain_comes_first(
 def test_the_batches_are_read_each_time_the_page_opens(
     qtbot: QtBot, window: Window, tmp_path: Path, zone: Path, data_dir: Path, folder: Path
 ) -> None:
-    # [0014.23] Sorted by the CLI while the window was open.
+    # [0014.23] [0014.52] Sorted by the CLI while the window was open.
     page = window.organize
-    header = page.batches.headerItem()
-    assert [header.text(column) for column in range(6)] == [
-        "Id",
-        "Time",
-        "Kind",
-        "Files moved",
-        "State",
-        "Folder",
-    ]
     assert _batches(window) == []
+    assert page.no_batches.text() == "No batches yet."
+    assert not page.batches.isVisible()
     assert not page.undo_button.isEnabled()
     window.show_page("overview")
     assert (
@@ -460,7 +484,8 @@ def test_the_batches_are_read_each_time_the_page_opens(
         == 0
     )
     _opened(qtbot, window)
-    assert _batches(window) == [["1", _when(data_dir, 1), "Sorted", "3", "Done", str(folder)]]
+    assert _batches(window) == [_batch(data_dir, 1, "3 files moved · Sorted · Done")]
+    assert (page.no_batches.isVisible(), page.batches.isVisible()) == (False, True)
     page.batches.setCurrentItem(page.batch_row(1))
     assert page.undo_button.text() == "Undo…"
     assert page.undo_button.isEnabled()
@@ -486,8 +511,8 @@ def test_undo_shows_its_plan_then_moves_back_after_confirmation(
     assert _lines(window) == [f"Moved back 3 files, 15 B in {folder} (batch 2, undoing batch 1)."]
     assert files(folder) == {**UNSORTED, **STAYING}
     assert _batches(window) == [
-        ["2", _when(data_dir, 2), "Undo of batch 1", "3", "Done", str(folder)],
-        ["1", _when(data_dir, 1), "Sorted", "3", "Done, undone", str(folder)],
+        _batch(data_dir, 2, "3 files moved · Undo of batch 1 · Done"),
+        _batch(data_dir, 1, "3 files moved · Sorted · Done, undone"),
     ]
 
 
@@ -500,11 +525,16 @@ def test_an_undo_cancelled_moves_nothing_back(
     _undo(qtbot, window, 1)
     assert len(dialogs.asked) == 1
     assert files(folder) == {**SORTED, **STAYING}
-    assert [row[0] for row in _batches(window)] == ["1"]
+    assert [row.data(0, Qt.ItemDataRole.UserRole) for row in _rows(window.organize.batches)] == [1]
 
 
 def test_what_cannot_move_back_stays_and_is_shown(
-    qtbot: QtBot, window: Window, dialogs: FakeDialogs, folder: Path, tmp_path: Path
+    qtbot: QtBot,
+    window: Window,
+    dialogs: FakeDialogs,
+    folder: Path,
+    tmp_path: Path,
+    data_dir: Path,
 ) -> None:
     # [0014.23] a.jpg was taken out of the folder: the batch is partly undone.
     _sorted(qtbot, window, dialogs)
@@ -516,7 +546,9 @@ def test_what_cannot_move_back_stays_and_is_shown(
         "Images/a.jpg (No longer there)",
     )
     assert files(folder) == {B: b"b.pdf", C: b"c.mp3", **STAYING}
-    assert _batches(window)[1][4] == "Done, partly undone"
+    assert _batches(window)[1] == _batch(
+        data_dir, 1, "3 files moved · Sorted · Done, partly undone"
+    )
 
 
 def test_an_undo_with_nothing_to_move_back_says_so(
@@ -600,39 +632,66 @@ def test_an_undo_that_stops_names_what_takes_the_rest(
 
 
 def test_the_page_in_russian(
-    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs, folder: Path
+    qtbot: QtBot,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    dialogs: FakeDialogs,
+    folder: Path,
 ) -> None:
-    # [0014.23] [0014.44] A group names its category in Russian and its directory beside it;
-    # every path keeps the directory's name on disk.
+    # [0014.23] [0014.44] [0014.52] A card names its category in Russian and its directory
+    # beside it; every path keeps the directory's name on disk.
     window = make_window(
         qtbot, environment(tmp_path, zone, data_dir), language="ru", dialogs=dialogs
     )
     _opened(qtbot, window)
     page, ru = window.organize, window.translator
     assert page.choose_button.text() == "Выбрать папку…"
+    assert (page.folder.accessibleName(), page.folder.placeholderText()) == (
+        "Папка",
+        "Папка не выбрана",
+    )
+    assert page.no_batches.text() == "Пакетов пока нет."
+    assert page.recent_title.text() == "Последние пакеты"
     _planned(qtbot, window)
-    assert page.summary.text() == f"Папка {folder}: будет перемещено 3 файла, 15 Б."
-    assert _tree(page.plan) == [
-        ("Изображения (папка Images): 1 файл, 5 Б", ["a.jpg → Images/"]),
-        ("Аудио (папка Audio): 1 файл, 5 Б", ["c.mp3 → Audio/"]),
-        ("Документы (папка Documents): 1 файл, 5 Б", ["b.pdf → Documents/"]),
-        (
-            "Остаются на месте: 3",
-            [
-                f"old ({ru.label(StayReason.NOT_REGULAR)})",
-                ".hidden (Служебный файл папки)",
-                f"old.tmp ({ru.label(StayReason.JUNK)}: temp-files)",
-            ],
-        ),
-    ]
-    assert page.move_button.text() == "Переместить файлы"
+    assert page.choose_button.text() == "Изменить…"
+    assert page.state.text() == (
+        f"План составлен {moment(_planned_at(page))} · ничего ещё не перемещено"
+    )
+    assert _plan(window) == (
+        [
+            ("Images", "1 файл · 5 Б", "Изображения (папка Images)", "a.jpg"),
+            ("Audio", "1 файл · 5 Б", "Аудио (папка Audio)", "c.mp3"),
+            ("Documents", "1 файл · 5 Б", "Документы (папка Documents)", "b.pdf"),
+        ],
+        [
+            ("old", ru.label(StayReason.NOT_REGULAR)),
+            (".hidden", "Служебный файл папки"),
+            ("old.tmp", f"{ru.label(StayReason.JUNK)}: temp-files"),
+        ],
+    )
+    assert (page.stays_title.text(), page.stays_note.text()) == (
+        "Остаются на месте",
+        "3 файла, каждый — по своей причине",
+    )
+    assert page.will.text() == "Будет разложено: 3 файла по 3 папкам."
+    assert page.safe.text() == (
+        "Ничего не переименовывается, не перезаписывается и не удаляется; пакет можно вернуть."
+    )
+    assert page.move_button.text() == "Разложить…"
     page.move_button.click()
     wait_idle(qtbot, window)
     [asked] = dialogs.asked
+    assert (asked.title, asked.action) == ("Разложить файлы", "Разложить файлы")
     assert asked.details == ("a.jpg → Images/", "c.mp3 → Audio/", "b.pdf → Documents/")
     assert _lines(window) == [f"Перемещено: 3 файла, 15 Б, папка {folder} (пакет 1)."]
     assert files(folder) == {**SORTED, **STAYING}
-    assert _batches(window) == [["1", _when(data_dir, 1), "Сортировка", "3", "Готово", str(folder)]]
+    assert _batches(window) == [
+        (
+            f"Пакет 1 · {_when(data_dir, 1)}",
+            "3 файла · Сортировка · Готово",
+        )
+    ]
     assert page.undo_button.text() == "Вернуть файлы…"
     dialogs.asked.clear()
     _undo(qtbot, window, 1)
@@ -643,3 +702,196 @@ def test_the_page_in_russian(
         "Documents/b.pdf → b.pdf",
     )
     assert files(folder) == {**UNSORTED, **STAYING}
+
+
+def _planned_at(page: OrganizePage) -> float:
+    planned = page.planned_at
+    assert planned is not None
+    return planned
+
+
+# --- the look [0014.52] --------------------------------------------------------------------------
+
+
+def test_the_folder_is_a_field_from_the_home_folder_then_change_and_the_plan_s_state(
+    qtbot: QtBot, window: Window, folder: Path, home: Path
+) -> None:
+    # [0014.52]
+    page = window.organize
+    field = page.folder
+    assert isinstance(field, Field)
+    assert (field.accessibleName(), field.placeholderText(), field.text()) == (
+        "Folder",
+        "No folder chosen",
+        "",
+    )
+    assert field.isReadOnly()
+    assert not field.mark.icon().isNull()
+    assert page.state.text() == ""
+    before = time.time()
+    _planned(qtbot, window)
+    planned = _planned_at(page)
+    assert before <= planned <= time.time()
+    assert field.text() == str(Path("~") / "zone" / "Downloads")
+    assert page.choose_button.text() == "Change…"
+    assert page.state.text() == f"Plan made {moment(planned)} · nothing moved yet"
+    assert page.state.property("role") == "caption"
+    assert page.state.geometry().right() > page.choose_button.geometry().right() + 100  # at right
+
+
+def test_a_refused_folder_is_shown_in_the_field_too(
+    qtbot: QtBot, window: Window, folder: Path, home: Path
+) -> None:
+    # [0014.52]
+    write(folder / "Makefile", b"all:")
+    _planned(qtbot, window)
+    page = window.organize
+    assert (page.folder.text(), page.choose_button.text()) == ("~/zone/Downloads", "Change…")
+    assert page.state.text() == ""
+
+
+def test_a_card_per_category_three_to_a_row_each_with_its_icon_files_size_name_and_names(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, zone: Path
+) -> None:
+    # [0014.52] Four categories: two rows, the second's free places kept, so that every card
+    # is as wide; a card names its first three files.
+    mixed = zone / "Mixed"
+    for name in ("1.jpg", "2.jpg", "3.png", "4.gif", "b.pdf", "c.mp3", "d.zip"):
+        write(mixed / name, b"12345")
+    dialogs.folders = [mixed]
+    _planned(qtbot, window)
+    page = window.organize
+    assert _cards(window) == [
+        ("Images", "4 files · 20 B", "Images", "1.jpg, 2.jpg, 3.png"),
+        ("Audio", "1 file · 5 B", "Audio", "c.mp3"),
+        ("Documents", "1 file · 5 B", "Documents", "b.pdf"),
+        ("Archives", "1 file · 5 B", "Archives", "d.zip"),
+    ]
+    assert [card.icon.name for card in page.cards] == ["image", "music", "file-text", "archive"]
+    grid = page.categories
+    assert [_at(grid, 0, 0), _at(grid, 0, 1), _at(grid, 0, 2), _at(grid, 1, 0)] == page.cards
+    assert grid.count() == 6  # two free places at the end of the second row
+    widths = [card.width() for card in page.cards]
+    assert max(widths) - min(widths) <= 1  # the grid's remainder
+    card = page.cards[0]
+    assert card.property("role") == "card"
+    assert (card.name.property("role"), card.amount.property("role")) == ("card-title", "secondary")
+    assert card.names.property("role") == "secondary"
+    assert card.icon.colours() == (LIGHT.text, LIGHT.surface2)
+    assert card.amount.geometry().right() > card.icon.geometry().right() + 100  # at right
+    assert card.icon.geometry().bottom() < card.name.geometry().top() < card.names.geometry().top()
+
+
+@pytest.mark.parametrize(
+    ("category", "icon"),
+    [
+        ("Images", "image"),
+        ("Videos", "square-play"),
+        ("Audio", "music"),
+        ("Documents", "file-text"),
+        ("Archives", "archive"),
+        ("Installers", "download"),
+        ("Fonts", "folder"),
+    ],
+)
+def test_each_category_has_its_icon(category: str, icon: str) -> None:
+    # [0014.52] A category the table names otherwise has the folder icon.
+    assert CATEGORY_ICONS.get(category, "folder") == icon
+
+
+def test_what_stays_a_row_per_file_its_reason_at_the_right_the_detail_under_the_list(
+    qtbot: QtBot, window: Window, folder: Path
+) -> None:
+    # [0014.52]
+    _planned(qtbot, window)
+    page = window.organize
+    assert page.staying.isVisible()
+    assert (page.stays_title.text(), page.stays_note.text()) == (
+        "Stays in place",
+        "3 files, each with its reason",
+    )
+    assert page.stays_title.property("role") == "strong"
+    assert page.stays.accessibleName() == "Stays in place"
+    assert page.stays.isHeaderHidden()
+    [row, *_] = _rows(page.stays)
+    assert row.textAlignment(1) == int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    assert row.data(1, QUIET)
+    assert not page.detail.isVisible()
+    assert not page.explain.isVisible()
+    page.stays.setCurrentItem(_rows(page.stays)[2])
+    assert page.detail.text().splitlines() == [
+        f"Path: {folder / 'old.tmp'}",
+        "Stays: Junk: for the cleanup: temp-files",
+    ]
+    assert page.explain.isVisible()
+    assert page.stays.geometry().bottom() < page.detail.geometry().top()
+    assert page.detail.geometry().bottom() < page.explain.geometry().top()
+    page.stays.setCurrentIndex(QModelIndex())
+    assert (page.detail.isVisible(), page.explain.isVisible()) == (False, False)
+
+
+def test_the_recent_batches_in_a_card_at_the_right_each_with_its_folder_in_its_tooltip(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, folder: Path, home: Path
+) -> None:
+    # [0014.52]
+    _sorted(qtbot, window, dialogs)
+    page = window.organize
+    recent = page.recent
+    assert recent.property("role") == "card"
+    assert recent.width() == BATCHES_WIDTH
+    assert (page.recent_title.text(), page.recent_title.property("role")) == (
+        "Recent batches",
+        "caption",
+    )
+    assert page.batches.accessibleName() == "Recent batches"
+    [row] = _rows(page.batches)
+    assert row.toolTip(0) == "~/zone/Downloads"
+    assert row.data(0, Qt.ItemDataRole.UserRole) == 1
+    assert page.undo_button.parent() is recent
+
+
+def test_the_cards_and_the_batches_scroll_with_the_page_and_the_bar_is_at_the_bottom(
+    qtbot: QtBot, window: Window, folder: Path
+) -> None:
+    # [0014.52]
+    _planned(qtbot, window)
+    page = window.organize
+    assert page.area.widget() is page.controls
+    assert page.area.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+    layout = page.layout()
+    assert layout is not None
+    last = layout.itemAt(layout.count() - 1)
+    assert last is not None
+    assert last.widget() is page.bar
+    assert page.bar.property("role") == "bar"
+    assert page.bar.isVisible()
+    assert (page.will.property("role"), page.safe.property("role")) == ("strong", "secondary")
+    assert page.safe.text() == (
+        "Nothing is renamed, overwritten or deleted; the batch can be undone."
+    )
+    assert page.move_button.property("role") == "primary"
+    assert page.will.geometry().right() < page.safe.geometry().left()
+    assert page.safe.geometry().right() < page.move_button.geometry().left()
+    assert page.head.geometry().bottom() < page.area.geometry().top()
+    cards = page.cards[0].mapTo(page, page.cards[0].rect().topLeft())
+    staying = page.staying.mapTo(page, page.staying.rect().topLeft())
+    recent = page.recent.mapTo(page, page.recent.rect().topLeft())
+    assert cards.y() < staying.y()
+    assert staying.x() < recent.x()
+    assert page.folder.mapTo(page, page.folder.rect().topLeft()).y() < cards.y()
+
+
+def test_one_category_or_two_keep_the_cards_as_wide_as_three_to_a_row(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, zone: Path
+) -> None:
+    # [0014.52]
+    two = zone / "Two"
+    write(two / "a.jpg", b"a")
+    write(two / "b.pdf", b"b")
+    dialogs.folders = [two]
+    _planned(qtbot, window)
+    page = window.organize
+    grid = page.categories
+    assert grid.count() == 3
+    [card, *_] = page.cards
+    assert card.width() * 3 < page.controls.width()

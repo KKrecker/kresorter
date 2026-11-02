@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Protocol
 
 import pytest
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PySide6.QtWidgets import QTreeWidgetItem
 from pytestqt.qtbot import QtBot
 
 from safeclean.analysis.report import Finding
@@ -20,6 +20,7 @@ from safeclean.llm.settings import URL_VARIABLE, Address
 from safeclean.llm.subjects import Result, subject_of
 from safeclean.ui.explain import ExplainPanel
 from safeclean.ui.i18n import Language
+from safeclean.ui.organize import OrganizePage
 from safeclean.ui.window import Window
 from support.files import write
 from support.interrupted import APP
@@ -99,21 +100,20 @@ def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
     return child
 
 
-def _plan_row(tree: QTreeWidget, start: str) -> QTreeWidgetItem:
-    """The plan's row that begins with ``start``."""
-    root = tree.invisibleRootItem()
-    groups = [_child(root, index) for index in range(root.childCount())]
-    rows = [_child(group, index) for group in groups for index in range(group.childCount())]
-    return next(row for row in rows if row.text(0).startswith(start))
+def _stay_row(page: OrganizePage, name: str) -> QTreeWidgetItem:
+    """The row of the file that stays named ``name``."""
+    root = page.stays.invisibleRootItem()
+    rows = [_child(root, index) for index in range(root.childCount())]
+    return next(row for row in rows if row.text(0) == name)
 
 
-def _plan(tree: QTreeWidget) -> list[str]:
-    root = tree.invisibleRootItem()
-    groups = [_child(root, index) for index in range(root.childCount())]
+def _plan(page: OrganizePage) -> list[str]:
+    """The plan shown: each category's card, then each file that stays."""
+    root = page.stays.invisibleRootItem()
+    stays = [_child(root, index) for index in range(root.childCount())]
     return [
-        line
-        for group in groups
-        for line in [group.text(0), *(_child(group, i).text(0) for i in range(group.childCount()))]
+        *(f"{card.name.text()}: {card.names.text()}" for card in page.cards),
+        *(f"{row.text(0)}: {row.text(1)}" for row in stays),
     ]
 
 
@@ -388,7 +388,7 @@ def test_another_entry_clears_the_answer(
 def test_a_file_that_stays_in_place_can_be_explained_and_the_plan_stays(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, ollama: ScriptedOllama
 ) -> None:
-    # [0014.26] Only a file that stays has Explain; a move has nothing to explain.
+    # [0014.26] [0014.52] Only a file that stays has Explain, shown once one is selected.
     folder = three_files(zone)
     write(folder / "old.tmp", b"old")
     dialogs = FakeDialogs(folders=[folder])
@@ -398,15 +398,16 @@ def test_a_file_that_stays_in_place_can_be_explained_and_the_plan_stays(
     page = window.organize
     page.choose_button.click()
     wait_idle(qtbot, window)
-    plan, files = _plan(page.plan), _listing(tmp_path)
+    plan, files = _plan(page), _listing(tmp_path)
 
-    page.plan.setCurrentItem(_plan_row(page.plan, "a.jpg"))
     assert page.detail.text() == ""
+    assert not page.explain.isVisible()
     assert not page.explain.button.isEnabled()
-    page.plan.setCurrentItem(_plan_row(page.plan, "old.tmp"))
+    page.stays.setCurrentItem(_stay_row(page, "old.tmp"))
     assert page.detail.text() == "\n".join(
         [f"Path: {folder / 'old.tmp'}", "Stays: Junk: for the cleanup: temp-files"]
     )
+    assert page.explain.isVisible()
     assert page.explain.button.isEnabled()
     assert ollama.paths() == []
 
@@ -415,7 +416,7 @@ def test_a_file_that_stays_in_place_can_be_explained_and_the_plan_stays(
 
     assert _asked(ollama) == [{"kind": "stay", "reason": "junk", "extension": ".tmp"}]
     assert _said(page) == (ANSWER, MODEL)
-    assert _plan(page.plan) == plan
+    assert _plan(page) == plan
     assert page.move_button.isEnabled()
     assert _listing(tmp_path) == files
     assert not dialogs.asked
@@ -434,7 +435,7 @@ def test_moving_the_plan_clears_the_answer(
     page = window.organize
     page.choose_button.click()
     wait_idle(qtbot, window)
-    page.plan.setCurrentItem(_plan_row(page.plan, "old.tmp"))
+    page.stays.setCurrentItem(_stay_row(page, "old.tmp"))
     page.explain.button.click()
     wait_idle(qtbot, window)
 
@@ -443,4 +444,5 @@ def test_moving_the_plan_clears_the_answer(
 
     assert _said(page) == ("", "")
     assert page.detail.text() == ""
+    assert not page.explain.isVisible()
     assert not page.explain.button.isEnabled()
