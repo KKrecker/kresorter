@@ -21,6 +21,7 @@ from safeclean.organize.undo import UndoReason
 from safeclean.quarantine.service import PurgeRefusal, RestoreRefusal
 from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailure
+from safeclean.ui.settings import Unused
 
 __all__ = ["LABELS"]
 
@@ -203,5 +204,14 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "journal_open": _both("The journal cannot be opened", "Журнал не открывается"),
         "stopped": _both("Stopped", "Остановлено"),
         "journal_failed": _both("The journal failed", "Сбой журнала"),
+    },
+    Unused: {
+        "unreadable": _both("The file cannot be read", "Файл не читается"),
+        "not_json": _both("The file is not valid JSON", "Файл не является корректным JSON"),
+        "not_an_object": _both("The file is not a JSON object", "Файл не является объектом JSON"),
+        "wrong_value": _both(
+            "A setting has a wrong or unknown value",
+            "У настройки неверное или неизвестное значение",
+        ),
     },
 }
