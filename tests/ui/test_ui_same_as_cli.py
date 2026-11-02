@@ -20,7 +20,7 @@ from safeclean.ui.i18n import Translator
 from support.cli import autostart_context, run, scan_context
 from support.files import write
 from support.interrupted import APP
-from support.moves import three_files
+from support.moves import A, B, C, files, three_files
 from support.window import (
     FakeDialogs,
     environment,
@@ -133,6 +133,37 @@ def test_the_organize_plan_is_that_of_organize_move_without_yes(
     assert stays_title == "Stay in place: 3"
     assert [row for [row] in shown_stays] == stays
     assert not (folder / "Images").exists()
+
+
+def test_what_the_russian_window_sorted_organize_undo_moves_back(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0014.44] The directories the window makes in Russian are those the CLI makes and knows.
+    folder = three_files(zone)
+    window = make_window(
+        qtbot,
+        environment(tmp_path, zone, data_dir),
+        language="ru",
+        dialogs=FakeDialogs(folders=[folder]),
+    )
+    window.show_page("organize")
+    wait_idle(qtbot, window)
+    window.organize.choose_button.click()
+    wait_idle(qtbot, window)
+    window.organize.move_button.click()
+    wait_idle(qtbot, window)
+    sorted_files = files(folder)
+
+    code, out, _ = run(["organize", "undo", "1", "--yes"], scan_context(tmp_path, zone, data_dir))
+
+    assert sorted_files == {
+        f"Images/{A}": b"a.jpg",
+        f"Documents/{B}": b"b.pdf",
+        f"Audio/{C}": b"c.mp3",
+    }
+    assert code == 0
+    assert "Images/a.jpg -> a.jpg" in out
+    assert files(folder) == {A: b"a.jpg", B: b"b.pdf", C: b"c.mp3"}
 
 
 def _expected(items: list[dict[str, object]]) -> list[tuple[str, list[list[str]]]]:

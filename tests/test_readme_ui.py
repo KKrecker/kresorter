@@ -84,3 +84,12 @@ def test_the_section_names_both_languages_and_the_one_file_kept() -> None:
     assert f"`{SETTINGS_NAME}`" in text
     defaults = {"language": DEFAULTS.language, "include_machine": DEFAULTS.include_machine}
     assert f"`{json.dumps(defaults)}`" in text
+
+
+def test_the_section_says_the_category_directories_keep_their_english_names() -> None:
+    # [0014.44] Under Organize, in every language.
+    text = " ".join(desktop())
+    organize = text.split("**Organize**", 1)[1].split("- **", 1)[0]
+    assert "`Images`" in organize
+    assert "English names" in organize
+    assert "every language" in organize

@@ -596,13 +596,14 @@ def test_an_undo_that_stops_names_what_takes_the_rest(
     assert files(folder) == {**SORTED, **STAYING}
 
 
-# --- in Russian [0014.23] ------------------------------------------------------------------------
+# --- in Russian [0014.23] [0014.44] --------------------------------------------------------------
 
 
 def test_the_page_in_russian(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs, folder: Path
 ) -> None:
-    # [0014.23]
+    # [0014.23] [0014.44] A group names its category in Russian and its directory beside it;
+    # every path keeps the directory's name on disk.
     window = make_window(
         qtbot, environment(tmp_path, zone, data_dir), language="ru", dialogs=dialogs
     )
@@ -612,9 +613,9 @@ def test_the_page_in_russian(
     _planned(qtbot, window)
     assert page.summary.text() == f"Папка {folder}: будет перемещено 3 файла, 15 Б."
     assert _tree(page.plan) == [
-        ("Images: 1 файл, 5 Б", ["a.jpg → Images/"]),
-        ("Audio: 1 файл, 5 Б", ["c.mp3 → Audio/"]),
-        ("Documents: 1 файл, 5 Б", ["b.pdf → Documents/"]),
+        ("Изображения (папка Images): 1 файл, 5 Б", ["a.jpg → Images/"]),
+        ("Аудио (папка Audio): 1 файл, 5 Б", ["c.mp3 → Audio/"]),
+        ("Документы (папка Documents): 1 файл, 5 Б", ["b.pdf → Documents/"]),
         (
             "Остаются на месте: 3",
             [
@@ -627,6 +628,18 @@ def test_the_page_in_russian(
     assert page.move_button.text() == "Переместить файлы"
     page.move_button.click()
     wait_idle(qtbot, window)
+    [asked] = dialogs.asked
+    assert asked.details == ("a.jpg → Images/", "c.mp3 → Audio/", "b.pdf → Documents/")
     assert _lines(window) == [f"Перемещено: 3 файла, 15 Б, папка {folder} (пакет 1)."]
+    assert files(folder) == {**SORTED, **STAYING}
     assert _batches(window) == [["1", _when(data_dir, 1), "Сортировка", "3", "Готово", str(folder)]]
     assert page.undo_button.text() == "Вернуть файлы…"
+    dialogs.asked.clear()
+    _undo(qtbot, window, 1)
+    [asked] = dialogs.asked
+    assert asked.details == (
+        "Images/a.jpg → a.jpg",
+        "Audio/c.mp3 → c.mp3",
+        "Documents/b.pdf → b.pdf",
+    )
+    assert files(folder) == {**UNSORTED, **STAYING}
