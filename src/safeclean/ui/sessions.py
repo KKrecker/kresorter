@@ -272,10 +272,16 @@ class Changed:
 
 
 def change_entry(
-    scan: ScanContext, auto: AutostartContext, action: Action, item: AutostartItem
+    scan: ScanContext,
+    auto: AutostartContext,
+    action: Action,
+    item: AutostartItem,
+    *,
+    include_machine: bool = False,
 ) -> Changed | Unclosed | Unfinished | SessionFailed:
     """``action`` on ``item``, as it was listed, inside the session, as ``autostart disable``
-    and ``enable`` with ``--yes`` change it; or why it did not run."""
+    and ``enable`` with ``--yes`` change it; or why it did not run. The entries after it are
+    listed with the machine scope when ``include_machine``."""
 
     def body(conn: Journal, data_dir: Path) -> Changed | Unclosed | Unfinished:
         changes = changes_for(auto, conn, data_dir)
@@ -286,7 +292,7 @@ def change_entry(
         if others:  # its own was recovered above (0011 item 127)
             return Unfinished(frozenset(others))
         result = _change(changes, action, item)
-        return Changed(recovered, result, list_autostart(auto, include_machine=False))
+        return Changed(recovered, result, list_autostart(auto, include_machine=include_machine))
 
     return run_session(scan, body)
 

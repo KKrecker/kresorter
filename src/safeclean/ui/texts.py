@@ -360,6 +360,121 @@ CATALOG: dict[str, dict[str, str]] = {
     "folder.title": {"en": "Choose a folder", "ru": "Выберите папку"},
     "folder.path": {"en": "Folder", "ru": "Папка"},
     "folder.choose": {"en": "Choose", "ru": "Выбрать"},
+    "explain.button": {"en": "Explain (local AI)", "ru": "Объяснить (локальный ИИ)"},
+    "explain.answer": {
+        "en": "Explanation by {model} via Ollama; advisory, it may be wrong:\n{answer}",
+        "ru": "Объяснение от {model} через Ollama; это лишь совет, оно может быть неверным:"
+        "\n{answer}",
+    },
+    "explain.none": {
+        "en": "No explanation: {reason}. The Check on the Settings page shows how to set it up.",
+        "ru": "Объяснения нет: {reason}. Проверка на странице «Настройки» покажет, как это"
+        " настроить.",
+    },
+    "task.explain": {"en": "Asking the local AI", "ru": "Запрос к локальному ИИ"},
+    "entry.command": {"en": "Command: {command}", "ru": "Команда: {command}"},
+    "entry.shadows": {
+        "en": "Replaces the system entry {shadows}",
+        "ru": "Заменяет системную запись {shadows}",
+    },
+    "entry.note": {"en": "Condition: {note}", "ru": "Условие: {note}"},
+    "autostart.machine": {
+        "en": "Machine-wide entries (HKLM, services, scheduled tasks, the common startup folder)"
+        " were not read; turn them on in Settings.",
+        "ru": "Общесистемные записи (HKLM, службы, задачи планировщика, общая папка"
+        " автозагрузки) не прочитаны; их можно включить в настройках.",
+    },
+    "organize.path": {"en": "Path: {path}", "ru": "Путь: {path}"},
+    "organize.why": {"en": "Stays: {reason}", "ru": "Остаётся: {reason}"},
+    "settings.language": {"en": "Language", "ru": "Язык"},
+    "settings.system": {"en": "As the system", "ru": "Как в системе"},
+    "settings.en": {"en": "English", "ru": "English"},
+    "settings.ru": {"en": "Русский", "ru": "Русский"},
+    "settings.language_note": {
+        "en": "A new language applies the next time the window opens.",
+        "ru": "Новый язык применится при следующем открытии окна.",
+    },
+    "settings.machine": {
+        "en": "Read machine-wide autostart entries",
+        "ru": "Читать общесистемные записи автозагрузки",
+    },
+    "settings.machine_title": {
+        "en": "Read machine-wide entries",
+        "ru": "Читать общесистемные записи",
+    },
+    "settings.machine_confirm": {
+        "en": "The Autostart page will also read the machine-wide entries: the HKLM Run keys,"
+        " the services, the scheduled tasks and the common startup folder. They are only read;"
+        " nothing in them is changed.",
+        "ru": "Страница «Автозагрузка» будет читать и общесистемные записи: ключи Run в HKLM,"
+        " службы, задачи планировщика и общую папку автозагрузки. Они только читаются; ничего"
+        " в них не меняется.",
+    },
+    "settings.machine_action": {"en": "Read", "ru": "Читать"},
+    "settings.saved": {"en": "Saved.", "ru": "Сохранено."},
+    "settings.not_saved": {"en": "Not saved: {reason}.", "ru": "Не сохранено: {reason}."},
+    "settings.unused": {
+        "en": "The settings file was not used: {reason}. The defaults apply until a setting is"
+        " changed.",
+        "ru": "Файл настроек не использован: {reason}. Действуют значения по умолчанию, пока"
+        " настройка не изменена.",
+    },
+    "settings.data_dir": {"en": "Data folder: {path}", "ru": "Папка данных: {path}"},
+    "settings.ai": {"en": "Local AI (Ollama)", "ru": "Локальный ИИ (Ollama)"},
+    "settings.check": {"en": "Check", "ru": "Проверить"},
+    "task.check": {"en": "Checking the local AI", "ru": "Проверка локального ИИ"},
+    "check.ollama": {"en": "Ollama: {state}", "ru": "Ollama: {state}"},
+    "check.model": {"en": "Model: {state}", "ru": "Модель: {state}"},
+    "check.running": {
+        "en": "running at {url} (version {version})",
+        "ru": "работает по адресу {url} (версия {version})",
+    },
+    "check.unreachable": {
+        "en": "not reachable at {url} ({detail})",
+        "ru": "недоступна по адресу {url} ({detail})",
+    },
+    "check.not_ollama": {
+        "en": "{url} does not answer as Ollama ({detail})",
+        "ru": "{url} отвечает не как Ollama ({detail})",
+    },
+    "check.not_checked": {"en": "not checked", "ru": "не проверено"},
+    "check.refused": {
+        "en": "refused setting {name}={value} ({why})",
+        "ru": "настройка отклонена: {name}={value} ({why})",
+    },
+    "check.installed": {"en": "{model}: installed", "ru": "{model}: установлена"},
+    "check.missing": {"en": "{model}: not installed", "ru": "{model}: не установлена"},
+    "check.model_not_checked": {"en": "{model}: not checked", "ru": "{model}: не проверена"},
+    "check.available": {
+        "en": "Explanations are available: Explain (local AI) on a finding, an autostart entry"
+        " or a file that stays in place.",
+        "ru": "Объяснения доступны: «Объяснить (локальный ИИ)» у находки, записи автозагрузки"
+        " или файла, который остаётся на месте.",
+    },
+    "check.unavailable": {
+        "en": "Explanations are unavailable; safeclean works as usual without them.",
+        "ru": "Объяснения недоступны; safeclean работает без них как обычно.",
+    },
+    "check.setup": {
+        "en": "To set them up (safeclean installs nothing itself):",
+        "ru": "Как их настроить (safeclean сам ничего не устанавливает):",
+    },
+    "check.step": {"en": "{n}. {step}", "ru": "{n}. {step}"},
+    "check.install": {
+        "en": "Install Ollama from https://ollama.com/download and start it.",
+        "ru": "Установите Ollama с https://ollama.com/download и запустите её.",
+    },
+    "check.pull": {
+        "en": "Download the model: ollama pull {model}",
+        "ru": "Скачайте модель: ollama pull {model}",
+    },
+    "check.again": {"en": "Check again.", "ru": "Проверьте снова."},
+    "check.settings": {
+        "en": "Settings, from the environment the window started in: {url_variable} (a loopback"
+        " address, default {url}) and {model_variable} (default {model}).",
+        "ru": "Настройки берутся из окружения, в котором запущено окно: {url_variable} (адрес"
+        " loopback, по умолчанию {url}) и {model_variable} (по умолчанию {model}).",
+    },
 }
 
 # Sizes: bytes, then binary multiples; the decimal separator of each language.

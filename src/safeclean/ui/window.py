@@ -7,7 +7,8 @@ task is registered with ``add_starter``: it is disabled while a task runs, and o
 when its page's own condition holds. The window says what runs, shows a task's error with its
 message, and refuses to close while a task that acts runs; it closes once that task has ended.
 Above the pages, the recovery banner offers Recover when the window opens on a journal with
-unfinished work, and whenever a session finds some (``refusal``).
+unfinished work, and whenever a session finds some (``refusal``). The window opens with the
+settings of the data directory (``ui.settings``); the Settings page keeps them as remembered.
 """
 
 from __future__ import annotations
@@ -40,6 +41,8 @@ from safeclean.ui.overview import OverviewPage
 from safeclean.ui.quarantine import QuarantinePage
 from safeclean.ui.recovery import RecoveryBanner
 from safeclean.ui.sessions import NoReliableCheck, Unclosed, Unfinished, problem
+from safeclean.ui.settings import Loaded, load
+from safeclean.ui.settings_page import SettingsPage
 from safeclean.ui.tasks import Task, Tasks
 from safeclean.ui.theme import Look
 
@@ -54,21 +57,16 @@ def _always() -> bool:
     return True
 
 
-def _placeholder(title: str) -> QWidget:
-    page = QWidget()
-    layout = QVBoxLayout(page)
-    heading = QLabel(title)
-    heading.setProperty("role", "heading")
-    layout.addWidget(heading)
-    layout.addStretch(1)
-    return page
-
-
 class Window(QMainWindow):
     def __init__(
-        self, environment: Environment, translator: Translator, dialogs: Dialogs | None = None
+        self,
+        environment: Environment,
+        translator: Translator,
+        dialogs: Dialogs | None = None,
+        loaded: Loaded | None = None,
     ) -> None:
-        """``dialogs``: the window's own, unless a test answers them."""
+        """``dialogs``: the window's own, unless a test answers them; ``loaded``: the settings
+        the window opens with, read from the data directory unless given."""
         super().__init__()
         self.environment = environment
         self.translator = translator
@@ -85,6 +83,7 @@ class Window(QMainWindow):
         self.tasks.failed.connect(self._failed)
 
         self.recovery = RecoveryBanner(self)
+        self.settings = SettingsPage(self, loaded or load(environment.scan_context()))
         self.overview = OverviewPage(self)
         self.findings = FindingsPage(self)
         self.quarantine = QuarantinePage(self)
@@ -96,6 +95,7 @@ class Window(QMainWindow):
             "quarantine": self.quarantine,
             "organize": self.organize,
             "autostart": self.autostart,
+            "settings": self.settings,
         }
         self.sidebar = QListWidget()
         self.sidebar.setObjectName("sidebar")
@@ -104,7 +104,7 @@ class Window(QMainWindow):
         for name in PAGES:
             title = translator.text(f"page.{name}")
             self.sidebar.addItem(title)
-            self._pages.append(made.get(name) or _placeholder(title))
+            self._pages.append(made[name])
             self.pages.addWidget(self._pages[-1])
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.sidebar.currentRowChanged.connect(self._opened)

@@ -1,13 +1,14 @@
 """The Findings page: what the analysis found, grouped, filtered and selected, and quarantine
-from the selection (decision 0014, items 4, 20 and 21).
+from the selection (decision 0014, items 4, 20, 21 and 26).
 
 The findings are grouped by their strongest reason, each group with its files and size; level
 filters and a search over the paths narrow what is shown. The detail of the current finding
-shows its path, size, time, level and every reason. What the analysis proposes at the Safe
-level is selected at first; a Review finding is selected only by its own check box, a kept
-copy never: selecting a group or a level takes only what the analysis proposes, and only what
-is shown. Moving asks first, runs as a task that acts, and says what moved, what was refused
-and why; what moved leaves the list, the selection made stays for the rest.
+shows its path, size, time, level and every reason, and Explain (local AI) (``ui.explain``).
+What the analysis proposes at the Safe level is selected at first; a Review finding is selected
+only by its own check box, a kept copy never: selecting a group or a level takes only what the
+analysis proposes, and only what is shown. Moving asks first, runs as a task that acts, and
+says what moved, what was refused and why; what moved leaves the list, the selection made stays
+for the rest.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from safeclean.quarantine.service import QuarantineResult
 from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.explain import ExplainPanel
 from safeclean.ui.recovery import quarantine_lines
 from safeclean.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine
 from safeclean.ui.tasks import Task
@@ -85,6 +87,7 @@ class FindingsPage(QWidget):
         self.detail = QLabel()
         self.detail.setWordWrap(True)
         self.detail.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.explain = ExplainPanel(window)
         self.select_buttons = {
             level: QPushButton(text("findings.select", level=translator.label(level)))
             for level in _SELECTABLE
@@ -117,6 +120,7 @@ class FindingsPage(QWidget):
         layout.addLayout(filters)
         layout.addWidget(self.tree, 1)
         layout.addWidget(self.detail)
+        layout.addWidget(self.explain)
         layout.addLayout(selection)
         layout.addWidget(self.result)
         window.add_starter(self.move_button, lambda: bool(self.selected()))
@@ -196,6 +200,7 @@ class FindingsPage(QWidget):
         key = "" if current is None else current.data(0, _PATH)  # a group's: None
         finding = self._findings.get(key)
         self.detail.setText("" if finding is None else "\n".join(self._detail(finding)))
+        self.explain.show_for(finding)
 
     def _detail(self, finding: Finding) -> list[str]:
         translator = self._window.translator

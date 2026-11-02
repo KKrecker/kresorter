@@ -18,8 +18,8 @@ __all__ = ["run"]
 def run(argv: Sequence[str], environment: Environment) -> int:
     """Show the window in the language of the settings and run until it is closed."""
     application = QApplication.instance() or QApplication(list(argv))
-    settings = load(environment.scan_context()).settings
-    translator = Translator(language_for(settings.language, QLocale.system().name()))
-    window = Window(environment, translator)
+    loaded = load(environment.scan_context())
+    translator = Translator(language_for(loaded.settings.language, QLocale.system().name()))
+    window = Window(environment, translator, loaded=loaded)
     window.show()
     return application.exec()

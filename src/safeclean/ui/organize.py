@@ -1,16 +1,16 @@
 """The Organize page: a folder's plan, its batch carried out after confirmation, the batches and
-their undo (decision 0014, items 14 and 23).
+their undo (decision 0014, items 14, 23 and 26).
 
-Where organize does not move files (0012 item 37: not Linux, or no reliable open-file check),
-the page says why and offers nothing else, and reads no journal. Elsewhere each step is a
-session of its own (``ui.sessions``), as ``organize move``, ``list`` and ``undo`` run them: a
-folder's plan shows the moves by category and the files that stay, with their reasons; after
-confirmation the plan is made again inside the session and only the confirmed moves it still
-holds unchanged are carried out, as one batch, which the result names, with what changed since
-the plan, what was refused at move time and, when the batch stopped, its state and what is still
-sorted. Every session ends with the batches as they are then, newest first; they are read again
-each time the page opens. Undo shows the undo's plan first and, confirmed, moves back only what
-its plan, made again, still holds.
+Where organize does not move files (0012 item 37: not Linux, or no reliable open-file check), the
+page says why and offers nothing else, and reads no journal. Elsewhere each step is a session of its
+own (``ui.sessions``), as ``organize move``, ``list`` and ``undo`` run them: a folder's plan shows
+the moves by category and the files that stay, with their reasons, and the detail of a file that
+stays has Explain (local AI) (``ui.explain``); after confirmation the plan is made again inside the
+session and only the confirmed moves it still holds unchanged are carried out, as one batch, which
+the result names, with what changed since the plan, what was refused at move time and, when the
+batch stopped, its state and what is still sorted. Every session ends with the batches as they are
+then, newest first; they are read again each time the page opens. Undo shows the undo's plan first
+and, confirmed, moves back only what its plan, made again, still holds.
 """
 
 from __future__ import annotations
@@ -40,6 +40,7 @@ from safeclean.organize.undo import UndoPlan, UndoRefused
 from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.explain import ExplainPanel
 from safeclean.ui.recovery import organize_lines
 from safeclean.ui.sessions import (
     Act,
@@ -62,6 +63,7 @@ __all__ = ["OrganizePage"]
 
 T = TypeVar("T")
 _NO_PLAN = Plan(Path(), (), ())
+_STAY = Qt.ItemDataRole.UserRole  # a file that stays keeps its place in the plan's stays
 _COLUMNS = ("id", "time", "kind", "moved", "state", "folder")
 
 
@@ -102,6 +104,9 @@ class OrganizePage(QWidget):
         self.plan = QTreeWidget()
         self.plan.setAccessibleName(text("organize.plan"))
         self.plan.setHeaderHidden(True)
+        self.plan.currentItemChanged.connect(self._current)
+        self.detail = _label()
+        self.explain = ExplainPanel(window)
         self.move_button = QPushButton(text("organize.move"))
         self.move_button.setProperty("role", "primary")
         self.move_button.clicked.connect(self._move)
@@ -130,6 +135,8 @@ class OrganizePage(QWidget):
         inside.addLayout(choose)
         inside.addWidget(self.summary)
         inside.addWidget(self.plan, 1)
+        inside.addWidget(self.detail)
+        inside.addWidget(self.explain)
         inside.addLayout(move)
         inside.addWidget(batches)
         inside.addWidget(self.batches, 1)
@@ -240,13 +247,29 @@ class OrganizePage(QWidget):
             self._group(title, [self._line(move) for move in moves])
         if found.stays:
             title = translator.text("organize.stays", n=len(found.stays))
-            self._group(title, self._stays(found.stays, found.folder))
+            rows = self._group(title, self._stays(found.stays, found.folder))
+            for index, row in enumerate(rows):
+                row.setData(0, _STAY, index)
         self.plan.expandAll()
 
-    def _group(self, title: str, lines: Sequence[str]) -> None:
+    def _group(self, title: str, lines: Sequence[str]) -> list[QTreeWidgetItem]:
         group = QTreeWidgetItem(self.plan, [title])
-        for line in lines:
-            QTreeWidgetItem(group, [line])
+        return [QTreeWidgetItem(group, [line]) for line in lines]
+
+    def _current(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
+        """The detail of a file that stays; a move and a group have none."""
+        index = None if current is None else current.data(0, _STAY)
+        stay = None if index is None else self._plan.stays[int(index)]
+        self.detail.setText("" if stay is None else "\n".join(self._detail(stay)))
+        self.explain.show_for(stay)
+
+    def _detail(self, stay: Stay) -> list[str]:
+        translator = self._window.translator
+        reason = translator.reason(stay.reason, stay.detail)
+        return [
+            translator.text("organize.path", path=stay.path),
+            translator.text("organize.why", reason=reason),
+        ]
 
     def _move(self) -> None:
         translator = self._window.translator
@@ -266,8 +289,8 @@ class OrganizePage(QWidget):
 
     def _sorted(self, carried: Carried | FolderRefused) -> None:
         text = self._window.translator.text
-        self._plan = _NO_PLAN
         self.plan.clear()
+        self._plan = _NO_PLAN
         self.summary.clear()
         if isinstance(carried, FolderRefused):
             self.result.setText(self._refused(carried))

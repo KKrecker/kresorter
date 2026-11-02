@@ -1,15 +1,17 @@
 """The Autostart page: the entries grouped by source, Disable and Enable after confirmation
-(decision 0014, items 3, 13 and 24).
+(decision 0014, items 3, 13, 24, 26 and 37).
 
-The entries are read each time the page opens, and on Refresh, as ``autostart list`` reads
-them: nothing is opened, created or changed. Each group names its source and its count; each
-entry shows its state, scope and location. Disable or Enable is offered for an entry that can
-change (``disableable``) and is not in that state already; the confirmation says what is
-written, as ``autostart disable`` without ``--yes`` does. Confirmed, the change runs in a
-session (``ui.sessions``) that recovers autostart's own unfinished changes first, and its
-changer refuses an entry that is no longer the one listed. The result says done, refused,
-rolled back or failed; a failed change, and one left unfinished, names Recover, which the
-banner offers.
+The entries are read each time the page opens, and on Refresh, as ``autostart list`` reads them:
+nothing is opened, created or changed. On Windows the machine scope is read only when the setting
+says so (``ui.settings``), as ``--include-machine`` reads it, and otherwise the page says what was
+not read. Each group names its source and its count; each entry shows its state, scope and location,
+and the detail of the selected entry its command, the system entry it replaces and its conditions,
+with Explain (local AI) (``ui.explain``). Disable or Enable is offered for an entry that can change
+(``disableable``) and is not in that state already; the confirmation says what is written, as
+``autostart disable`` without ``--yes`` does. Confirmed, the change runs in a session
+(``ui.sessions``) that recovers autostart's own unfinished changes first, and its changer refuses an
+entry that is no longer the one listed. The result says done, refused, rolled back or failed; a
+failed change, and one left unfinished, names Recover, which the banner offers.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ from safeclean.autostart.xdg import autostart_dirs
 from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
+from safeclean.ui.explain import ExplainPanel
 from safeclean.ui.recovery import autostart_lines
 from safeclean.ui.sessions import (
     Action,
@@ -67,6 +70,7 @@ class AutostartPage(QWidget):
         self._window = window
         self._items: tuple[AutostartItem, ...] = ()
         self._rows: list[QTreeWidgetItem] = []
+        self._windows = window.environment.autostart_context().platform == "windows"
         text = window.translator.text
 
         heading = QLabel(text("page.autostart"))
@@ -75,9 +79,13 @@ class AutostartPage(QWidget):
         self.entries.setAccessibleName(text("autostart.entries"))
         self.entries.setColumnCount(len(_COLUMNS))
         self.entries.setHeaderLabels([text(f"autostart.{name}") for name in _COLUMNS])
-        self.entries.itemSelectionChanged.connect(window.update_starters)
+        self.entries.itemSelectionChanged.connect(self._selected)
         self.total = QLabel()
+        self.machine = _label(text("autostart.machine"))
+        self.machine.setHidden(True)
         self.skipped = _label()
+        self.detail = _label()
+        self.explain = ExplainPanel(window)
         self.refresh_button = QPushButton(text("autostart.refresh"))
         self.refresh_button.clicked.connect(self.load)
         self.disable_button = QPushButton(text("autostart.disable"))
@@ -95,7 +103,10 @@ class AutostartPage(QWidget):
         layout.addWidget(heading)
         layout.addWidget(self.entries, 1)
         layout.addWidget(self.total)
+        layout.addWidget(self.machine)
         layout.addWidget(self.skipped)
+        layout.addWidget(self.detail)
+        layout.addWidget(self.explain)
         layout.addLayout(buttons)
         layout.addWidget(self.result)
         window.add_starter(self.refresh_button)
@@ -117,22 +128,24 @@ class AutostartPage(QWidget):
     # --- the listing ---------------------------------------------------------------------------
 
     def load(self) -> None:
-        """Read the entries again; no journal is opened."""
+        """Read the entries again, with the machine scope as the setting says; no journal is
+        opened."""
         window = self._window
         environment = window.environment
+        machine = window.settings.current.include_machine
 
         def work() -> AutostartListing:
-            return list_autostart(environment.autostart_context(), include_machine=False)
+            return list_autostart(environment.autostart_context(), include_machine=machine)
 
         def done(listing: AutostartListing) -> None:
             self.result.clear()
-            self._list(listing)
+            self._list(listing, machine)
 
         window.run(Task(window.translator.text("task.autostart"), work, done))
 
-    def _list(self, listing: AutostartListing) -> None:
-        """Show ``listing``, grouped by source; the entry selected stays selected while one of
-        the same source and name is there."""
+    def _list(self, listing: AutostartListing, machine: bool) -> None:
+        """Show ``listing``, grouped by source, read with the machine scope when ``machine``;
+        the entry selected stays selected while one of the same source and name is there."""
         translator = self._window.translator
         text = translator.text
         chosen = self.selected()
@@ -168,6 +181,7 @@ class AutostartPage(QWidget):
             for skip in listing.skipped
         ]
         self.skipped.setText("\n".join(skipped))
+        self.machine.setHidden(machine or not self._windows)
         again = [row for row in self._rows if chosen is not None and _same(self._item(row), chosen)]
         if again:
             again[0].setSelected(True)
@@ -180,6 +194,19 @@ class AutostartPage(QWidget):
 
     def _item(self, row: QTreeWidgetItem) -> AutostartItem:
         return self._items[int(row.data(0, _INDEX))]
+
+    def _selected(self) -> None:
+        item = self.selected()
+        self.detail.setText("" if item is None else "\n".join(self._detail(item)))
+        self.explain.show_for(item)
+
+    def _detail(self, item: AutostartItem) -> list[str]:
+        """The command, the system entry it replaces and its conditions, as they are."""
+        text = self._window.translator.text
+        lines = [text("entry.command", command=item.command)]
+        if item.shadows is not None:
+            lines.append(text("entry.shadows", shadows=item.shadows))
+        return lines + [text("entry.note", note=note) for note in item.notes]
 
     # --- a change ------------------------------------------------------------------------------
 
@@ -202,12 +229,13 @@ class AutostartPage(QWidget):
         if not window.dialogs.confirm(asked):
             return
         scan = window.environment.scan_context
+        machine = window.settings.current.include_machine
 
         def work() -> Changed | Unclosed | Unfinished | SessionFailed:
-            return change_entry(scan(), context, action, item)
+            return change_entry(scan(), context, action, item, include_machine=machine)
 
         def done(outcome: Changed | Unclosed | Unfinished | SessionFailed) -> None:
-            self._changed(outcome, action, item)
+            self._changed(outcome, action, item, machine)
 
         window.run(Task(text(f"task.{action}"), work, done, acts=True))
 
@@ -228,6 +256,7 @@ class AutostartPage(QWidget):
         outcome: Changed | Unclosed | Unfinished | SessionFailed,
         action: Action,
         item: AutostartItem,
+        machine: bool,
     ) -> None:
         window = self._window
         if not isinstance(outcome, Changed):
@@ -236,7 +265,7 @@ class AutostartPage(QWidget):
         window.recovery.report(
             Domain.AUTOSTART, autostart_lines(window.translator, outcome.recovered)
         )
-        self._list(outcome.listing)
+        self._list(outcome.listing, machine)
         self.result.setText(self._result(outcome.result, action, item))
 
     def _result(
