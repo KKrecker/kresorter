@@ -190,6 +190,11 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
         ('QLabel[role="card-title"]', {"font-size": "16px", "font-weight": "600"}),
         ('QLabel[role="figure"]', {"font-size": "28px", "font-weight": "600"}),
         ('QLabel[role="caption"]', {"color": p.secondary, "font-size": "13px"}),
+        ('QLabel[role="question"]', {"font-size": "18px", "font-weight": "600"}),
+        (
+            'QScrollArea[role="details"]',
+            {"background-color": p.surface, "border": "none", "border-radius": "8px"},
+        ),
         (
             'QFrame[role="card"]',
             {
