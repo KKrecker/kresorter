@@ -61,6 +61,8 @@ COMPLETED: frozenset[int] = frozenset(
         38,
         39,
         40,
+        41,
+        42,
         43,
     }
 )
