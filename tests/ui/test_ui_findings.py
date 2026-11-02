@@ -1,5 +1,6 @@
-"""The Findings page: groups, filters, search, the detail and the selection; Review never
-preselected; quarantine from the findings (decision 0014, items 4, 20 and 21)."""
+"""The Findings page: the head, groups, chips, search, the detail and the bar with the
+selection; Review never preselected; quarantine from the findings (decision 0014, items 4, 20,
+21 and 49)."""
 
 import functools
 import time
@@ -14,6 +15,16 @@ from fakes import UnreliableOpenFiles
 from safeclean.analysis.score import Level
 from safeclean.quarantine.service import QuarantineService
 from safeclean.ui import sessions
+from safeclean.ui.findings import (
+    DETAIL_WIDTH,
+    PATH,
+    SEARCH_WIDTHS,
+    FindingDetail,
+    folders,
+    found_in,
+)
+from safeclean.ui.i18n import Translator
+from safeclean.ui.parts import BADGE, EMPHASIS, QUIET, SECONDARY
 from safeclean.ui.window import Window
 from support.files import write
 from support.journal import pending_move_batch, query
@@ -36,6 +47,7 @@ def window(
     tmp_path: Path,
     zone: Path,
     data_dir: Path,
+    home: Path,
     tree: dict[str, Path],
     dialogs: FakeDialogs,
 ) -> Window:
@@ -60,7 +72,7 @@ def _children(group: QTreeWidgetItem) -> list[QTreeWidgetItem]:
 def _shown(window: Window) -> list[str]:
     """The paths shown, group by group."""
     return [
-        child.text(0)
+        child.data(0, PATH)
         for group in _groups(window)
         if not group.isHidden()
         for child in _children(group)
@@ -81,26 +93,115 @@ def _check_group(group: QTreeWidgetItem, on: bool = True) -> None:
     group.setCheckState(0, Qt.CheckState.Checked if on else Qt.CheckState.Unchecked)
 
 
-# --- the findings [0014.20] ----------------------------------------------------------------------
+# --- the findings [0014.20] [0014.49] ------------------------------------------------------------
 
 
-def test_findings_are_grouped_by_their_strongest_reason_with_count_and_size(
-    window: Window, tree: dict[str, Path]
+def _row(item: QTreeWidgetItem) -> tuple[str, str | None, str, str]:
+    """A row's name, what is under it, its size and its level."""
+    return (item.text(0), item.data(0, SECONDARY), item.text(1), item.text(2))
+
+
+def test_findings_are_grouped_by_their_strongest_reason_with_files_rules_and_size(
+    window: Window, tmp_path: Path, tree: dict[str, Path]
 ) -> None:
-    # [0014.20]
-    assert [group.text(0) for group in _groups(window)] == [
-        "Cache: 4 files, 31 B",
-        "Duplicate copy: 1 file, 10 B",
-        "Not changed for a long time: 1 file, 10 B",
+    # [0014.20] [0014.49] Under a group's reason its files and, for junk, its rules; for
+    # duplicate copies, that one copy of each stays.
+    assert [_row(group) for group in _groups(window)] == [
+        ("Cache", "4 files · python-bytecode", "31 B", "Safe"),
+        ("Duplicate copy", "1 file · one copy of each stays", "10 B", "Likely safe"),
+        ("Not changed for a long time", "1 file", "10 B", "Review"),
     ]
     cache, copies, old = _groups(window)
-    assert [child.text(0) for child in _children(cache)] == [
+    assert [group.data(2, BADGE) for group in (cache, copies, old)] == [
+        "safe",
+        "likely_safe",
+        "review",
+    ]
+    assert all(group.data(0, EMPHASIS) and group.data(1, EMPHASIS) for group in _groups(window))
+    assert [_row(child) for child in _children(cache)] == [
+        (tree[name].name, str(Path("~", tree[name].parent.relative_to(tmp_path))), size, "")
+        for name, size in (("n", "15 B"), ("m", "8 B"), ("kept", "4 B"), ("copy", "4 B"))
+    ]
+    assert [child.data(0, PATH) for child in _children(cache)] == [
         str(tree[name]) for name in ("n", "m", "kept", "copy")
     ]
-    assert [(c.text(1), c.text(2)) for c in _children(copies)] == [("Likely safe", "10 B")]
-    assert [(c.text(1), c.text(2)) for c in _children(old)] == [("Review", "10 B")]
+    assert all(child.data(1, QUIET) for child in _children(cache))
+    assert [_row(child) for child in _children(copies)] == [
+        ("img.jpg", str(Path("~", "zone", "backup")), "10 B", "")
+    ]
     header = window.findings.tree.headerItem()
-    assert [header.text(column) for column in range(3)] == ["Path", "Level", "Size"]
+    assert [header.text(column) for column in range(3)] == ["Name", "Size", "Level"]
+    right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+    assert header.textAlignment(1) == right
+    assert cache.textAlignment(1) == right
+    assert _children(cache)[0].textAlignment(1) == right
+
+
+def test_a_folder_elsewhere_is_shown_as_it_is(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
+) -> None:
+    # [0014.49]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    scanned(qtbot, window)
+    [old] = _children(_groups(window)[2])
+    assert old.data(0, SECONDARY) == str(tree["old"].parent)
+
+
+def test_the_head_says_which_folders_were_scanned_and_when_with_rescan(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path, tree: dict[str, Path]
+) -> None:
+    # [0014.49]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    page = window.findings
+    assert page.head.subtitle.text() == "What the last scan found, grouped by its strongest reason."
+    assert page.head.controls == (page.rescan_button,)
+    assert page.rescan_button.text() == "Rescan"
+    scanned(qtbot, window)
+    found = window.overview.scanned
+    assert found is not None
+    assert found.roots == [zone]
+    assert page.head.subtitle.text() == f"Scan of {Path('~', 'zone')}, {_moment(found.at)}"
+    write(zone / "c" / "__pycache__" / "y.pyc", b"more")
+    page.rescan_button.click()
+    wait_idle(qtbot, window)
+    rescanned = window.overview.scanned
+    assert rescanned is not None
+    assert rescanned is not found
+    assert _row(_groups(window)[0]) == ("Cache", "5 files · python-bytecode", "35 B", "Safe")
+
+
+def test_the_folders_of_a_scan_and_the_scanned_folder_a_file_is_in(
+    tmp_path: Path, home: Path
+) -> None:
+    # [0014.49] "and" before the last; the deepest scanned folder that holds the file.
+    en, ru = Translator("en"), Translator("ru")
+    a, b, c = tmp_path / "a", tmp_path / "a" / "b", Path("/elsewhere")
+    assert folders(en, []) == ""
+    assert folders(en, [a]) == str(Path("~", "a"))
+    assert folders(en, [a, c]) == f"{Path('~', 'a')} and {c}"
+    assert folders(en, [a, b, c]) == f"{Path('~', 'a')}, {Path('~', 'a', 'b')} and {c}"
+    assert folders(ru, [a, c]) == f"{Path('~', 'a')} и {c}"
+    assert found_in(b / "f.txt", [a, b]) == b
+    assert found_in(b / "f.txt", [b, a]) == b
+    assert found_in(a / "f.txt", [a, b]) == a
+    assert found_in(c / "f.txt", [a, b]) == c
+
+
+def test_a_chip_per_level_with_its_count_and_the_search_with_its_icon(
+    qtbot: QtBot, window: Window
+) -> None:
+    # [0014.49] The search is as wide as it may be when the chips leave it the room.
+    page = window.findings
+    assert [box.text() for box in page.filters.values()] == ["Safe 4", "Likely safe 1", "Review 1"]
+    assert all(box.isCheckable() for box in page.filters.values())
+    assert page.search.placeholderText() == "Search the paths"
+    assert page.search.accessibleName() == "Search the paths"
+    assert not page.search.glass.icon().isNull()
+    assert page.search.minimumWidth() == SEARCH_WIDTHS[0] == 160
+    assert page.search.maximumWidth() == SEARCH_WIDTHS[1] == 240
+    window.resize(1200, 780)
+    window.show_page("findings")
+    qtbot.waitUntil(lambda: page.search.width() == 240)
 
 
 def test_the_level_filters_are_all_on_at_first_and_hide_their_findings(
@@ -137,64 +238,118 @@ def test_the_search_keeps_the_paths_that_contain_the_text_ignoring_case(
     assert len(_shown(window)) == 6
 
 
-def _moment(path: Path) -> str:
-    return time.strftime("%Y-%m-%d %H:%M", time.localtime(path.stat().st_mtime_ns / 1e9))
+def _moment(at: float) -> str:
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(at))
 
 
-def test_the_detail_shows_path_size_time_level_and_every_reason(
-    window: Window, tree: dict[str, Path]
+def _facts(detail: FindingDetail) -> dict[str, tuple[str, str]]:
+    return {
+        fact: (detail.labels[fact].text(), shown.text()) for fact, shown in detail.facts.items()
+    }
+
+
+def test_the_detail_shows_level_name_folder_size_time_where_found_and_every_reason(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path, tree: dict[str, Path]
 ) -> None:
-    # [0014.20]
+    # [0014.20] [0014.49]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    scanned(qtbot, window)
     page = window.findings
+    detail = page.detail
+    assert detail.width() == DETAIL_WIDTH == 320
+    assert detail.property("role") == "side"
+    assert detail.none.text() == "Choose a file to see why it was found."
+    assert not detail.none.isHidden()
+    assert detail.content.isHidden()
+
     page.tree.setCurrentItem(page.item(tree["copy"]))
-    assert page.detail.text().splitlines() == [
-        f"Path: {tree['copy']}",
-        "Size: 4 B",
-        f"Modified: {_moment(tree['copy'])}",
-        "Level: Safe",
+    assert detail.none.isHidden()
+    assert not detail.content.isHidden()
+    assert (detail.badge.text(), detail.badge.property("badge")) == ("Safe", "safe")
+    assert detail.name.text() == "x.pyc"
+    assert detail.folder.text() == str(Path("~", "zone", "b", "__pycache__"))
+    assert _facts(detail) == {
+        "size": ("Size", "4 B"),
+        "modified": ("Modified", _moment(tree["copy"].stat().st_mtime_ns / 1e9)),
+        "found": ("Found in", str(Path("~", "zone"))),
+    }
+    assert detail.why_title.text() == "Why"
+    assert detail.why.text().splitlines() == [
         "Cache: python-bytecode",
         f"Duplicate copy: {tree['kept']}",
     ]
     page.tree.setCurrentItem(page.item(tree["kept"]))
-    assert page.detail.text().splitlines()[-2:] == [
+    assert detail.why.text().splitlines() == [
         "Cache: python-bytecode",
         "This copy stays: the others are its duplicates.",
     ]
+    page.tree.setCurrentItem(page.item(tree["backup"]))
+    assert (detail.badge.text(), detail.badge.property("badge")) == ("Likely safe", "likely_safe")
     page.tree.setCurrentItem(page.item(tree["old"]))
-    old = "Not changed for a long time: unmodified for 800 days"
-    assert page.detail.text().splitlines()[-1] == old
+    assert detail.why.text() == "Not changed for a long time: unmodified for 800 days"
     page.tree.setCurrentItem(_groups(window)[0])
-    assert page.detail.text() == ""
+    assert not detail.none.isHidden()
+    assert detail.content.isHidden()
+
+
+def test_the_detail_in_russian(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
+) -> None:
+    # [0014.49]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
+    scanned(qtbot, window)
+    detail = window.findings.detail
+    assert detail.none.text() == "Выберите файл, чтобы увидеть, почему он найден."
+    window.findings.tree.setCurrentItem(window.findings.item(tree["old"]))
+    assert detail.badge.text() == "Проверить"
+    assert [label.text() for label in detail.labels.values()] == ["Размер", "Изменён", "Найден в"]
+    assert detail.why_title.text() == "Почему"
+
+
+def _bar(window: Window) -> tuple[str, str]:
+    return (window.findings.chosen.text(), window.findings.chosen_size.text())
 
 
 def test_the_bar_shows_the_selection_and_moving_needs_one(
     window: Window, tree: dict[str, Path]
 ) -> None:
-    # [0014.20]
+    # [0014.20] [0014.49]
     page = window.findings
-    assert page.bar.text() == "Selected: 3 files, 27 B"
+    assert page.bar.property("role") == "bar"
+    assert _bar(window) == ("3 files selected", "· 27 B")
+    assert page.move_button.text() == "Move to quarantine…"
+    assert page.move_button.property("role") == "primary"
     assert page.move_button.isEnabled()
     page.clear_button.click()
-    assert page.bar.text() == "Selected: 0 files, 0 B"
+    assert _bar(window) == ("0 files selected", "· 0 B")
     assert not page.move_button.isEnabled()
     _check(window, tree["old"])
-    assert page.bar.text() == "Selected: 1 file, 10 B"
+    assert _bar(window) == ("1 file selected", "· 10 B")
     assert page.move_button.isEnabled()
 
 
 def test_the_page_in_russian(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
 ) -> None:
-    # [0014.20]
+    # [0014.20] [0014.49]
     window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
     scanned(qtbot, window)
-    assert [group.text(0) for group in _groups(window)] == [
-        "Кэш: 4 файла, 31 Б",
-        "Копия дубликата: 1 файл, 10 Б",
-        "Давно не изменялся: 1 файл, 10 Б",
+    page = window.findings
+    assert [_row(group) for group in _groups(window)] == [
+        ("Кэш", "4 файла · python-bytecode", "31 Б", "Безопасно"),
+        ("Копия дубликата", "1 файл · одна копия каждого остаётся", "10 Б", "Скорее безопасно"),
+        ("Давно не изменялся", "1 файл", "10 Б", "Проверить"),
     ]
-    assert window.findings.bar.text() == "Выбрано: 3 файла, 27 Б"
-    assert window.findings.move_button.text() == "Переместить в карантин"
+    header = page.tree.headerItem()
+    assert [header.text(column) for column in range(3)] == ["Имя", "Размер", "Уровень"]
+    assert [box.text() for box in page.filters.values()] == [
+        "Безопасно 4",
+        "Скорее безопасно 1",
+        "Проверить 1",
+    ]
+    assert page.rescan_button.text() == "Сканировать снова"
+    assert _bar(window) == ("Выбрано: 3 файла", "· 27 Б")
+    assert page.move_button.text() == "Переместить в карантин…"
 
 
 # --- review is never preselected [0014.4] --------------------------------------------------------
@@ -310,12 +465,13 @@ def test_the_confirmed_findings_move_and_leave_the_list(
         (str(tree[name]),) for name in ("n", "m", "copy")
     ]
     assert _shown(window) == [str(tree["kept"]), str(tree["backup"]), str(tree["old"])]
-    assert [group.text(0) for group in _groups(window)] == [
-        "Cache: 1 file, 4 B",
-        "Duplicate copy: 1 file, 10 B",
-        "Not changed for a long time: 1 file, 10 B",
+    assert [_row(group) for group in _groups(window)] == [
+        ("Cache", "1 file · python-bytecode", "4 B", "Safe"),
+        ("Duplicate copy", "1 file · one copy of each stays", "10 B", "Likely safe"),
+        ("Not changed for a long time", "1 file", "10 B", "Review"),
     ]
-    assert page.bar.text() == "Selected: 0 files, 0 B"
+    assert [box.text() for box in page.filters.values()] == ["Safe 1", "Likely safe 1", "Review 1"]
+    assert _bar(window) == ("0 files selected", "· 0 B")
     assert not page.move_button.isEnabled()
 
 
@@ -378,9 +534,9 @@ def test_a_group_whose_findings_all_moved_leaves_the_list(
     _check(window, tree["backup"])
     window.findings.move_button.click()
     wait_idle(qtbot, window)
-    assert [group.text(0) for group in _groups(window)] == [
-        "Cache: 4 files, 31 B",
-        "Not changed for a long time: 1 file, 10 B",
+    assert [_row(group) for group in _groups(window)] == [
+        ("Cache", "4 files · python-bytecode", "31 B", "Safe"),
+        ("Not changed for a long time", "1 file", "10 B", "Review"),
     ]
     assert not tree["backup"].exists()
 

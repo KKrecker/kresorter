@@ -4,6 +4,7 @@ parts it is made of (decision 0014, items 46 and 47)."""
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QPoint
 from PySide6.QtGui import QFont, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -57,11 +58,7 @@ def _central(window: Window) -> QWidget:
 
 
 def _head(window: Window, name: str) -> Head:
-    layout = window.page(name).layout()
-    assert layout is not None
-    item = layout.itemAt(0)
-    assert item is not None
-    head = item.widget()
+    head = window.page(name).findChild(QWidget, "head")
     assert isinstance(head, Head)
     return head
 
@@ -118,20 +115,22 @@ def test_a_title_is_24_px_semibold_and_what_it_does_is_secondary_text(window: Wi
 
 
 def test_a_page_has_margins_of_32_px_at_its_sides_and_its_top(window: Window) -> None:
-    # [0014.46]
+    # [0014.46] [0014.49] The head first, 32 px from the page's top and left and from the right
+    # of what holds it: the page, or the Findings' column at the left of the detail.
     assert PAGE_MARGIN == 32
     for name in PAGES:
-        layout = window.page(name).layout()
-        assert layout is not None
-        margins = layout.contentsMargins()
-        assert (margins.left(), margins.top(), margins.right()) == (32, 32, 32)
         window.show_page(name)
-        assert _head(window, name).geometry().topLeft().toTuple() == (32, 32)
+        page, head = window.page(name), _head(window, name)
+        holder = head.parentWidget()
+        assert holder is not None
+        assert head.mapTo(page, QPoint(0, 0)).toTuple() == (32, 32)
+        assert holder.width() - head.geometry().right() - 1 == 32
 
 
 def test_the_page_s_own_controls_sit_at_the_right_of_its_title(window: Window) -> None:
-    # [0014.46] Findings' Rescan and Autostart's search come with their pages (items 49, 53).
+    # [0014.46] [0014.49] Autostart's search comes with its page (item 53).
     for name, controls in (
+        ("findings", (window.findings.rescan_button,)),
         ("quarantine", (window.quarantine.refresh_button,)),
         ("autostart", (window.autostart.refresh_button,)),
         ("overview", ()),

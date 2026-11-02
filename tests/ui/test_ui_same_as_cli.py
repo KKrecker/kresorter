@@ -90,7 +90,9 @@ def test_the_findings_and_their_levels_are_those_of_analyze_json(
         for finding in window.findings.findings()
     ] == expected
     for path, level, *_ in expected:
-        assert window.findings.item(path).text(1) == EN.label(Level(level))
+        group = window.findings.item(path).parent()
+        assert group is not None
+        assert group.text(2) == EN.label(Level(level))
 
 
 def test_the_organize_plan_is_that_of_organize_move_without_yes(

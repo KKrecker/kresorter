@@ -257,7 +257,7 @@ src/safeclean/
 ├── organize/     # step 5: categories, planner, mover, journal, recovery, undo (decision 0012)
 ├── llm/          # step 6: settings, transport, client, prompt, clean, subjects, explain (0013)
 └── ui/           # step 7: launch, app, window, sidebar, tasks, i18n, texts, labels, theme,
-                  #   icons (and icons/, Lucide's), parts, settings, dialogs, sessions,
+                  #   icons (and icons/, Lucide's), parts, shown, settings, dialogs, sessions,
                   #   overview, findings, organize, autostart, quarantine, recovery, explain,
                   #   settings_page (0014)
 ```

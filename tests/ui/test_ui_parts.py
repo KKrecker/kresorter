@@ -24,8 +24,10 @@ from safeclean.ui.parts import (
     Icon,
     Note,
     RowDelegate,
+    SearchField,
     badge,
     badge_colours,
+    bar,
     button,
     card,
     cell_colours,
@@ -229,6 +231,31 @@ def test_buttons_chips_and_links(qtbot: QtBot, holder: QWidget, look: Look) -> N
     assert more.isFlat()
     assert more.cursor().shape() == Qt.CursorShape.PointingHandCursor
     assert all(made.height() >= 36 for made in (plain, primary, danger, on, folder))
+
+
+def test_a_bar_across_a_page_s_bottom() -> None:
+    # [0014.49]
+    frame, inside = bar()
+    margins = inside.contentsMargins()
+    assert frame.property("role") == "bar"
+    assert (margins.left(), margins.top(), margins.right(), margins.bottom()) == (32, 12, 32, 12)
+    assert inside.spacing() == 16
+    assert inside.parentWidget() is frame
+
+
+def test_a_search_field_is_named_by_its_placeholder_its_icon_in_secondary_text(
+    qapp: QApplication, look: Look
+) -> None:
+    # [0014.49] The icon's button says what the field is for, as the field does.
+    field = SearchField(look, "Search the paths")
+    assert field.placeholderText() == field.accessibleName() == "Search the paths"
+    assert field.glass.text() == "Search the paths"
+    for palette in (LIGHT, DARK):
+        if palette is DARK:
+            _dark(qapp)
+        shown = field.glass.icon().pixmap(QSize(16, 16), 2.0).toImage()
+        assert inked_in(shown, palette.secondary)
+    _light(qapp)
 
 
 def _icon(made: QPushButton, mode: QIcon.Mode = QIcon.Mode.Normal) -> QImage:

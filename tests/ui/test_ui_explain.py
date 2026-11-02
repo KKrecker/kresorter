@@ -1,14 +1,15 @@
 """Explanations, on request: the detail of a finding, an autostart entry and a file organize
-leaves in place has Explain (local AI). It asks for the one subject of that result through
-``llm.explain`` and shows the answer under a label that names the model and says it may be
-wrong, or why there is none, in the window's words (decision 0014, item 26). Nothing is asked
-without the button, nothing is stored, and an answer changes no level, selection, plan or
-action."""
+leaves in place has the explanation card with Explain (local AI). It asks for the one subject
+of that result through ``llm.explain`` and shows the answer with a note that names the model
+and says it may be wrong, or why there is none, in the window's words (decision 0014, items 26
+and 54). Nothing is asked without the button, nothing is stored, and an answer changes no
+level, selection, plan or action."""
 
 import json
 import threading
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
@@ -17,6 +18,7 @@ from pytestqt.qtbot import QtBot
 from safeclean.analysis.report import Finding
 from safeclean.llm.settings import URL_VARIABLE, Address
 from safeclean.llm.subjects import Result, subject_of
+from safeclean.ui.explain import ExplainPanel
 from safeclean.ui.i18n import Language
 from safeclean.ui.window import Window
 from support.files import write
@@ -28,7 +30,7 @@ from support.window import FakeDialogs, environment, junk_tree, make_window, sca
 ANSWER = "Bytecode that Python makes again when it needs it."
 CHECKS = [("GET", "/api/version"), ("GET", "/api/tags")]
 GENERATE = ("POST", "/api/generate")
-LABEL = "Explanation by llama3.2 via Ollama; advisory, it may be wrong:"
+MODEL = "llama3.2 via Ollama · may be wrong"
 SETUP = "The Check on the Settings page shows how to set it up."
 
 
@@ -78,6 +80,15 @@ def _levels(window: Window) -> list[tuple[Path, str, bool]]:
     return [(f.entry.path, f.level, f in chosen) for f in window.findings.findings()]
 
 
+class _Explained(Protocol):
+    explain: ExplainPanel
+
+
+def _said(page: _Explained) -> tuple[str, str]:
+    """The answer the explanation card shows, and the note under it."""
+    return (page.explain.answer.text(), page.explain.note.text())
+
+
 def _listing(root: Path) -> list[str]:
     return sorted(path.relative_to(root).as_posix() for path in root.rglob("*"))
 
@@ -123,14 +134,41 @@ def test_a_finding_s_detail_asks_for_its_one_subject_only_on_request(
     page.tree.setCurrentItem(page.item(tree["m"]))
     assert page.explain.button.isEnabled()
     assert ollama.paths() == []
-    assert page.explain.answer.text() == ""
+    assert _said(page) == ("", "")
 
     page.explain.button.click()
     wait_idle(qtbot, window)
 
     assert ollama.paths() == [*CHECKS, GENERATE]
     assert _asked(ollama) == [_facts(_finding(window, tree["m"]))]
-    assert page.explain.answer.text() == f"{LABEL}\n{ANSWER}"
+    assert _said(page) == (ANSWER, MODEL)
+
+
+def test_the_card_its_title_its_badge_and_the_button_until_it_is_asked(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, ollama: ScriptedOllama
+) -> None:
+    # [0014.54] Once answered, the button goes; another result brings it back.
+    tree = junk_tree(zone)
+    window = _window(qtbot, tmp_path, zone, data_dir, ollama.address)
+    page = window.findings
+    card = page.explain
+    assert (card.property("role"), card.property("tone")) == ("card", "surface")
+    assert card.icon.name == "sparkles"
+    assert (card.title.text(), card.title.property("role")) == ("AI explanation", "strong")
+    assert (card.advisory.text(), card.advisory.property("badge")) == ("advisory", "advisory")
+    assert card.note.property("role") == "secondary"
+    scanned(qtbot, window)
+    page.tree.setCurrentItem(page.item(tree["m"]))
+    assert not card.button.isHidden()
+
+    card.button.click()
+    wait_idle(qtbot, window)
+
+    assert card.button.isHidden()
+    assert _said(page) == (ANSWER, MODEL)
+    page.tree.setCurrentItem(page.item(tree["n"]))
+    assert not card.button.isHidden()
+    assert _said(page) == ("", "")
 
 
 def test_an_answer_changes_no_level_selection_or_action_and_nothing_is_stored(
@@ -147,7 +185,7 @@ def test_an_answer_changes_no_level_selection_or_action_and_nothing_is_stored(
     page.explain.button.click()
     wait_idle(qtbot, window)
 
-    assert page.explain.answer.text() == f"{LABEL}\n{ANSWER}"
+    assert _said(page) == (ANSWER, MODEL)
     assert _levels(window) == before
     assert page.move_button.isEnabled()
     assert _listing(tmp_path) == files
@@ -167,15 +205,15 @@ def test_another_finding_clears_the_answer_and_a_new_analysis_too(
     wait_idle(qtbot, window)
 
     page.tree.setCurrentItem(page.item(tree["n"]))
-    assert page.explain.answer.text() == ""
+    assert _said(page) == ("", "")
     assert page.explain.button.isEnabled()
 
     page.tree.setCurrentItem(page.item(tree["m"]))
     page.explain.button.click()
     wait_idle(qtbot, window)
-    assert page.explain.answer.text() == f"{LABEL}\n{ANSWER}"
+    assert _said(page) == (ANSWER, MODEL)
     scanned(qtbot, window)
-    assert page.explain.answer.text() == ""
+    assert _said(page) == ("", "")
     assert not page.explain.button.isEnabled()
 
 
@@ -196,7 +234,7 @@ def test_an_answer_that_comes_after_the_result_changed_is_not_shown(
         gate.set()
         wait_idle(qtbot, window)
 
-    assert page.explain.answer.text() == ""
+    assert _said(page) == ("", "")
     assert page.explain.button.isEnabled()
 
 
@@ -233,7 +271,7 @@ def test_without_an_answer_the_detail_says_why_there_is_none(
         page.explain.button.click()
         wait_idle(qtbot, window)
 
-    assert page.explain.answer.text() == expected
+    assert _said(page) == ("", expected)
     assert _levels(window) == before
 
 
@@ -250,7 +288,8 @@ def test_a_refused_setting_asks_nothing_and_says_so(
     page.explain.button.click()
     wait_idle(qtbot, window)
 
-    answer = page.explain.answer.text()
+    assert page.explain.answer.text() == ""
+    answer = page.explain.note.text()
     assert answer.startswith(
         "No explanation: The settings are refused: SAFECLEAN_OLLAMA_URL='http://192.0.2.1:11434': "
     )
@@ -267,11 +306,12 @@ def test_the_answer_s_label_in_russian(
     scanned(qtbot, window)
     page.tree.setCurrentItem(page.item(tree["m"]))
     assert page.explain.button.text() == "Объяснить (локальный ИИ)"
+    assert page.explain.title.text() == "Объяснение ИИ"
+    assert page.explain.advisory.text() == "лишь совет"
     page.explain.button.click()
     wait_idle(qtbot, window)
 
-    label = "Объяснение от llama3.2 через Ollama; это лишь совет, оно может быть неверным:"
-    assert page.explain.answer.text() == f"{label}\n{ANSWER}"
+    assert _said(page) == (ANSWER, "llama3.2 через Ollama · может ошибаться")
 
 
 # --- an autostart entry --------------------------------------------------------------------------
@@ -310,7 +350,7 @@ def test_an_autostart_entry_s_detail_and_its_explanation(
     wait_idle(qtbot, window)
 
     assert _asked(ollama) == [_facts(item)]
-    assert page.explain.answer.text() == f"{LABEL}\n{ANSWER}"
+    assert _said(page) == (ANSWER, MODEL)
     assert page.selected() == item
     assert page.disable_button.isEnabled()
     assert _listing(tmp_path) == files
@@ -331,10 +371,10 @@ def test_another_entry_clears_the_answer(
     page.row("app").setSelected(True)
     page.explain.button.click()
     wait_idle(qtbot, window)
-    assert page.explain.answer.text() == f"{LABEL}\n{ANSWER}"
+    assert _said(page) == (ANSWER, MODEL)
 
     page.entries.clearSelection()
-    assert page.explain.answer.text() == ""
+    assert _said(page) == ("", "")
     assert page.detail.text() == ""
     assert not page.explain.button.isEnabled()
     page.row("other").setSelected(True)
@@ -374,7 +414,7 @@ def test_a_file_that_stays_in_place_can_be_explained_and_the_plan_stays(
     wait_idle(qtbot, window)
 
     assert _asked(ollama) == [{"kind": "stay", "reason": "junk", "extension": ".tmp"}]
-    assert page.explain.answer.text() == f"{LABEL}\n{ANSWER}"
+    assert _said(page) == (ANSWER, MODEL)
     assert _plan(page.plan) == plan
     assert page.move_button.isEnabled()
     assert _listing(tmp_path) == files
@@ -401,6 +441,6 @@ def test_moving_the_plan_clears_the_answer(
     page.move_button.click()
     wait_idle(qtbot, window)
 
-    assert page.explain.answer.text() == ""
+    assert _said(page) == ("", "")
     assert page.detail.text() == ""
     assert not page.explain.button.isEnabled()

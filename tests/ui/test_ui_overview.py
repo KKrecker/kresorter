@@ -12,7 +12,8 @@ from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
 from safeclean.analysis.score import Level
-from safeclean.ui.overview import FolderChip, shown_path
+from safeclean.ui.overview import FolderChip
+from safeclean.ui.shown import shown_path
 from safeclean.ui.window import Window
 from support.files import write
 from support.moves import three_files
@@ -22,14 +23,6 @@ from support.window import FakeDialogs, environment, junk_tree, make_window, sca
 @pytest.fixture
 def tree(zone: Path) -> dict[str, Path]:
     return junk_tree(zone)
-
-
-@pytest.fixture
-def home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """The home folder: tmp_path, so that the zone is ``~/zone``."""
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("USERPROFILE", str(tmp_path))
-    return tmp_path
 
 
 def _chips(window: Window) -> list[FolderChip]:

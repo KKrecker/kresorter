@@ -295,6 +295,27 @@ def test_a_confirmation_s_title_is_18_px_semibold_and_its_details_on_surface(
 
 
 @pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
+def test_the_bar_the_detail_at_the_side_and_the_advisory_badge(palette: Palette) -> None:
+    # [0014.49] [0014.54] A border above the bar, one at the detail's left; the advisory badge
+    # is text on surface2, a pill.
+    rules = dict(_rules(style_sheet(palette)))
+    canvas, border = palette.canvas, f"1px solid {palette.border}"
+    assert rules['QFrame[role="bar"]'] == {
+        "background-color": canvas,
+        "border": "none",
+        "border-top": border,
+    }
+    assert rules['QFrame[role="side"]'] == {
+        "background-color": canvas,
+        "border": "none",
+        "border-left": border,
+    }
+    advisory = rules['QLabel[badge="advisory"]']
+    assert (advisory["color"], advisory["background-color"]) == (palette.text, palette.surface2)
+    assert advisory["border-radius"] == "10px"
+
+
+@pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
 def test_a_title_is_24_px_semibold_and_what_it_does_secondary_text(palette: Palette) -> None:
     # [0014.46]
     rules = dict(_rules(style_sheet(palette)))

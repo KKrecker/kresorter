@@ -114,6 +114,14 @@ def zone(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """The home folder: tmp_path, so that the zone is ``~/zone``."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    return tmp_path
+
+
+@pytest.fixture
 def scan(tmp_path: Path, zone: Path, data_dir: Path) -> ScanContext:
     """The scan context of a CLI test: ``zone`` and ``data_dir``, a reliable open-file check."""
     return scan_context(tmp_path, zone, data_dir)
