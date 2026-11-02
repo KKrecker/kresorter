@@ -3,7 +3,7 @@
 pytest finds a fixture by its name, so these are not imported; helpers are imported by name
 from ``support``, and boundary fakes from ``fakes``. One fixture is used by every test: no
 test reaches beyond loopback or asks a resolver (decision 0013, item 29). Qt, for the window's
-tests, runs offscreen.
+tests, runs offscreen, and they reach no live system (decision 0014, items 38 and 39).
 """
 
 import ipaddress
@@ -18,6 +18,7 @@ import pytest
 
 from safeclean.core.scanner import ScanContext
 from support.cli import scan_context
+from support.live import guard
 
 # The window's tests run on Qt's offscreen platform, set before any application is made
 # (decision 0014, item 38).
@@ -27,6 +28,7 @@ _IPV4_LOOPBACK = ipaddress.IPv4Network("127.0.0.0/8")
 _IPV6_LOOPBACK = ipaddress.IPv6Address("::1")
 _RESOLVERS = ("getaddrinfo", "gethostbyname", "gethostbyname_ex", "gethostbyaddr")
 _QT_ROOTS = ("PySide6", "shiboken6")
+_WINDOW_TESTS = Path(__file__).resolve().parent / "ui"
 
 
 def _address(host: object) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
@@ -82,6 +84,19 @@ def loopback_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(socket.socket, "sendto", _guard_sendto(socket.socket.sendto))
     for name in _RESOLVERS:
         monkeypatch.setattr(socket, name, _guard_resolver(name, getattr(socket, name)))
+
+
+@pytest.fixture(autouse=True)
+def no_live_system(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """A test of the window (``tests/ui``) reaches no live system: the running system's
+    contexts are refused, home is temporary, the local AI's address is refused (0014 item 39,
+    ``support.live``)."""
+    if _WINDOW_TESTS in Path(request.node.path).resolve().parents:
+        guard(monkeypatch, tmp_path_factory.mktemp("home"))
 
 
 @pytest.fixture
