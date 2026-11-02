@@ -200,6 +200,7 @@ Scanner core and `safeclean scan` (read-only report).
 - B8: one environment object for `cli.main` instead of a factory per parameter.
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
 - B11: CI on Windows and macOS and live `WinRegistry` tests, once the repository is published.
+- Before the first release: CI confirms Python 3.14 (step 6 was checked on it locally only).
 - B12: a user's own stub without `Exec` that `enable` moved to the store is not given back
   (accepted limitation of step 5).
 
