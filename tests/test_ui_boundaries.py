@@ -10,7 +10,6 @@ import argparse
 import ast
 import importlib
 import io
-import sys
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
@@ -224,15 +223,6 @@ def test_the_package_depends_on_nothing() -> None:
     # [0014.1]
     project = tomllib.loads((SRC.parent / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["dependencies"] == []
-
-
-@pytest.fixture
-def without_qt(monkeypatch: pytest.MonkeyPatch) -> None:
-    """PySide6 and shiboken6, and every module under them, cannot be imported."""
-    for name in [name for name in sys.modules if name.split(".")[0] in QT_ROOTS]:
-        monkeypatch.setitem(sys.modules, name, None)
-    for root in QT_ROOTS:
-        monkeypatch.setitem(sys.modules, root, None)
 
 
 @pytest.mark.usefixtures("without_qt")
