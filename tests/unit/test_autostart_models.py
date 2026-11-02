@@ -54,8 +54,9 @@ def test_sources_and_scopes_are_pinned() -> None:
 
 
 def test_an_item_is_immutable() -> None:
+    name = "enabled"  # set by name: the type checker knows it is frozen, the test checks it is
     with pytest.raises(dataclasses.FrozenInstanceError):
-        item().enabled = False  # type: ignore[misc]
+        setattr(item(), name, False)
 
 
 def test_an_item_shadows_nothing_by_default() -> None:
