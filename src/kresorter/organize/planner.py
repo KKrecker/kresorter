@@ -4,11 +4,16 @@ items 1-20). It only looks: ``lstat`` and ``iterdir``; nothing is made, moved or
 One level only: the regular files directly in the folder are the candidates, and every entry is
 either moved or kept in place with its reason, never skipped in silence. A file is kept by the
 first of, in this order: not a regular file, the folder's metadata, work in progress, junk, no
-kind in the table, a program next to its libraries, its category path not a directory, its
-destination taken. Then companions: a file whose stem (the name before its first dot) it shares
-with an entry that would not go to the same category directory stays too. Names are compared
-folded (``names``); whether a path is taken is asked of the file system. The plan is sorted, so
-it does not depend on the order the folder is listed in.
+kind in the table, a program next to its libraries, on Windows a new path past the limit, its
+category path not a directory, its destination taken. Then companions: a file whose stem (the
+name before its first dot) it shares with an entry that would not go to the same category
+directory stays too. Names are compared folded (``names``); whether a path is taken is asked of
+the file system. The plan is sorted, so it does not depend on the order the folder is listed in.
+
+The limit (decision 0017, item 6) is Windows's without long paths, whether they are enabled or
+not: a category directory of at most ``DIRECTORY_LIMIT`` characters and a destination of at most
+``PATH_LIMIT``, counted in UTF-16 code units. It is decided from the names alone, before the
+category path or the destination is looked at.
 """
 
 from __future__ import annotations
@@ -29,6 +34,8 @@ __all__ = ["Move", "Plan", "Stay", "StayReason", "plan"]
 METADATA = ("desktop.ini", "thumbs.db")  # with every name that starts with "."
 IN_PROGRESS = ("*.part", "*.crdownload", "*.download", "*.partial", "~$*")
 LIBRARIES = ("*.dll", "*.so", "*.so.*", "*.dylib")
+DIRECTORY_LIMIT = 247  # MAX_PATH less its terminating zero and a directory's 8.3 name
+PATH_LIMIT = 259  # MAX_PATH less its terminating zero
 
 
 class StayReason(StrEnum):
@@ -39,6 +46,7 @@ class StayReason(StrEnum):
     UNKNOWN_KIND = "unknown_kind"
     COMPANION = "companion"
     PROGRAM = "program"
+    PATH_TOO_LONG = "path_too_long"  # Windows only; the detail says which length passes
     CONFLICT = "conflict"  # the detail says why, when the destination cannot be looked at
     CATEGORY_BLOCKED = "category_blocked"  # likewise for the category path
     MISSING = "missing"  # undo only: nothing at the destination, or nothing it can look at
@@ -92,6 +100,8 @@ def plan(folder: Path, context: ScanContext) -> Plan:
             outcome[name] = Stay(path, StayReason.UNKNOWN_KIND)
         elif libraries and kind.extension == "exe":
             outcome[name] = Stay(path, StayReason.PROGRAM)
+        elif context.platform == "windows" and (long := _too_long(path, kind.category)):
+            outcome[name] = Stay(path, StayReason.PATH_TOO_LONG, long)
         else:
             if kind.category not in blocked:
                 blocked[kind.category] = _not_a_directory(folder / kind.category)
@@ -135,6 +145,23 @@ def _placed(path: Path, category: str, info: os.stat_result, blocked: str | None
     if taken is not None:
         return Stay(path, StayReason.CONFLICT, taken)
     return Move(path, category, info.st_size, info.st_mtime_ns)
+
+
+def _too_long(path: Path, category: str) -> str | None:
+    """Which length of the new path passes Windows's limit, or None."""
+    directory = path.parent / category
+    length = _length(directory)
+    if length > DIRECTORY_LIMIT:
+        return f"{directory}: {length} > {DIRECTORY_LIMIT}"
+    length = _length(directory / path.name)
+    if length > PATH_LIMIT:
+        return f"{length} > {PATH_LIMIT}"
+    return None
+
+
+def _length(path: Path) -> int:
+    """The length of ``path`` as Windows counts it: UTF-16 code units."""
+    return len(str(path).encode("utf-16-le")) // 2
 
 
 def _not_a_directory(path: Path) -> str | None:

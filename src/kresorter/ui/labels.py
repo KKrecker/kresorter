@@ -120,6 +120,9 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "unknown_kind": _both("Unknown kind", "Неизвестный тип"),
         "companion": _both("Belongs with other files", "Связан с другими файлами"),
         "program": _both("A program or installer", "Программа или установщик"),
+        "path_too_long": _both(
+            "Its new path would be too long", "Новый путь был бы слишком длинным"
+        ),
         "conflict": _both("Its place is taken", "Его место занято"),
         "category_blocked": _both(
             "Its category's folder cannot be used", "Папку категории нельзя использовать"
