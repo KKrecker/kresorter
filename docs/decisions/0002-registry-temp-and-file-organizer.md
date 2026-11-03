@@ -43,7 +43,7 @@ into categories (tabs).
 - Moves go through **the same quarantine/journal API as deletions**: journaled in SQLite,
   reversible, re-validated before execution (file changed since scan → move refused).
 
-**Placement.** Separate package `safeclean.organize`, outside the MVP. Reuses `core` (walker,
+**Placement.** Separate package `kresorter.organize`, outside the MVP. Reuses `core` (walker,
 policy) and `quarantine` (journal, rollback). See `docs/roadmap.md`, step 5.
 
 **Consequences for step 1.** Policy and walker report *why* something is skipped through a

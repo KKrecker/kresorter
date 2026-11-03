@@ -16,17 +16,17 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean.core.hashing import hash_file
-from safeclean.core.heuristics import JunkClassifier, load_rules
-from safeclean.core.models import FileEntry
-from safeclean.core.open_files import NoOpenFileCheck
-from safeclean.core.policy import PathPolicy
-from safeclean.core.preflight import Candidate, RefusalReason, UnreliableCheckerError
-from safeclean.quarantine.journal import OperationState
-from safeclean.quarantine.recovery import RecoveryReport
-from safeclean.quarantine.service import QuarantineError, QuarantineService
-from safeclean.quarantine.vault import Vault
-from safeclean.storage.db import connect
+from kresorter.core.hashing import hash_file
+from kresorter.core.heuristics import JunkClassifier, load_rules
+from kresorter.core.models import FileEntry
+from kresorter.core.open_files import NoOpenFileCheck
+from kresorter.core.policy import PathPolicy
+from kresorter.core.preflight import Candidate, RefusalReason, UnreliableCheckerError
+from kresorter.quarantine.journal import OperationState
+from kresorter.quarantine.recovery import RecoveryReport
+from kresorter.quarantine.service import QuarantineError, QuarantineService
+from kresorter.quarantine.vault import Vault
+from kresorter.storage.db import connect
 from support.files import write
 from support.journal import rows
 
@@ -108,7 +108,7 @@ def test_unreliable_checker_is_refused(conn: sqlite3.Connection, policy: PathPol
 def test_data_dir_inside_a_default_root_is_refused(
     conn: sqlite3.Connection, tmp_path: Path, zone: Path
 ) -> None:
-    policy = make_policy(tmp_path, default_roots=[zone], app_data_dir=zone / "xdg" / "safeclean")
+    policy = make_policy(tmp_path, default_roots=[zone], app_data_dir=zone / "xdg" / "kresorter")
     with pytest.raises(QuarantineError, match="scan zone"):
         make_service(conn, policy)
 

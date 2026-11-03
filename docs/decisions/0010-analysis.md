@@ -6,7 +6,7 @@
 
 ## Principles
 
-1. **Analysis only advises and never touches the disk.** `safeclean.analysis` turns a scan
+1. **Analysis only advises and never touches the disk.** `kresorter.analysis` turns a scan
    report into proposals; every proposal is a quarantine `Candidate`, so preflight re-checks it
    right before anything moves, and every action stays reversible until purge.
 2. **Every conclusion is explained.** A proposal carries the reasons that produced it; there is

@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.core.scanner import ScanContext
-from safeclean.storage.session import SessionFailure
-from safeclean.ui.settings import (
+from kresorter.core.scanner import ScanContext
+from kresorter.storage.session import SessionFailure
+from kresorter.ui.settings import (
     DEFAULTS,
     LANGUAGE_SETTINGS,
     SETTINGS_NAME,
@@ -125,7 +125,7 @@ def test_nothing_is_written_where_the_data_directory_must_not_be(
     tmp_path: Path, zone: Path
 ) -> None:
     # [0014.35] The data directory is checked first (0009): inside a scan zone, no file.
-    inside = zone / "safeclean"
+    inside = zone / "kresorter"
     context = scan_context(tmp_path, zone, inside)
     before = _listing(tmp_path)
     failed = save(context, Settings(language="ru"))

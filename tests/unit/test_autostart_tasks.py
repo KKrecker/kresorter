@@ -13,15 +13,15 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.autostart.entries import MAX_ENTRY_BYTES
-from safeclean.autostart.models import (
+from kresorter.autostart.entries import MAX_ENTRY_BYTES
+from kresorter.autostart.models import (
     AutostartListing,
     AutostartSkipped,
     Scope,
     Source,
     entry_digest,
 )
-from safeclean.autostart.tasks import read_tasks, tasks_dir
+from kresorter.autostart.tasks import read_tasks, tasks_dir
 
 NS = "http://schemas.microsoft.com/windows/2004/02/mit/task"
 LOGON = "<LogonTrigger><Enabled>true</Enabled></LogonTrigger>"

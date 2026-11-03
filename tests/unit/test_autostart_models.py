@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from safeclean.autostart.models import (
+from kresorter.autostart.models import (
     AutostartItem,
     AutostartSkipped,
     Scope,

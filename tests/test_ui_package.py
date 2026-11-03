@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.autostart.listing import AutostartContext
-from safeclean.core.scanner import ScanContext
-from safeclean.environment import Environment
-from safeclean.ui import launch
+from kresorter.autostart.listing import AutostartContext
+from kresorter.core.scanner import ScanContext
+from kresorter.environment import Environment
+from kresorter.ui import launch
 
 ROOT = Path(__file__).resolve().parents[1]
 QT = "PySide6-Essentials>=6.8,<7"
@@ -40,8 +40,8 @@ def test_the_extra_and_the_dev_dependencies() -> None:
 
 def test_the_entry_points() -> None:
     # [0014.8]
-    assert project()["gui-scripts"] == {"safeclean-ui": "safeclean.ui.launch:main"}
-    assert project()["scripts"] == {"safeclean": "safeclean.cli:main"}
+    assert project()["gui-scripts"] == {"kresorter-ui": "kresorter.ui.launch:main"}
+    assert project()["scripts"] == {"kresorter": "kresorter.cli:main"}
 
 
 def test_main_takes_its_arguments_and_an_environment() -> None:
@@ -63,7 +63,7 @@ def test_python_dash_m_runs_the_launch(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(launch, "main", launched)
     with pytest.raises(SystemExit) as exited:
-        runpy.run_module("safeclean.ui", run_name="__main__")
+        runpy.run_module("kresorter.ui", run_name="__main__")
 
     assert (exited.value.code, calls) == (7, [()])
 
@@ -91,9 +91,9 @@ def test_without_pyside6_one_line_and_exit_3(
     line, end = captured.err.split("\n")
     assert end == ""
     assert line.startswith(
-        'safeclean-ui: the desktop window needs PySide6 (pip install "safeclean[ui]"): '
+        'kresorter-ui: the desktop window needs PySide6 (pip install "kresorter[ui]"): '
     )
-    assert "PySide6" in line.removeprefix("safeclean-ui: the desktop window needs PySide6")
+    assert "PySide6" in line.removeprefix("kresorter-ui: the desktop window needs PySide6")
     assert list(tmp_path.iterdir()) == []
 
 
@@ -123,7 +123,7 @@ def test_a_library_qt_cannot_load_is_one_line_and_exit_3(
     assert captured.out == ""
     line, end = captured.err.split("\n")
     assert end == ""
-    assert line.startswith("safeclean-ui: Qt cannot load a library it needs (libGL.so.1: ")
+    assert line.startswith("kresorter-ui: Qt cannot load a library it needs (libGL.so.1: ")
     assert all(library in line for library in LIBRARIES)
     assert list(tmp_path.iterdir()) == []
 
@@ -140,11 +140,11 @@ def test_without_a_standard_error_nothing_is_written_and_exit_3(
 
 def test_another_import_error_is_not_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
     # [0014.9] only Qt's absence is the one line; a broken module of the window is raised
-    monkeypatch.setitem(sys.modules, "safeclean.ui.app", None)
-    window = importlib.import_module("safeclean.ui")
+    monkeypatch.setitem(sys.modules, "kresorter.ui.app", None)
+    window = importlib.import_module("kresorter.ui")
     monkeypatch.delattr(window, "app", raising=False)
 
-    with pytest.raises(ImportError, match=r"safeclean\.ui\.app"):
+    with pytest.raises(ImportError, match=r"kresorter\.ui\.app"):
         launch.main([], environment=UNTOUCHED)
 
 

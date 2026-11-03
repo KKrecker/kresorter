@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from safeclean.analysis.run import analyze_paths
-from safeclean.analysis.score import Level
-from safeclean.analysis.size_age import Thresholds
-from safeclean.core.scanner import ScanContext
+from kresorter.analysis.run import analyze_paths
+from kresorter.analysis.score import Level
+from kresorter.analysis.size_age import Thresholds
+from kresorter.core.scanner import ScanContext
 from support.files import snapshot, write
 
 

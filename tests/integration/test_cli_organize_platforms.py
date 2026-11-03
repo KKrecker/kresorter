@@ -1,9 +1,9 @@
-"""`safeclean organize` on macOS and Windows, on Linux without a reliable open-file check, and
+"""`kresorter organize` on macOS and Windows, on Linux without a reliable open-file check, and
 folded names end to end (decision 0012, items 20, 37-39).
 
 On a blocked system `move` and `undo` refuse before anything, with or without `--yes`: before
 the journal is opened (the data directory is not made), before planning, and without asking
-the open-file check. On macOS and Windows the checker is the one safeclean gives that system
+the open-file check. On macOS and Windows the checker is the one kresorter gives that system
 today, or a reliable fake: a backend alone does not lift the refusal (item 39); on Linux an
 unreliable checker is the one blocker. `list` and `recover` move nothing and run everywhere.
 The platform is the one the scan context was made for (`ScanContext.platform`, required);
@@ -17,11 +17,11 @@ from typing import Any
 import pytest
 
 from fakes import FakeOpenFiles, UnreliableOpenFiles
-from safeclean import environment
-from safeclean.core.heuristics import Platform
-from safeclean.core.open_files import NoOpenFileCheck
-from safeclean.core.scanner import ScanContext
-from safeclean.organize.platforms import refusal
+from kresorter import environment
+from kresorter.core.heuristics import Platform
+from kresorter.core.open_files import NoOpenFileCheck
+from kresorter.core.scanner import ScanContext
+from kresorter.organize.platforms import refusal
 from support.cli import autostart_context, run, scan_context
 from support.files import snapshot, write
 from support.journal import query
@@ -103,7 +103,7 @@ def test_macos_today_is_told_both_of_its_blockers(
     code, _, err = run(["organize", "move", str(folder), "--yes"], context)
     assert code == 3
     assert err == (
-        "safeclean: organize does not move files on macOS; nothing was changed\n"
+        "kresorter: organize does not move files on macOS; nothing was changed\n"
         "  - no reliable open-file check: a file a program holds open could be moved"
         " from under it\n"
         "  - Desktop and Documents can be synced to the cloud: a move would reach every device\n"
@@ -135,7 +135,7 @@ def test_linux_without_a_reliable_check_refuses_before_anything(
     assert run(organize(action, folder), context) == (
         3,
         "",
-        "safeclean: organize does not move files on Linux; nothing was changed\n"
+        "kresorter: organize does not move files on Linux; nothing was changed\n"
         "  - no reliable open-file check: a file a program holds open could be moved"
         " from under it\n",
     )

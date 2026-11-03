@@ -11,18 +11,18 @@ from dataclasses import replace
 from pathlib import Path
 
 from fakes import FakeRegistry
-from safeclean.autostart.listing import (
+from kresorter.autostart.listing import (
     AutostartContext,
     RegistryFactory,
     default_autostart_context,
     list_autostart,
 )
-from safeclean.autostart.models import AutostartSkipped, Scope, Source
-from safeclean.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
-from safeclean.autostart.run_keys import RUN
-from safeclean.autostart.services import SERVICES
-from safeclean.autostart.winregistry import WinRegistry
-from safeclean.core.heuristics import Platform
+from kresorter.autostart.models import AutostartSkipped, Scope, Source
+from kresorter.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
+from kresorter.autostart.run_keys import RUN
+from kresorter.autostart.services import SERVICES
+from kresorter.autostart.winregistry import WinRegistry
+from kresorter.core.heuristics import Platform
 from support.files import write
 
 DESKTOP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app\n"

@@ -19,11 +19,11 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean.analysis.duplicates import DuplicateDecision, KeepReason, decide
-from safeclean.core.heuristics import JunkClassifier, load_rules
-from safeclean.core.models import FileEntry
-from safeclean.core.preflight import Candidate
-from safeclean.core.scanner import ScanContext, scan
+from kresorter.analysis.duplicates import DuplicateDecision, KeepReason, decide
+from kresorter.core.heuristics import JunkClassifier, load_rules
+from kresorter.core.models import FileEntry
+from kresorter.core.preflight import Candidate
+from kresorter.core.scanner import ScanContext, scan
 
 DIGEST = "ab" * 32
 SIZE = 4096

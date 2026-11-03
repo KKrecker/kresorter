@@ -13,15 +13,15 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeRegistry, RegistryKeys
-from safeclean.autostart.models import (
+from kresorter.autostart.models import (
     AutostartItem,
     AutostartListing,
     AutostartSkipped,
     Scope,
     Source,
 )
-from safeclean.autostart.registry import Hive, Registry, RegValue, ValueKind
-from safeclean.autostart.startup_folders import (
+from kresorter.autostart.registry import Hive, Registry, RegValue, ValueKind
+from kresorter.autostart.startup_folders import (
     MAX_ENTRY_BYTES,
     STARTUP_APPROVED,
     read_startup_folders,

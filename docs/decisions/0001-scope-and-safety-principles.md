@@ -5,7 +5,7 @@
 
 ## Context
 
-safeclean analyzes user-selected directories and proposes a cleanup plan. Wrongly deleting a
+kresorter analyzes user-selected directories and proposes a cleanup plan. Wrongly deleting a
 user's file is the worst possible failure, so safety must be enforced by structure and tooling,
 not by discipline alone.
 

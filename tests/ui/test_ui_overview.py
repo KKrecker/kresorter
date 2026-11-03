@@ -11,10 +11,10 @@ from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
-from safeclean.analysis.score import Level
-from safeclean.ui.overview import FolderChip
-from safeclean.ui.shown import shown_path
-from safeclean.ui.window import Window
+from kresorter.analysis.score import Level
+from kresorter.ui.overview import FolderChip
+from kresorter.ui.shown import shown_path
+from kresorter.ui.window import Window
 from support.files import write
 from support.moves import three_files
 from support.window import FakeDialogs, environment, junk_tree, make_window, scanned, wait_idle

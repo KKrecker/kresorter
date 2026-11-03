@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.storage.db import connect
-from safeclean.storage.pending import Domain, pending_domains
+from kresorter.storage.db import connect
+from kresorter.storage.pending import Domain, pending_domains
 
 OPERATION = "INSERT INTO operations (kind, state, created_at_ns) VALUES ('quarantine', ?, 1)"
 CHANGE = (

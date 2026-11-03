@@ -4,23 +4,23 @@ from enum import StrEnum
 
 import pytest
 
-from safeclean.analysis.score import Evidence, Level
-from safeclean.autostart.journal import ChangeRefusal, ChangeState
-from safeclean.autostart.models import Scope, Source
-from safeclean.core.models import SkipReason
-from safeclean.core.policy import BlockReason
-from safeclean.core.preflight import RefusalReason
-from safeclean.llm.failure import Unavailable
-from safeclean.organize.folders import FolderReason
-from safeclean.organize.journal import BatchKind, BatchState
-from safeclean.organize.planner import StayReason
-from safeclean.organize.platforms import Blocker
-from safeclean.organize.undo import UndoReason
-from safeclean.quarantine.service import PurgeRefusal, RestoreRefusal
-from safeclean.storage.pending import Domain
-from safeclean.storage.session import SessionFailure
-from safeclean.text import format_size
-from safeclean.ui.i18n import (
+from kresorter.analysis.score import Evidence, Level
+from kresorter.autostart.journal import ChangeRefusal, ChangeState
+from kresorter.autostart.models import Scope, Source
+from kresorter.core.models import SkipReason
+from kresorter.core.policy import BlockReason
+from kresorter.core.preflight import RefusalReason
+from kresorter.llm.failure import Unavailable
+from kresorter.organize.folders import FolderReason
+from kresorter.organize.journal import BatchKind, BatchState
+from kresorter.organize.planner import StayReason
+from kresorter.organize.platforms import Blocker
+from kresorter.organize.undo import UndoReason
+from kresorter.quarantine.service import PurgeRefusal, RestoreRefusal
+from kresorter.storage.pending import Domain
+from kresorter.storage.session import SessionFailure
+from kresorter.text import format_size
+from kresorter.ui.i18n import (
     CATALOG,
     LABELS,
     LANGUAGES,
@@ -33,7 +33,7 @@ from safeclean.ui.i18n import (
     plural_problems,
     russian_form,
 )
-from safeclean.ui.settings import Unused
+from kresorter.ui.settings import Unused
 
 SHOWN: tuple[type[StrEnum], ...] = (
     Level,

@@ -10,9 +10,9 @@ read or does not parse is skipped with a reason. The registry is a fake; read-on
 import pytest
 
 from fakes import FakeRegistry, RegistryKeys
-from safeclean.autostart.models import AutostartListing, AutostartSkipped, Scope, Source
-from safeclean.autostart.registry import Hive, Registry, RegValue, ValueKind
-from safeclean.autostart.services import SERVICES, read_services
+from kresorter.autostart.models import AutostartListing, AutostartSkipped, Scope, Source
+from kresorter.autostart.registry import Hive, Registry, RegValue, ValueKind
+from kresorter.autostart.services import SERVICES, read_services
 
 OWN, SHARED, USER_OWN, USER_INSTANCE = 0x10, 0x20, 0x50, 0xD0
 AUTO, MANUAL, DISABLED = 2, 3, 4

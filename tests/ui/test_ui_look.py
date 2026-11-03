@@ -22,8 +22,8 @@ from PySide6.QtWidgets import (
 )
 from pytestqt.qtbot import QtBot
 
-from safeclean.ui.i18n import Language
-from safeclean.ui.parts import (
+from kresorter.ui.i18n import Language
+from kresorter.ui.parts import (
     BADGE_HEIGHT,
     GRID,
     PAGE_MARGIN,
@@ -32,8 +32,8 @@ from safeclean.ui.parts import (
     Head,
     RowDelegate,
 )
-from safeclean.ui.sidebar import NavDelegate
-from safeclean.ui.window import PAGES, Window
+from kresorter.ui.sidebar import NavDelegate
+from kresorter.ui.window import PAGES, Window
 from support.window import environment, junk_tree, make_window, scanned
 
 _MINIMUM = 36  # px: a chip's, a field's and a button's height

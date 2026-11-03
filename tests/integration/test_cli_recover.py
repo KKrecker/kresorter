@@ -1,4 +1,4 @@
-"""`safeclean recover`, its alias `safeclean autostart recover`, and the commands naming it:
+"""`kresorter recover`, its alias `kresorter autostart recover`, and the commands naming it:
 end-to-end (commit 12c2a; decision 0011, items 125-127; decision 0012, items 31, 32).
 
 Autostart changes share the journal, the data directory and the lock with the quarantine
@@ -6,7 +6,7 @@ Autostart changes share the journal, the data directory and the lock with the qu
 interrupted work of every domain: the quarantine's first, which needs no open-file check
 (item 124), then organize's moves, then the autostart changes of this platform. While work of
 another domain is unfinished, a command that would act refuses with exit 3 and names
-``safeclean recover``; ``quarantine list`` still runs. Real temporary trees and a fake registry.
+``kresorter recover``; ``quarantine list`` still runs. Real temporary trees and a fake registry.
 """
 
 import errno
@@ -17,17 +17,17 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, FakeRegistry, journal_held, make_policy
-from safeclean.autostart.changes import AutostartStore, XdgChanges
-from safeclean.autostart.registry import Hive, RegValue, ValueKind
-from safeclean.autostart.run_keys import APPROVED, RUN
-from safeclean.autostart.xdg import read_xdg
-from safeclean.core.heuristics import JunkClassifier, default_rules
-from safeclean.core.open_files import NoOpenFileCheck
-from safeclean.core.scanner import ScanContext
-from safeclean.organize.mover import carry_out
-from safeclean.organize.undo import plan_undo
-from safeclean.storage.db import connect
-from safeclean.storage.lock import InstanceLock
+from kresorter.autostart.changes import AutostartStore, XdgChanges
+from kresorter.autostart.registry import Hive, RegValue, ValueKind
+from kresorter.autostart.run_keys import APPROVED, RUN
+from kresorter.autostart.xdg import read_xdg
+from kresorter.core.heuristics import JunkClassifier, default_rules
+from kresorter.core.open_files import NoOpenFileCheck
+from kresorter.core.scanner import ScanContext
+from kresorter.organize.mover import carry_out
+from kresorter.organize.undo import plan_undo
+from kresorter.storage.db import connect
+from kresorter.storage.lock import InstanceLock
 from support.cli import autostart_context, run, scan_context
 from support.files import write
 from support.interrupted import (
@@ -165,7 +165,7 @@ def test_an_interrupted_organize_batch_names_the_files_still_sorted(
     assert (code, err) == (0, "")
     assert out == (
         "Recovered 1 interrupted organize batch:\n"
-        "  [1] failed: 2 files still sorted; 'safeclean organize undo 1' moves them back\n"
+        "  [1] failed: 2 files still sorted; 'kresorter organize undo 1' moves them back\n"
         f"    {folder / MOVED[A]}\n"
         f"    {folder / MOVED[B]}\n"
     )
@@ -188,7 +188,7 @@ def test_one_file_still_sorted_is_named_alone(
     assert (code, out) == (
         0,
         "Recovered 1 interrupted organize batch:\n"
-        "  [1] failed: 1 file still sorted; 'safeclean organize undo 1' moves it back\n"
+        "  [1] failed: 1 file still sorted; 'kresorter organize undo 1' moves it back\n"
         f"    {folder / MOVED[A]}\n",
     )
 
@@ -208,7 +208,7 @@ def test_two_interrupted_batches_are_counted(
     assert (code, out) == (
         0,
         "Recovered 2 interrupted organize batches:\n"
-        "  [1] failed: 1 file still sorted; 'safeclean organize undo 1' moves it back\n"
+        "  [1] failed: 1 file still sorted; 'kresorter organize undo 1' moves it back\n"
         f"    {folder / MOVED[A]}\n"
         "  [2] rolled_back\n",
     )
@@ -225,7 +225,7 @@ def test_a_move_recovery_cannot_settle_is_warned_about_on_stderr(
 
     assert (code, out) == (0, "Recovered 1 interrupted organize batch:\n  [1] failed\n")
     assert err == (
-        f"safeclean: FAILED: {folder / A} -> {folder / MOVED[A]}: at the source the file,"
+        f"kresorter: FAILED: {folder / A} -> {folder / MOVED[A]}: at the source the file,"
         " at the destination the file; neither was touched\n"
     )
     assert (folder / A).read_bytes() == (folder / MOVED[A]).read_bytes() == A.encode()
@@ -253,7 +253,7 @@ def test_an_interrupted_undo_names_the_batch_it_undoes(
     assert out == (
         "Recovered 1 interrupted organize batch:\n"
         f"  [2] {state}: the undo of batch 1 stopped;"
-        " 'safeclean organize undo 1' moves back the files still sorted\n"
+        " 'kresorter organize undo 1' moves back the files still sorted\n"
     )
 
 
@@ -309,7 +309,7 @@ def test_a_lost_file_is_warned_about_on_stderr(
 
     assert (code, out) == (0, "Recovered an interrupted quarantine operation (1 file).\n")
     assert err == (
-        f"safeclean: LOST: the vault copy of {path} changed after the move ({copy});"
+        f"kresorter: LOST: the vault copy of {path} changed after the move ({copy});"
         " it will not be restored or purged\n"
     )
     assert query(data_dir, "SELECT state FROM items") == [("lost",)]
@@ -328,15 +328,15 @@ def test_an_autostart_change_that_cannot_be_checked_leaves_the_quarantine_recove
 
     assert (code, out) == (3, "Recovered an interrupted quarantine operation (1 file).\n")
     assert err == (
-        "safeclean: an unfinished autostart change cannot be checked: not a regular file;"
-        " fix or move what is there, then run 'safeclean autostart recover' again\n"
+        "kresorter: an unfinished autostart change cannot be checked: not a regular file;"
+        " fix or move what is there, then run 'kresorter autostart recover' again\n"
     )
     assert query(data_dir, "SELECT state FROM operations") == [("done",)]
     assert query(data_dir, "SELECT state FROM autostart_changes") == [("pending",)]
 
 
 @RECOVER
-def test_a_journal_failure_names_safeclean_recover(
+def test_a_journal_failure_names_kresorter_recover(
     tmp_path: Path,
     scan: ScanContext,
     zone: Path,
@@ -351,7 +351,7 @@ def test_a_journal_failure_names_safeclean_recover(
         code, out, err = run(command, scan, autostart_context("linux", tmp_path))
 
     assert (code, out) == (3, "")
-    assert err == "safeclean: journal failed: database is locked; run 'safeclean recover'\n"
+    assert err == "kresorter: journal failed: database is locked; run 'kresorter recover'\n"
     assert query(data_dir, "SELECT state FROM operations") == [("pending",)]
 
 
@@ -403,8 +403,8 @@ def test_an_entry_that_cannot_be_read_stops_with_the_reason(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: an unfinished autostart change cannot be checked: not a regular file;"
-        " fix or move what is there, then run 'safeclean autostart recover' again\n"
+        "kresorter: an unfinished autostart change cannot be checked: not a regular file;"
+        " fix or move what is there, then run 'kresorter autostart recover' again\n"
     )
     assert query(data_dir, "SELECT state FROM autostart_changes") == [("pending",)]
 
@@ -429,9 +429,9 @@ def test_a_partial_stub_that_cannot_be_moved_stops_with_the_reason(
     slot = data_dir / "autostart" / "1"
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: an unfinished autostart change cannot be closed: [Errno 13] Permission"
+        "kresorter: an unfinished autostart change cannot be closed: [Errno 13] Permission"
         f" denied: '{stub}' -> '{slot}'; fix or move what is there, then run"
-        " 'safeclean autostart recover' again\n"
+        " 'kresorter autostart recover' again\n"
     )
     assert query(data_dir, "SELECT state, error FROM autostart_changes") == before
     assert stub.read_bytes() == b""  # still in place, never deleted
@@ -454,11 +454,11 @@ def test_an_unsafe_data_directory_is_refused_before_anything_is_created(
 
 def test_a_running_instance_locks_it_out(tmp_path: Path, scan: ScanContext, data_dir: Path) -> None:
     data_dir.mkdir(parents=True)
-    with InstanceLock(data_dir / "safeclean.lock"):
+    with InstanceLock(data_dir / "kresorter.lock"):
         code, _, err = run(["autostart", "recover"], scan, autostart_context("linux", tmp_path))
 
     assert code == 3
-    assert "safeclean:" in err
+    assert "kresorter:" in err
     assert not (data_dir / "journal.db").exists()
 
 
@@ -470,7 +470,7 @@ def test_a_running_instance_locks_it_out(tmp_path: Path, scan: ScanContext, data
     [["add", "a.bin"], ["restore", "1"], ["purge", "1", "--yes"]],
     ids=["add", "restore", "purge"],
 )
-def test_quarantine_actions_wait_for_safeclean_recover(
+def test_quarantine_actions_wait_for_kresorter_recover(
     tmp_path: Path, scan: ScanContext, data_dir: Path, zone: Path, args: list[str]
 ) -> None:
     pending_run_change(data_dir)
@@ -481,7 +481,7 @@ def test_quarantine_actions_wait_for_safeclean_recover(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: the journal has unfinished autostart work; run 'safeclean recover' first;"
+        "kresorter: the journal has unfinished autostart work; run 'kresorter recover' first;"
         " nothing was changed\n"
     )
     assert target.read_bytes() == b"payload"
@@ -518,7 +518,7 @@ def test_quarantine_actions_wait_for_an_unfinished_organize_batch(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: the journal has unfinished organize work; run 'safeclean recover' first;"
+        "kresorter: the journal has unfinished organize work; run 'kresorter recover' first;"
         " nothing was changed\n"
     )
     assert target.read_bytes() == b"payload"

@@ -12,17 +12,17 @@ from typing import Any
 
 import pytest
 
-from safeclean.analysis.report import Finding
-from safeclean.analysis.score import Evidence, Level, Reason, junk_reason, level_of
-from safeclean.autostart.models import AutostartItem, Scope, Source, entry_digest
-from safeclean.core.heuristics import JunkMatch, JunkRule, default_rules
-from safeclean.core.models import FileEntry
-from safeclean.core.preflight import Candidate
-from safeclean.llm.client import generate
-from safeclean.llm.prompt import generate_body
-from safeclean.llm.subjects import Result, subject_of, subjects
-from safeclean.llm.transport import LIMITS
-from safeclean.organize.planner import Stay, StayReason
+from kresorter.analysis.report import Finding
+from kresorter.analysis.score import Evidence, Level, Reason, junk_reason, level_of
+from kresorter.autostart.models import AutostartItem, Scope, Source, entry_digest
+from kresorter.core.heuristics import JunkMatch, JunkRule, default_rules
+from kresorter.core.models import FileEntry
+from kresorter.core.preflight import Candidate
+from kresorter.llm.client import generate
+from kresorter.llm.prompt import generate_body
+from kresorter.llm.subjects import Result, subject_of, subjects
+from kresorter.llm.transport import LIMITS
+from kresorter.organize.planner import Stay, StayReason
 from support.ollama import ScriptedOllama, as_json
 
 FOLDER = Path("/home/alice/Secret-Project")
@@ -80,7 +80,7 @@ def test_a_finding() -> None:
 
 @pytest.mark.parametrize("rule", default_rules(), ids=lambda rule: rule.id)
 def test_a_junk_reason_names_its_rule(rule: JunkRule) -> None:
-    # [0013.17] Every rule safeclean ships: the evidence and the rule id, not what it matched.
+    # [0013.17] Every rule kresorter ships: the evidence and the rule id, not what it matched.
     path = FOLDER / "__pycache__" / "secret.cpython-313.pyc"
     reason = junk_reason(JunkMatch(path, rule.id, rule.category, rule.description))
     facts = subject_of(finding("secret.cpython-313.pyc", reason, LARGE)).facts

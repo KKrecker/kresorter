@@ -1,4 +1,4 @@
-"""Purge: the only real deletion in safeclean (decision 0004, item 8).
+"""Purge: the only real deletion in kresorter (decision 0004, item 8).
 
 Two steps. ``plan_purge`` reads the journal only and returns a plan for the user to confirm
 (what, how many bytes). ``purge`` accepts exactly that plan, once, from the same service, and
@@ -16,20 +16,20 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean.core.heuristics import JunkClassifier
-from safeclean.core.models import FileEntry
-from safeclean.core.policy import PathPolicy
-from safeclean.core.preflight import Candidate
-from safeclean.quarantine.journal import OperationState
-from safeclean.quarantine.purge import UnsafeDeleteError, delete_from_vault
-from safeclean.quarantine.service import (
+from kresorter.core.heuristics import JunkClassifier
+from kresorter.core.models import FileEntry
+from kresorter.core.policy import PathPolicy
+from kresorter.core.preflight import Candidate
+from kresorter.quarantine.journal import OperationState
+from kresorter.quarantine.purge import UnsafeDeleteError, delete_from_vault
+from kresorter.quarantine.service import (
     PurgeError,
     PurgeRefusal,
     QuarantineError,
     QuarantineService,
     RestoreRefusal,
 )
-from safeclean.storage.db import connect
+from kresorter.storage.db import connect
 from support.files import write
 from support.journal import rows
 

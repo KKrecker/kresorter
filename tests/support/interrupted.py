@@ -1,14 +1,14 @@
-"""Work a crash left unfinished, in each domain, as ``safeclean recover`` finds it: a quarantine
+"""Work a crash left unfinished, in each domain, as ``kresorter recover`` finds it: a quarantine
 operation, an organize batch, an autostart change (decision 0011, item 126; 0012, item 32)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from safeclean.autostart.changes import AutostartStore, XdgChanges
-from safeclean.autostart.xdg import read_xdg
-from safeclean.core.scanner import ScanContext
-from safeclean.storage.db import connect
+from kresorter.autostart.changes import AutostartStore, XdgChanges
+from kresorter.autostart.xdg import read_xdg
+from kresorter.core.scanner import ScanContext
+from kresorter.storage.db import connect
 from support.cli import run
 from support.files import write
 from support.journal import query

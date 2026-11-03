@@ -10,7 +10,7 @@ OS-specific backend (Windows handles, `/proc/*/fd`, `lsof`). Step 1 is report-on
 
 ## Decision
 
-- `safeclean scan` uses `NoOpenFileCheck` (reports nothing as open) and sets
+- `kresorter scan` uses `NoOpenFileCheck` (reports nothing as open) and sets
   `ScanContext.open_files_checked = False`.
 - The text report prints a note and the JSON report has `"open_file_check": false`.
 - **Any action** (quarantine, deletion, organizer move: step 2 and later) must refuse to run

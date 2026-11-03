@@ -129,7 +129,7 @@
 25. **Only `ERROR_NO_MORE_ITEMS` (259) ends an enumeration.** Any other error while enumerating
     (for example `ERROR_MORE_DATA`) is a failure of the whole key, never a silently shorter list.
 26. `winreg` is imported on first use, like `msvcrt` (0009), and tested with a stand-in module.
-    Choosing the registry per platform belongs to the `safeclean autostart list` commit.
+    Choosing the registry per platform belongs to the `kresorter autostart list` commit.
 
 ## Addendum (step 4, commit 7): startup folders
 
@@ -276,7 +276,7 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     other: one that cannot be listed is a skip with its reason, the others are still read. The
     digest covers the file bytes; launchd items are read-only in step 4 (item 9).
 
-## Addendum (step 4, commit 10): `safeclean autostart list`
+## Addendum (step 4, commit 10): `kresorter autostart list`
 
 53. **One listing per platform, from its readers, joined in order**: Linux XDG autostart, then
     systemd user units; Windows Run keys, startup folders, services, then scheduled tasks;
@@ -287,9 +287,9 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     on a live system); Linux and macOS never touch it. `--include-machine` changes nothing on
     Linux and macOS, where no machine scope needs consent, and is accepted silently. The
     caller detects the platform: `autostart.listing` does not depend on the CLI.
-55. **`safeclean autostart list [--json] [--include-machine]` reports only**: it creates,
+55. **`kresorter autostart list [--json] [--include-machine]` reports only**: it creates,
     changes and deletes nothing (not even the data directory), builds no scan context and
-    always exits with 0 once it has listed; `safeclean autostart` without an action is a
+    always exits with 0 once it has listed; `kresorter autostart` without an action is a
     usage error (2). The text groups entries by source in reader order, each with its state
     and scope, `command`, `location`, `shadows` if any and every note, then the skips. On
     Windows without `--include-machine` a note says what was not read. JSON has `platform`,
@@ -387,7 +387,7 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
 73. **Leftovers stay in the store**: a partial `<id>.new` after a failed write, or the slot of
     an original linked before `os.replace` failed. The store is ours and nothing deletes;
     `recover()` reconciles them (commit 12b).
-74. **Enabling an entry not disabled by safeclean is refused in step 4** (commit 12a3): a
+74. **Enabling an entry not disabled by kresorter is refused in step 4** (commit 12a3): a
     user's own entry with `Hidden=true` or `X-GNOME-Autostart-enabled=false` and no journal
     row would need its content edited. A user stub over a system entry can be enabled: it is
     moved, not edited.
@@ -399,11 +399,11 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     slot of the disable to its place (the same inode it had before the disable). The slot of
     the disable is then empty; its `disable` row stays as history. Disable and enable can be
     repeated, each with its own slot.
-76. **"Disabled by safeclean" is decided by the journal, not by the file**: the last `done`
+76. **"Disabled by kresorter" is decided by the journal, not by the file**: the last `done`
     change at this location must be the `disable` of an own entry, and its `value_after` must
     equal the file byte for byte. An enable after it, an edited copy, or no row at all is
     `foreign` (item 74); `rolled_back` rows do not count. The journal is the only source of
-    truth about what safeclean did.
+    truth about what kresorter did.
 77. **The original in the store is checked against `value_before` byte for byte** before it
     is put back; missing or different is `original_changed`, so a substituted file never
     reaches the entry's place.
@@ -421,7 +421,7 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
 
 80. **Writing is one value under `HKCU`, and nothing else**: the `UserRegistry` protocol adds
     a single method to `Registry`, `set_user_value(key, value)`, without a hive parameter,
-    so nothing in safeclean can write `HKLM`; the ban is in the API itself, like the closed
+    so nothing in kresorter can write `HKLM`; the ban is in the API itself, like the closed
     list of sources in the schema (item 60). There is no method to delete a value or a key.
     `WinRegistry` opens the key with `CreateKeyEx(HKEY_CURRENT_USER, key, 0, KEY_SET_VALUE |
     KEY_WOW64_64KEY)`, creating it if it is missing, writes with `SetValueEx` and closes the
@@ -441,7 +441,7 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `value_before` of the journal.
 83. **A missing flag means enabled**: disabling it creates the flag; enabling writes `02`
     and never deletes a value, even when there was no flag before the disable (nothing in
-    safeclean can delete a value, item 80).
+    kresorter can delete a value, item 80).
 84. **A value disabled by the Task Manager can be enabled**: unlike an XDG entry disabled
     elsewhere (item 74, `foreign`), the flag is the single, documented switch the Task Manager
     itself flips back; enabling it edits nothing else, so it is not refused.
@@ -524,7 +524,7 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     operations alone (items 91, 98); a `recover()` refused because of the other domain
     would leave no way out.
 
-## Addendum (step 4, commit 12c2a): `safeclean autostart recover`
+## Addendum (step 4, commit 12c2a): `kresorter autostart recover`
 
 101. **One journal session for every command that acts**: `cli_journal.with_journal` checks
     the data directory before creating anything (decision 0009), takes the single-instance
@@ -532,7 +532,7 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     that act share it, so both domains write one journal (item 62). These autostart commands
     build the scan context to find the data directory; `autostart list` still does not and
     opens no journal (item 55).
-102. **`safeclean autostart recover` reconciles the autostart changes of this platform**:
+102. **`kresorter autostart recover` reconciles the autostart changes of this platform**:
     XDG on Linux, `HKCU` Run on Windows, nothing on macOS, where nothing can be written. It
     prints `Nothing to recover.` or each closed change as `[id] done|rolled_back|failed`
     and exits with 0. It is a command of its own because each domain recovers its own
@@ -540,17 +540,17 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     the journal without changing an entry.
 103. **An unfinished change that cannot be checked stops it with exit 3**: the reason
     (`BrokenEntryError` or `RegistryError`, items 90, 97) is printed with what to do (fix or
-    move what is there, then run `safeclean autostart recover` again); the row stays as it
+    move what is there, then run `kresorter autostart recover` again); the row stays as it
     is. A data directory, lock or journal that cannot be used is exit 3, as in quarantine.
 104. **Quarantine actions wait for it, by name**: after its own `recover()`, a quarantine
     command that would act (`add`, `restore`, `purge`) and finds unfinished work, which can
-    then only be an autostart change, exits with 3 and names `safeclean autostart recover`;
+    then only be an autostart change, exits with 3 and names `kresorter autostart recover`;
     nothing is changed. `quarantine list` reads only and still runs.
 105. **The registry of a listing context is a `UserRegistry`**: the same factory gives the
     registry the listing reads and the one a change writes; `WinRegistry` is both, and
     tests use one `FakeRegistry` for both.
 
-## Addendum (step 4, commit 12c2b): `safeclean autostart disable|enable ID [--yes]`
+## Addendum (step 4, commit 12c2b): `kresorter autostart disable|enable ID [--yes]`
 
 106. **The id is the beginning of the digest**: `autostart list` shows its first 12
     characters as the last line of each entry; the command takes any beginning of 1 to 32
@@ -567,13 +567,13 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     `purge` and `add --from-analysis`): the name, source, scope and location, then, for an
     own XDG entry, the copy with `Hidden=true` and the original kept in the store; for a
     system entry, the stub created in the user directory and the system file never written;
-    for enable, what safeclean changed put back, nothing deleted; for a Run value, its
+    for enable, what kresorter changed put back, nothing deleted; for a Run value, its
     `StartupApproved` flag set as the Task Manager does, the Run value never written. The
     preview reads no journal: a refusal such as `foreign` comes only with `--yes` (item 56).
 109. **With `--yes`, exit codes as in quarantine**: `done` is 0 with the change id; a refusal
     (`Refused: <refusal>: <detail>`) and a `rolled_back` change are 1; a `failed` change is
-    3 and names `safeclean autostart recover`; unfinished quarantine work is 3 and names
-    `safeclean quarantine list` (items 62, 104); an entry or flag that cannot be checked is 3
+    3 and names `kresorter autostart recover`; unfinished quarantine work is 3 and names
+    `kresorter quarantine list` (items 62, 104); an entry or flag that cannot be checked is 3
     with its reason, as in `autostart recover` (item 103).
 
 ## Addendum (step 5.0): after the pre-step-5 audit
@@ -596,22 +596,22 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
 112. **`with_journal` names the data directory only for its own steps** (pre-step-5 audit,
     A2): creating it and taking the lock are `cannot use the data directory`, opening the
     journal is `cannot open the journal`. An `OSError` that the body of a command does not
-    handle is exit 3 as `safeclean: stopped: <reason>`: the reason names its path, a wrong place
+    handle is exit 3 as `kresorter: stopped: <reason>`: the reason names its path, a wrong place
     is worse than none, and no command is suggested, since for an error nobody foresaw it could
     fail the same way again. The quarantine names its vault when it cannot be created or made
     private: `cannot use the vault: <reason>` (exit 3).
 113. **An autostart command says what it could not do** (A2), in two phases, both exit 3: an
     `OSError` from `recover()` (a partial stub that cannot be moved to the store, item 96) is
     `an unfinished autostart change cannot be closed: <reason>; fix or move what is there, then
-    run 'safeclean autostart recover' again`, in `recover`, `disable` and `enable` alike, and the
+    run 'kresorter autostart recover' again`, in `recover`, `disable` and `enable` alike, and the
     row stays as it was; an `OSError` from the checks before a disable or enable acts (the
     device check, item 111) is `cannot <action> <name>: <reason>; nothing was changed`, and
     nothing is journaled. Output written after these phases is not part of either.
 114. **A journal failure in the middle of a command is exit 3** (pre-step-5 audit, A3 and its
     decision 1): a `sqlite3.Error` raised by the body (a full disk, an I/O error, the journal
-    held by another program past the busy timeout) is `safeclean: journal failed: <reason>; run
+    held by another program past the busy timeout) is `kresorter: journal failed: <reason>; run
     '<command>'`. The command is the one that recovers the domain, passed to `with_journal` by
-    it: `safeclean autostart recover`, `safeclean quarantine list`. Its end cannot be trusted,
+    it: `kresorter autostart recover`, `kresorter quarantine list`. Its end cannot be trusted,
     as with the lock and a `failed` change; a new code would break the 0/1/2/3 contract for no
     gain. A failed transaction is rolled back, and a change left `pending` in the journal is
     closed by `recover()`.
@@ -637,7 +637,7 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     file of the user's for a partial stub and moved it to the store (item 96).
 118. **The data directory's policy lives in `storage.data_dir`** (pre-step-5 audit, B1):
     `check_data_dir` raises `DataDirError`, and `PRIVATE` (0700) is the mode of the data
-    directory and of every directory safeclean makes in it (the vault, the autostart store).
+    directory and of every directory kresorter makes in it (the vault, the autostart store).
     The journal session (`cli_journal`) no longer depends on the quarantine, nor would
     organize; `QuarantineService` keeps its contract and raises `QuarantineError` with the
     same message.
@@ -674,13 +674,13 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     without a reliable open-file check, a policy or a vault to make; `QuarantineService.recover()`
     runs it with its own clock. The states, the two updates (`set_item`, `finish_operation`)
     and the check of a file against the journal (`probe`) are `quarantine.journal`, shared by
-    both, as `autostart.journal` is (item 119). Behaviour is unchanged; `safeclean recover`
+    both, as `autostart.journal` is (item 119). Behaviour is unchanged; `kresorter recover`
     builds on it.
 125. **`storage.pending.pending_domains(conn) -> set[Domain]` says whose work is unfinished**
     (B4): `Domain` names each domain as its command (`quarantine`, `autostart`), and one query
     per domain is the only place that knows their tables; `has_pending` is "any of them"
     (item 99). Organize adds its domain and its query there, and every message follows.
-126. **`safeclean recover` recovers every domain; `safeclean autostart recover` is its alias**
+126. **`kresorter recover` recovers every domain; `kresorter autostart recover` is its alias**
     (audit, decision 2; amends item 102): it opens the shared journal and closes the
     quarantine's work first, by `quarantine.recovery` (item 124), so it runs where the
     quarantine refuses to act, then the autostart changes of this platform. It prints what
@@ -689,11 +689,11 @@ of `values()` and of items 24–25: a missing key is `None`, any other failure a
     makes neither the vault nor the store. Domain commands still recover their own work first,
     and a domain's own messages still name its own command (`autostart recover`, the alias):
     one command and an alias are cheaper than one command per domain.
-127. **Work of another domain is named with `safeclean recover`** (B4; amends item 104): a
+127. **Work of another domain is named with `kresorter recover`** (B4; amends item 104): a
     command that would act and finds, after its own recovery, that another domain has
-    unfinished work exits with 3: `the journal has unfinished <domains> work; run 'safeclean
+    unfinished work exits with 3: `the journal has unfinished <domains> work; run 'kresorter
     recover' first; nothing was changed`, from `pending_domains`, so no command assumes which
     domain is left. The quarantine has no recover command of its own: after a journal failure
-    it names `safeclean recover` too (it named `quarantine list`), and its recovery reads
+    it names `kresorter recover` too (it named `quarantine list`), and its recovery reads
     `Recovered an interrupted quarantine operation`, beside the autostart lines of
-    `safeclean recover`.
+    `kresorter recover`.

@@ -10,21 +10,21 @@ from, or written to, a real one.
 import pytest
 
 from fakes import FakeRegistry, RegistryKeys
-from safeclean.autostart.models import (
+from kresorter.autostart.models import (
     AutostartItem,
     AutostartListing,
     AutostartSkipped,
     Scope,
     Source,
 )
-from safeclean.autostart.registry import (
+from kresorter.autostart.registry import (
     Hive,
     Registry,
     RegValue,
     ValueKind,
     value_digest,
 )
-from safeclean.autostart.run_keys import (
+from kresorter.autostart.run_keys import (
     APPROVED,
     APPROVED_32,
     RUN,

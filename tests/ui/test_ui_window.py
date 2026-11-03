@@ -10,10 +10,10 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QPushButton, QWidget
 from pytestqt.qtbot import QtBot
 
-from safeclean.ui.i18n import Language, Translator
-from safeclean.ui.sidebar import NAV_ROW
-from safeclean.ui.tasks import Task
-from safeclean.ui.window import PAGES, Window
+from kresorter.ui.i18n import Language, Translator
+from kresorter.ui.sidebar import NAV_ROW
+from kresorter.ui.tasks import Task
+from kresorter.ui.window import PAGES, Window
 from support.window import environment, unnamed, wait_idle
 
 

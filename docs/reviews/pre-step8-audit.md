@@ -24,8 +24,8 @@ found a fourth defect (A7).
 |---|---|
 | Python 3.11, 3.13, 3.14 (the local gate) | 2673 passed and 100 % line and branch coverage on each; ruff, the format and mypy strict clean |
 | `pragma: no cover` / `type: ignore` / `noqa` | 2 (`lastrowid is None` in `storage.journal` and one line of a test) / 0 / 0 |
-| The wheel (`pip wheel .`) | 138 files: every module, `py.typed`, the 23 icons with Lucide's licence; `safeclean` a console script, `safeclean-ui` a GUI script |
-| A fresh virtual environment without the extra | every command runs; `safeclean-ui` and `python -m safeclean.ui` write one line and exit with 3 |
+| The wheel (`pip wheel .`) | 138 files: every module, `py.typed`, the 23 icons with Lucide's licence; `kresorter` a console script, `kresorter-ui` a GUI script |
+| A fresh virtual environment without the extra | every command runs; `kresorter-ui` and `python -m kresorter.ui` write one line and exit with 3 |
 | A fresh virtual environment with `[ui]` (PySide6-Essentials 6.12.0 from PyPI), Linux without `libGL` | a traceback (A1) |
 | Work off the window's thread | the 14 `work` functions and the scan's lambda read no widget and no translator; what they return is shown by `done`, in the window's thread |
 | 20 000 cache files (`__pycache__`, 200 folders), offscreen | scan and analysis 2.3 s in the worker; then the window's thread: listing 2.0 s, a group's check box 3.5 s, removing what was moved 65 s, the confirmation 6.4 s (A2); search 0.11 s, one check box 0.23 s, a page change 0.03 s |
@@ -37,14 +37,14 @@ found a fourth defect (A7).
 
 ### A1. A Qt library that cannot be loaded is a traceback (confirmed by experiment)
 
-Item 9 says that when PySide6 cannot be imported, `safeclean-ui` writes one line and returns 3.
+Item 9 says that when PySide6 cannot be imported, `kresorter-ui` writes one line and returns 3.
 `launch.main` tells PySide6's absence from any other import error by `ImportError.name`: only
 `PySide6...` and `shiboken6...` give the line, anything else is raised. But when a binding
 cannot load a system library (a Linux without `libGL.so.1`, the usual case on a server or a
 minimal desktop), the error names the binding alone (`name='QtWidgets'`, `path` its `.so`), so
 the user gets a traceback and exit code 1, and nothing says which packages are missing.
 
-On Windows, `safeclean-ui` is a GUI script, which runs without a console: `sys.stderr` is
+On Windows, `kresorter-ui` is a GUI script, which runs without a console: `sys.stderr` is
 `None`, so without PySide6 the one line raises `AttributeError` instead (confirmed by the code
 and Python's documentation, not run on Windows).
 
@@ -100,12 +100,12 @@ Fix: the response is closed on every way out of `request`.
 - **A4.** `pyproject.toml` says `license = { text = "MIT" }` and the README's last section
   "MIT", but the repository has no licence text, nor does the wheel (only Lucide's, for the
   icons). The metadata has no authors, no URLs and no classifiers; the version is `0.0.1` in
-  two places (`pyproject.toml` and `safeclean.__version__`), and no command prints it.
+  two places (`pyproject.toml` and `kresorter.__version__`), and no command prints it.
 - **A5.** Three entries of the catalog are used by nothing: `overview.folder` (by a test
   only), `overview.folders` and the count `batch`, left from the pages before items 45-55.
 - **A6.** `CHANGELOG.md` is the log of the development: 108 entries under `[Unreleased]`,
   some describing what was replaced since (Findings with the columns Path, Level and Size,
-  Autostart's Disable and Enable buttons), not in order (`safeclean scan`, the first, is the
+  Autostart's Disable and Enable buttons), not in order (`kresorter scan`, the first, is the
   last of `Added`). A first release needs a section that says what it has.
 
 ## 5. Weak spots

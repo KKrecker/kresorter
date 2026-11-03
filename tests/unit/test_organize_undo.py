@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, deny_stat
-from safeclean.core.scanner import ScanContext
-from safeclean.organize.journal import (
+from kresorter.core.scanner import ScanContext
+from kresorter.organize.journal import (
     Batch,
     BatchKind,
     BatchState,
@@ -25,11 +25,11 @@ from safeclean.organize.journal import (
     identity,
     journaled,
 )
-from safeclean.organize.mover import BatchResult, carry_out, check
-from safeclean.organize.planner import Stay, StayReason
-from safeclean.organize.recovery import RecoveredBatch, recover
-from safeclean.organize.undo import UndoMove, UndoPlan, UndoReason, UndoRefused, plan_undo
-from safeclean.storage.db import connect
+from kresorter.organize.mover import BatchResult, carry_out, check
+from kresorter.organize.planner import Stay, StayReason
+from kresorter.organize.recovery import RecoveredBatch, recover
+from kresorter.organize.undo import UndoMove, UndoPlan, UndoReason, UndoRefused, plan_undo
+from kresorter.storage.db import connect
 from support.files import write
 from support.moves import (
     MOVED,

@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from safeclean.llm.failure import ExplanationUnavailable, Unavailable
-from safeclean.llm.settings import (
+from kresorter.llm.failure import ExplanationUnavailable, Unavailable
+from kresorter.llm.settings import (
     DEFAULT_ADDRESS,
     Address,
     address_from,
@@ -16,7 +16,7 @@ from safeclean.llm.settings import (
 
 
 def address(value: str) -> Address:
-    return address_from({"SAFECLEAN_OLLAMA_URL": value})
+    return address_from({"KRESORTER_OLLAMA_URL": value})
 
 
 def test_the_default_address_is_ollamas_on_loopback() -> None:
@@ -83,7 +83,7 @@ def test_refused_addresses(value: str) -> None:
     with pytest.raises(ExplanationUnavailable) as refused:
         address(value)
     assert refused.value.reason is Unavailable.CONFIG
-    assert refused.value.detail.startswith(f"SAFECLEAN_OLLAMA_URL={value!r}: ")
+    assert refused.value.detail.startswith(f"KRESORTER_OLLAMA_URL={value!r}: ")
 
 
 def test_localhost_becomes_an_address_without_a_resolver(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -127,7 +127,7 @@ def test_the_default_model() -> None:
 )
 def test_accepted_model_names(name: str) -> None:
     # [0013.9]
-    assert model_from({"SAFECLEAN_OLLAMA_MODEL": name}) == name
+    assert model_from({"KRESORTER_OLLAMA_MODEL": name}) == name
 
 
 @pytest.mark.parametrize(
@@ -136,9 +136,9 @@ def test_accepted_model_names(name: str) -> None:
 def test_refused_model_names(name: str) -> None:
     # [0013.9]
     with pytest.raises(ExplanationUnavailable) as refused:
-        model_from({"SAFECLEAN_OLLAMA_MODEL": name})
+        model_from({"KRESORTER_OLLAMA_MODEL": name})
     assert refused.value.reason is Unavailable.CONFIG
-    assert refused.value.detail.startswith(f"SAFECLEAN_OLLAMA_MODEL={name!r}: ")
+    assert refused.value.detail.startswith(f"KRESORTER_OLLAMA_MODEL={name!r}: ")
 
 
 @pytest.mark.parametrize(

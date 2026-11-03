@@ -1,4 +1,4 @@
-"""`safeclean analyze`: end-to-end on a real temporary tree. Read-only, like `scan`."""
+"""`kresorter analyze`: end-to-end on a real temporary tree. Read-only, like `scan`."""
 
 import io
 import json
@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean import cli
-from safeclean.analysis.duplicates import KeepReason
-from safeclean.core.heuristics import JunkClassifier, default_rules
-from safeclean.core.scanner import ScanContext
-from safeclean.environment import Environment
+from kresorter import cli
+from kresorter.analysis.duplicates import KeepReason
+from kresorter.core.heuristics import JunkClassifier, default_rules
+from kresorter.core.scanner import ScanContext
+from kresorter.environment import Environment
 from support.files import snapshot
 
 DAY_NS = 86_400 * 10**9
@@ -71,7 +71,7 @@ def test_text_report_groups_findings_by_level(tmp_path: Path, tree: Path) -> Non
     pyc = tree / "proj" / "__pycache__" / "m.cpython-313.pyc"
 
     assert code == 0
-    assert out.startswith("safeclean analyze - report only, nothing was changed\n")
+    assert out.startswith("kresorter analyze - report only, nothing was changed\n")
     assert "Scanned: 6 files" in out
     assert section(out, "Safe:") == [
         "Safe: 1 file, 8 B",

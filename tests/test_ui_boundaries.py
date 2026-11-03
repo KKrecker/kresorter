@@ -1,10 +1,10 @@
 """What may import Qt, and what the window may import (decision 0014).
 
-No module outside ``safeclean.ui`` imports PySide6 or shiboken6, the package depends on nothing,
+No module outside ``kresorter.ui`` imports PySide6 or shiboken6, the package depends on nothing,
 and the CLI runs every command with Qt made unimportable [0014.1]. From PySide6 the window
 imports only QtCore, QtGui and QtWidgets, never names ``QProcess`` or ``QDesktopServices``, and
-imports no module of the CLI [0014.7]. Only ``safeclean.ui.settings`` opens, reads or writes a
-file, besides ``safeclean.ui.icons``, which reads the icons shipped in the package [0014.47],
+imports no module of the CLI [0014.7]. Only ``kresorter.ui.settings`` opens, reads or writes a
+file, besides ``kresorter.ui.icons``, which reads the icons shipped in the package [0014.47],
 and no module of the window names Qt's own ways to store [0014.35]. The guards read the AST of
 ``src`` (``support.imports``).
 """
@@ -19,22 +19,22 @@ from pathlib import Path
 
 import pytest
 
-from safeclean import cli
-from safeclean.environment import Environment
+from kresorter import cli
+from kresorter.environment import Environment
 from support.cli import autostart_context, scan_context
 from support.imports import SRC, file_uses, imports, sources
 
-UI = "safeclean.ui"
+UI = "kresorter.ui"
 QT_ROOTS = frozenset({"PySide6", "shiboken6"})
 QT_ALLOWED = frozenset({"PySide6.QtCore", "PySide6.QtGui", "PySide6.QtWidgets"})
 QT_FORBIDDEN_NAMES = frozenset({"QProcess", "QDesktopServices"})
 # Qt's own file dialog keeps its state in Qt's settings file: the window has a folder dialog of
 # its own.
 QT_STORAGE_NAMES = frozenset({"QSettings", "QFile", "QSaveFile", "QTemporaryFile", "QFileDialog"})
-SETTINGS = "safeclean.ui.settings"  # the one module of the window that touches a file
-ICONS = "safeclean.ui.icons"  # reads its icons, shipped in the package, and writes nothing
-SHIPPED_ICON = 'files("safeclean.ui").joinpath("icons", f"{name}.svg").read_text('
-REFUSED_URL = {"SAFECLEAN_OLLAMA_URL": "http://192.0.2.1:11434"}  # not loopback: no connection
+SETTINGS = "kresorter.ui.settings"  # the one module of the window that touches a file
+ICONS = "kresorter.ui.icons"  # reads its icons, shipped in the package, and writes nothing
+SHIPPED_ICON = 'files("kresorter.ui").joinpath("icons", f"{name}.svg").read_text('
+REFUSED_URL = {"KRESORTER_OLLAMA_URL": "http://192.0.2.1:11434"}  # not loopback: no connection
 
 
 def in_ui(module: str) -> bool:
@@ -93,7 +93,7 @@ def is_cli(name: str) -> bool:
     last = name.rsplit(".", 1)[-1]
     return (
         name.count(".") == 1
-        and name.startswith("safeclean.")
+        and name.startswith("kresorter.")
         and (last == "cli" or last.startswith("cli_"))
     )
 
@@ -170,12 +170,12 @@ def test_qt_s_ways_to_store_are_found() -> None:
 @pytest.mark.parametrize(
     ("name", "cli_module"),
     [
-        ("safeclean.cli", True),
-        ("safeclean.cli_quarantine", True),
-        ("safeclean.environment", False),
-        ("safeclean.client", False),
-        ("safeclean.core.cli_tools", False),
-        ("safeclean.ui.cli", False),
+        ("kresorter.cli", True),
+        ("kresorter.cli_quarantine", True),
+        ("kresorter.environment", False),
+        ("kresorter.client", False),
+        ("kresorter.core.cli_tools", False),
+        ("kresorter.ui.cli", False),
     ],
 )
 def test_a_cli_module_is_recognized(name: str, cli_module: bool) -> None:
@@ -200,8 +200,8 @@ def test_no_module_outside_the_window_imports_qt() -> None:
 def test_the_guards_read_every_module() -> None:
     # [0014.1] [0014.7] the guards see the whole package, the CLI and the environment included
     modules = {module for module, _ in sources()}
-    assert {"safeclean", "safeclean.cli", "safeclean.environment", "safeclean.llm"} <= modules
-    assert len(modules) == len(list((SRC / "safeclean").rglob("*.py")))
+    assert {"kresorter", "kresorter.cli", "kresorter.environment", "kresorter.llm"} <= modules
+    assert len(modules) == len(list((SRC / "kresorter").rglob("*.py")))
 
 
 def test_the_window_imports_from_qt_only_what_it_may() -> None:

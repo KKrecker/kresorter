@@ -19,7 +19,7 @@ FORBIDDEN_MODULE_ATTRS = {"os": frozenset({"remove", "unlink", "rmdir", "removed
 # The only file allowed to delete: final purge of verified vault copies.
 # ``from os import remove`` and friends hide the module from the attribute check.
 FORBIDDEN_FROM_IMPORTS = {**FORBIDDEN_MODULE_ATTRS, "shutil": frozenset({"rmtree"})}
-ALLOWED_TO_DELETE = frozenset({"src/safeclean/quarantine/purge.py"})
+ALLOWED_TO_DELETE = frozenset({"src/kresorter/quarantine/purge.py"})
 
 
 def find_direct_deletes(source: str) -> list[int]:
@@ -83,7 +83,7 @@ def test_project_code_has_no_direct_deletes() -> None:
 
 def test_allowlist_is_exactly_the_purge_module() -> None:
     # Growing this set needs a decision record, not a quiet edit.
-    assert frozenset({"src/safeclean/quarantine/purge.py"}) == ALLOWED_TO_DELETE
+    assert frozenset({"src/kresorter/quarantine/purge.py"}) == ALLOWED_TO_DELETE
 
 
 def test_allowlisted_file_really_deletes() -> None:

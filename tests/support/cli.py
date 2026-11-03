@@ -8,13 +8,13 @@ from dataclasses import replace
 from pathlib import Path
 
 from fakes import FakeOpenFiles, FakeRegistry, make_policy
-from safeclean import cli
-from safeclean.autostart.listing import AutostartContext
-from safeclean.autostart.registry import UserRegistry
-from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
-from safeclean.core.open_files import OpenFileChecker
-from safeclean.core.scanner import ScanContext
-from safeclean.environment import Environment
+from kresorter import cli
+from kresorter.autostart.listing import AutostartContext
+from kresorter.autostart.registry import UserRegistry
+from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
+from kresorter.core.open_files import OpenFileChecker
+from kresorter.core.scanner import ScanContext
+from kresorter.environment import Environment
 
 
 def scan_context(
@@ -57,7 +57,7 @@ def autostart_context(
 def run(
     args: list[str], scan: ScanContext, auto: AutostartContext | None = None
 ) -> tuple[int, str, str]:
-    """``safeclean <args>``: exit code, stdout, stderr."""
+    """``kresorter <args>``: exit code, stdout, stderr."""
     out, err = io.StringIO(), io.StringIO()
     environment = Environment(scan_context=lambda: scan)
     if auto is not None:

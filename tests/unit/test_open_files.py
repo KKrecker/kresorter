@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.core.open_files import (
+from kresorter.core.open_files import (
     NoOpenFileCheck,
     OpenFileChecker,
     OpenFileCheckError,

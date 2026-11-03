@@ -10,9 +10,9 @@ from pathlib import Path, PurePath
 
 import pytest
 
-from safeclean.autostart.registry import Hive, RegistryError, RegValue
-from safeclean.core.policy import BlockReason, PathPolicy
-from safeclean.storage import db
+from kresorter.autostart.registry import Hive, RegistryError, RegValue
+from kresorter.core.policy import BlockReason, PathPolicy
+from kresorter.storage import db
 
 RegistryKeys = Mapping[tuple[Hive, str], Sequence[RegValue]]
 
@@ -191,7 +191,7 @@ def deny_listing(monkeypatch: pytest.MonkeyPatch, denied: Path) -> None:
 
 @contextmanager
 def journal_held(monkeypatch: pytest.MonkeyPatch, data_dir: Path) -> Iterator[None]:
-    """Another program holds the journal for writing (a backup, the sqlite3 shell): safeclean's
+    """Another program holds the journal for writing (a backup, the sqlite3 shell): kresorter's
     lock does not cover it, so a write in the middle of a command fails, without the wait."""
     db.connect(data_dir / "journal.db").close()  # created and migrated, as by a first command
     monkeypatch.setattr(db, "BUSY_TIMEOUT_MS", 0)

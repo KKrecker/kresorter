@@ -9,8 +9,8 @@ import json
 import tomllib
 from pathlib import Path
 
-from safeclean.ui.settings import DEFAULTS, SETTINGS_NAME
-from safeclean.ui.texts import CATALOG
+from kresorter.ui.settings import DEFAULTS, SETTINGS_NAME
+from kresorter.ui.texts import CATALOG
 from support.markdown import blocks, section
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,11 +37,11 @@ def test_the_section_installs_the_extra_and_starts_the_window_both_ways() -> Non
     project = data["project"]
     assert isinstance(project, dict)
     assert "ui" in project["optional-dependencies"]
-    assert project["gui-scripts"] == {"safeclean-ui": "safeclean.ui.launch:main"}
+    assert project["gui-scripts"] == {"kresorter-ui": "kresorter.ui.launch:main"}
     words = [line.split("#")[0].split() for line in commands()]
-    assert ["pip", "install", '"safeclean[ui]"'] in words
-    assert ["safeclean-ui"] in words
-    assert ["python", "-m", "safeclean.ui"] in words
+    assert ["pip", "install", '"kresorter[ui]"'] in words
+    assert ["kresorter-ui"] in words
+    assert ["python", "-m", "kresorter.ui"] in words
 
 
 def test_the_section_names_the_system_libraries_ci_installs() -> None:

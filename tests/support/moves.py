@@ -142,8 +142,8 @@ def _child(code: str, spec: object) -> subprocess.CompletedProcess[str]:
 _CARRY_OUT = """
 import json, sys
 from pathlib import Path
-from safeclean.organize.mover import carry_out
-from safeclean.storage.db import connect
+from kresorter.organize.mover import carry_out
+from kresorter.storage.db import connect
 from support.moves import FlakyRename
 spec = json.loads(sys.argv[1])
 faults = {Path(path): fault for path, fault in spec["faults"].items()}
@@ -156,8 +156,8 @@ carry_out(conn, Path(spec["folder"]), moves, rename=FlakyRename(faults), undoes=
 _RECOVER = f"""
 import json, os, sys
 from pathlib import Path
-from safeclean.organize.recovery import recover
-from safeclean.storage.db import connect
+from kresorter.organize.recovery import recover
+from kresorter.storage.db import connect
 spec = json.loads(sys.argv[1])
 conn = connect(Path(spec["journal"]))
 sent = 0

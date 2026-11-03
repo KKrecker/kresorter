@@ -1,4 +1,4 @@
-"""safeclean launches no program, so it installs, starts and updates nothing (decision 0013).
+"""kresorter launches no program, so it installs, starts and updates nothing (decision 0013).
 
 Ollama is installed and started by the user [0013.2]. The guard reads the AST of ``src``:
 no module imports what starts a process, or names a function of ``os`` that does. Tests may
@@ -82,7 +82,7 @@ def test_detector_allows_unrelated_modules() -> None:
     assert find_launches("import subprocessing_notes\nfrom ptyx import y\nimport osx") == []
 
 
-def test_no_module_of_safeclean_launches_a_program() -> None:
+def test_no_module_of_kresorter_launches_a_program() -> None:
     offenders = [
         f"{path.relative_to(SRC).as_posix()}:{line}"
         for path in sorted(SRC.rglob("*.py"))

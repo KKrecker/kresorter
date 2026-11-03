@@ -14,11 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from safeclean import cli_journal
-from safeclean.core.scanner import ScanContext
-from safeclean.storage.pending import Domain
+from kresorter import cli_journal
+from kresorter.core.scanner import ScanContext
+from kresorter.storage.pending import Domain
 
-RECOVER = "safeclean thing recover"  # the domain's own command, passed in by it
+RECOVER = "kresorter thing recover"  # the domain's own command, passed in by it
 
 
 def full(conn: sqlite3.Connection, data_dir: Path) -> int:
@@ -36,7 +36,7 @@ def test_an_os_error_of_the_body_is_reported_with_its_reason_only(scan: ScanCont
 
     assert code == 3
     assert err.getvalue() == (
-        "safeclean: stopped: [Errno 13] Permission denied: '/elsewhere/app.desktop'\n"
+        "kresorter: stopped: [Errno 13] Permission denied: '/elsewhere/app.desktop'\n"
     )
 
 
@@ -59,7 +59,7 @@ def test_its_own_steps_name_the_data_directory(
     code = cli_journal.with_journal(scan, err, body, recover=RECOVER)
 
     assert (code, ran) == (3, [])
-    assert err.getvalue().startswith("safeclean: cannot use the data directory: ")
+    assert err.getvalue().startswith("kresorter: cannot use the data directory: ")
 
 
 def test_a_journal_failure_of_the_body_names_the_command_that_recovers(scan: ScanContext) -> None:
@@ -69,7 +69,7 @@ def test_a_journal_failure_of_the_body_names_the_command_that_recovers(scan: Sca
 
     assert code == 3
     assert err.getvalue() == (
-        "safeclean: journal failed: database or disk is full; run 'safeclean thing recover'\n"
+        "kresorter: journal failed: database or disk is full; run 'kresorter thing recover'\n"
     )
 
 
@@ -85,6 +85,6 @@ def test_work_of_other_domains_names_the_one_recover_command(
     domains: set[Domain], work: str
 ) -> None:
     assert cli_journal.unfinished(domains) == (
-        f"safeclean: the journal has unfinished {work} work; run 'safeclean recover' first;"
+        f"kresorter: the journal has unfinished {work} work; run 'kresorter recover' first;"
         " nothing was changed\n"
     )

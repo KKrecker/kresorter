@@ -11,14 +11,14 @@ from pathlib import Path
 from PySide6.QtWidgets import QAbstractButton, QTreeWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
-from safeclean.autostart.registry import UserRegistry
-from safeclean.core.heuristics import Platform
-from safeclean.core.open_files import OpenFileChecker
-from safeclean.environment import Environment
-from safeclean.llm.transport import LIMITS, Limits
-from safeclean.ui.dialogs import Confirmation, Dialogs
-from safeclean.ui.i18n import Language, Translator
-from safeclean.ui.window import Window
+from kresorter.autostart.registry import UserRegistry
+from kresorter.core.heuristics import Platform
+from kresorter.core.open_files import OpenFileChecker
+from kresorter.environment import Environment
+from kresorter.llm.transport import LIMITS, Limits
+from kresorter.ui.dialogs import Confirmation, Dialogs
+from kresorter.ui.i18n import Language, Translator
+from kresorter.ui.window import Window
 from support.cli import autostart_context, scan_context
 from support.files import aged, write
 

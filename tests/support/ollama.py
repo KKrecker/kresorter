@@ -20,7 +20,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from types import TracebackType
 
-from safeclean.llm.settings import Address
+from kresorter.llm.settings import Address
 
 GIVE_UP = 5.0
 ENDLESS_BYTES = 8 << 20

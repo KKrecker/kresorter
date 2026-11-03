@@ -26,8 +26,8 @@
    0700; looser existing permissions are tightened at startup.
 8. **Refuse to start** when the data directory is inside a default scan root or matches a junk
    rule (probed as `<data_dir>/quarantine/0/0`).
-9. **Default data directories stay blocked** (`~/.local/share/safeclean`,
-   `%USERPROFILE%\AppData\Local\safeclean`) when `XDG_DATA_HOME` / `LOCALAPPDATA` point
+9. **Default data directories stay blocked** (`~/.local/share/kresorter`,
+   `%USERPROFILE%\AppData\Local\kresorter`) when `XDG_DATA_HOME` / `LOCALAPPDATA` point
    elsewhere, so a vault left behind never becomes scannable.
 
 ## Consequences

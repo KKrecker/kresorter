@@ -14,21 +14,21 @@ from PySide6.QtWidgets import QTreeWidgetItem
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeRegistry, deny_stat
-from safeclean.autostart.journal import ChangeRefusal, ChangeResult, ChangeState, refused
-from safeclean.autostart.models import AutostartItem
-from safeclean.autostart.registry import Hive, RegistryError, RegValue, ValueKind
-from safeclean.autostart.run_changes import RunKeyChanges
-from safeclean.autostart.run_keys import APPROVED, RUN, RUN_ONCE
-from safeclean.autostart.xdg_changes import STUB, hidden_copy
-from safeclean.core.heuristics import Platform
-from safeclean.core.scanner import ScanContext
-from safeclean.storage.pending import Domain
-from safeclean.ui.dialogs import Confirmation
-from safeclean.ui.i18n import Language
-from safeclean.ui.parts import BADGE, EMPHASIS, INITIAL, QUIET, SECONDARY, Icon, Switch
-from safeclean.ui.sessions import Changed, change_entry
-from safeclean.ui.tasks import Task
-from safeclean.ui.window import Window
+from kresorter.autostart.journal import ChangeRefusal, ChangeResult, ChangeState, refused
+from kresorter.autostart.models import AutostartItem
+from kresorter.autostart.registry import Hive, RegistryError, RegValue, ValueKind
+from kresorter.autostart.run_changes import RunKeyChanges
+from kresorter.autostart.run_keys import APPROVED, RUN, RUN_ONCE
+from kresorter.autostart.xdg_changes import STUB, hidden_copy
+from kresorter.core.heuristics import Platform
+from kresorter.core.scanner import ScanContext
+from kresorter.storage.pending import Domain
+from kresorter.ui.dialogs import Confirmation
+from kresorter.ui.i18n import Language
+from kresorter.ui.parts import BADGE, EMPHASIS, INITIAL, QUIET, SECONDARY, Icon, Switch
+from kresorter.ui.sessions import Changed, change_entry
+from kresorter.ui.tasks import Task
+from kresorter.ui.window import Window
 from support.cli import autostart_context, run
 from support.files import write
 from support.interrupted import APP
@@ -139,7 +139,7 @@ def _turns(window: Window, name: str) -> tuple[bool, bool]:
 
 
 def _cli(scan: ScanContext, tmp_path: Path, action: str) -> None:
-    """``safeclean autostart <action> <id> --yes`` on the one entry there is."""
+    """``kresorter autostart <action> <id> --yes`` on the one entry there is."""
     auto = autostart_context("linux", tmp_path)
     _, out, _ = run(["autostart", "list", "--json"], scan, auto)
     (item,) = json.loads(out)["items"]
@@ -298,7 +298,7 @@ def test_an_entry_that_cannot_change_has_a_lock_and_a_switch_that_cannot_turn(
     assert (_turns(window, "Setup"), _turns(window, "Sync")) == ((False, True), (True, True))
     locks = [_lock(window, page.row(name)) for name in ("Setup", "Sync")]
     assert [(lock.name, lock.toolTip()) for lock in locks if lock is not None] == [
-        ("lock", "Listed only: safeclean does not change this entry")
+        ("lock", "Listed only: kresorter does not change this entry")
     ]
     assert locks[1] is None
     QTest.mouseClick(page.switch("Setup"), Qt.MouseButton.LeftButton)
@@ -366,7 +366,7 @@ def test_an_enable_asks_first_saying_nothing_is_deleted(
             text="Enable app (Desktop autostart, This user)?",
             details=(
                 f"Location: {entry}",
-                "If safeclean disabled it, what it changed is put back (the original from the"
+                "If kresorter disabled it, what it changed is put back (the original from the"
                 " store, or the stub moved to the store); nothing is deleted.",
             ),
             action="Enable",
@@ -456,10 +456,10 @@ def test_a_system_entry_is_disabled_by_a_stub(
 def test_a_refused_change_says_why(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs, user: Path
 ) -> None:
-    # [0014.24] Disabled, but not by safeclean: enabling it would edit it (0011 item 74).
+    # [0014.24] Disabled, but not by kresorter: enabling it would edit it (0011 item 74).
     entry = write(user / "app.desktop", hidden_copy(APP))
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
-    assert _change(qtbot, window, "app", "enable") == "Refused: Not disabled by safeclean."
+    assert _change(qtbot, window, "app", "enable") == "Refused: Not disabled by kresorter."
     assert entry.read_bytes() == hidden_copy(APP)
     assert _changes(data_dir) == []
 

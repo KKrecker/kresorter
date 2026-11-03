@@ -13,17 +13,17 @@ from PySide6.QtWidgets import QGridLayout, QTreeWidget, QTreeWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeOpenFiles, UnreliableOpenFiles
-from safeclean.core.heuristics import Platform
-from safeclean.core.open_files import OpenFileChecker
-from safeclean.organize.mover import carry_out
-from safeclean.organize.planner import StayReason
-from safeclean.ui import sessions
-from safeclean.ui.dialogs import Confirmation
-from safeclean.ui.organize import BATCHES_WIDTH, CATEGORY_ICONS, OrganizePage
-from safeclean.ui.parts import QUIET, SECONDARY, Field
-from safeclean.ui.shown import moment
-from safeclean.ui.theme import LIGHT
-from safeclean.ui.window import Window
+from kresorter.core.heuristics import Platform
+from kresorter.core.open_files import OpenFileChecker
+from kresorter.organize.mover import carry_out
+from kresorter.organize.planner import StayReason
+from kresorter.ui import sessions
+from kresorter.ui.dialogs import Confirmation
+from kresorter.ui.organize import BATCHES_WIDTH, CATEGORY_ICONS, OrganizePage
+from kresorter.ui.parts import QUIET, SECONDARY, Field
+from kresorter.ui.shown import moment
+from kresorter.ui.theme import LIGHT
+from kresorter.ui.window import Window
 from support.cli import run, scan_context
 from support.files import write
 from support.journal import pending_quarantine, query

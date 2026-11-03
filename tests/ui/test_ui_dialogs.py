@@ -12,9 +12,9 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QPlainTextEdit, QWidget
 from pytestqt.qtbot import QtBot
 
-from safeclean.ui.dialogs import Confirmation, ConfirmDialog, FolderDialog, choose_folder, confirm
-from safeclean.ui.i18n import Translator
-from safeclean.ui.theme import LIGHT, style_sheet
+from kresorter.ui.dialogs import Confirmation, ConfirmDialog, FolderDialog, choose_folder, confirm
+from kresorter.ui.i18n import Translator
+from kresorter.ui.theme import LIGHT, style_sheet
 
 MOVE = Confirmation(
     title="Move to quarantine",

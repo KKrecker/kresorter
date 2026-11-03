@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.analysis.duplicates import DuplicateDecision, KeepReason
-from safeclean.analysis.score import (
+from kresorter.analysis.duplicates import DuplicateDecision, KeepReason
+from kresorter.analysis.score import (
     Assessment,
     Evidence,
     Level,
@@ -23,10 +23,10 @@ from safeclean.analysis.score import (
     level_of,
     size_age_reasons,
 )
-from safeclean.analysis.size_age import SizeAgeFinding, SizeAgeReason
-from safeclean.core.heuristics import JunkCategory, JunkMatch
-from safeclean.core.models import FileEntry
-from safeclean.core.preflight import Candidate
+from kresorter.analysis.size_age import SizeAgeFinding, SizeAgeReason
+from kresorter.core.heuristics import JunkCategory, JunkMatch
+from kresorter.core.models import FileEntry
+from kresorter.core.preflight import Candidate
 
 MIB = 1024**2
 

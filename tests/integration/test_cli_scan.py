@@ -1,4 +1,4 @@
-"""`safeclean scan`: end-to-end on a real temporary tree. The disk must not change."""
+"""`kresorter scan`: end-to-end on a real temporary tree. The disk must not change."""
 
 import io
 import json
@@ -9,10 +9,10 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean import cli, environment
-from safeclean.core.heuristics import JunkClassifier, Platform, default_rules
-from safeclean.core.scanner import ScanContext
-from safeclean.environment import Environment
+from kresorter import cli, environment
+from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
+from kresorter.core.scanner import ScanContext
+from kresorter.environment import Environment
 from support.files import snapshot, write
 
 
@@ -161,7 +161,7 @@ def test_unsupported_platform_is_rejected() -> None:
 
 def test_explicit_scan_never_lists_the_app_data_dir(tmp_path: Path, tree: Path) -> None:
     # Even when the user scans a parent of the data dir (e.g. ~), the vault stays invisible.
-    app_data = tree / "appdata" / "safeclean"
+    app_data = tree / "appdata" / "kresorter"
     write(app_data / "quarantine" / "1" / "1" / "m.cpython-313.pyc", b"in vault")
     base = ctx(tmp_path, tree)
     context = ScanContext(
@@ -187,7 +187,7 @@ def test_default_context_passes_environment_to_posix_policy(tmp_path: Path) -> N
     env = {"XDG_DATA_HOME": str(tmp_path / "xdg")}
     context = environment.default_context(platform="linux", env=env, home=tmp_path)
 
-    assert context.policy.app_data_dir == tmp_path / "xdg" / "safeclean"
+    assert context.policy.app_data_dir == tmp_path / "xdg" / "kresorter"
 
 
 @pytest.mark.parametrize("platform", ["linux", "darwin"])
@@ -195,7 +195,7 @@ def test_default_context_posix(tmp_path: Path, platform: Platform) -> None:
     context = environment.default_context(platform=platform, env={}, home=tmp_path)
 
     assert context.policy.default_roots() == (tmp_path / ".cache", tmp_path / "Downloads")
-    assert context.policy.app_data_dir.name == "safeclean"
+    assert context.policy.app_data_dir.name == "kresorter"
 
 
 def test_default_context_windows() -> None:
@@ -218,12 +218,12 @@ def test_python_dash_m_entry_point(
     tmp_path: Path, tree: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(environment, "default_context", lambda: ctx(tmp_path, tree))
-    monkeypatch.setattr(sys, "argv", ["safeclean", "scan", "--json", str(tree)])
+    monkeypatch.setattr(sys, "argv", ["kresorter", "scan", "--json", str(tree)])
     out = io.StringIO()
     monkeypatch.setattr(sys, "stdout", out)
 
     with pytest.raises(SystemExit) as exc:
-        runpy.run_module("safeclean", run_name="__main__")
+        runpy.run_module("kresorter", run_name="__main__")
 
     assert exc.value.code == 0
     assert json.loads(out.getvalue())["files_scanned"] == 4

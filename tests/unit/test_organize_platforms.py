@@ -10,9 +10,9 @@ from typing import get_args
 import pytest
 
 from fakes import FakeOpenFiles
-from safeclean.core.heuristics import Platform
-from safeclean.core.open_files import NoOpenFileCheck, checker_for_platform
-from safeclean.organize.platforms import Blocker, blockers, refusal
+from kresorter.core.heuristics import Platform
+from kresorter.core.open_files import NoOpenFileCheck, checker_for_platform
+from kresorter.organize.platforms import Blocker, blockers, refusal
 
 # The columns of item 38: what each system blocks whatever its open-file check.
 SYSTEM: dict[Platform, tuple[Blocker, ...]] = {
@@ -59,7 +59,7 @@ def test_an_unreliable_checker_blocks_linux_too() -> None:
 def test_today_macos_and_windows_have_every_blocker_of_their_column(
     platform: Platform, expected: tuple[Blocker, ...]
 ) -> None:
-    # [0012.37] [0012.39] with the checkers safeclean gives them (0005; 0004 item 9)
+    # [0012.37] [0012.39] with the checkers kresorter gives them (0005; 0004 item 9)
     assert blockers(platform, checker_for_platform(platform)) == expected
 
 
@@ -71,7 +71,7 @@ def test_nothing_to_refuse_where_nothing_blocks() -> None:
 def test_the_refusal_names_the_system_and_every_blocker_in_table_order() -> None:
     # [0012.37] [0012.38] one line per blocker, nothing was changed
     assert refusal("windows", NoOpenFileCheck()) == (
-        "safeclean: organize does not move files on Windows; nothing was changed\n"
+        "kresorter: organize does not move files on Windows; nothing was changed\n"
         "  - no reliable open-file check: a file a program holds open could be moved"
         " from under it\n"
         "  - a file another program holds open can refuse to move halfway through a batch,"
@@ -88,4 +88,4 @@ def test_the_refusal_names_the_system_as_its_users_do(platform: Platform, name: 
     # [0012.37]
     message = refusal(platform, NoOpenFileCheck())
     assert message is not None
-    assert message.startswith(f"safeclean: organize does not move files on {name}; ")
+    assert message.startswith(f"kresorter: organize does not move files on {name}; ")

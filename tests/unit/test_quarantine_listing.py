@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean.core.heuristics import JunkClassifier
-from safeclean.core.models import FileEntry
-from safeclean.core.preflight import Candidate
-from safeclean.quarantine.journal import QuarantinedItem, quarantined
-from safeclean.quarantine.service import QuarantineService
-from safeclean.storage.db import connect
+from kresorter.core.heuristics import JunkClassifier
+from kresorter.core.models import FileEntry
+from kresorter.core.preflight import Candidate
+from kresorter.quarantine.journal import QuarantinedItem, quarantined
+from kresorter.quarantine.service import QuarantineService
+from kresorter.storage.db import connect
 from support.files import write
 
 

@@ -15,13 +15,13 @@ import pytest
 from PySide6.QtWidgets import QTreeWidgetItem
 from pytestqt.qtbot import QtBot
 
-from safeclean.analysis.report import Finding
-from safeclean.llm.settings import URL_VARIABLE, Address
-from safeclean.llm.subjects import Result, subject_of
-from safeclean.ui.explain import ExplainPanel
-from safeclean.ui.i18n import Language
-from safeclean.ui.organize import OrganizePage
-from safeclean.ui.window import Window
+from kresorter.analysis.report import Finding
+from kresorter.llm.settings import URL_VARIABLE, Address
+from kresorter.llm.subjects import Result, subject_of
+from kresorter.ui.explain import ExplainPanel
+from kresorter.ui.i18n import Language
+from kresorter.ui.organize import OrganizePage
+from kresorter.ui.window import Window
 from support.files import write
 from support.interrupted import APP
 from support.moves import three_files
@@ -293,7 +293,7 @@ def test_a_refused_setting_asks_nothing_and_says_so(
     assert page.explain.answer.text() == ""
     answer = page.explain.note.text()
     assert answer.startswith(
-        "No explanation: The settings are refused: SAFECLEAN_OLLAMA_URL='http://192.0.2.1:11434': "
+        "No explanation: The settings are refused: KRESORTER_OLLAMA_URL='http://192.0.2.1:11434': "
     )
     assert answer.endswith(SETUP)
 

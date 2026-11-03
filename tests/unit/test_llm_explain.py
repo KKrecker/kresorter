@@ -13,11 +13,11 @@ from typing import Any
 
 import pytest
 
-from safeclean.llm.explain import BUDGET, Explained, Explanations, explain
-from safeclean.llm.failure import Unavailable
-from safeclean.llm.settings import Address
-from safeclean.llm.subjects import Subject
-from safeclean.llm.transport import Limits
+from kresorter.llm.explain import BUDGET, Explained, Explanations, explain
+from kresorter.llm.failure import Unavailable
+from kresorter.llm.settings import Address
+from kresorter.llm.subjects import Subject
+from kresorter.llm.transport import Limits
 from support.ollama import Answer, ScriptedOllama, after, as_json, head
 
 VERSION = as_json({"version": "0.6.2"})
@@ -36,7 +36,7 @@ def answer(text: str) -> Answer:
 
 
 def env_for(address: Address, **more: str) -> dict[str, str]:
-    return {"SAFECLEAN_OLLAMA_URL": address.url, **more}
+    return {"KRESORTER_OLLAMA_URL": address.url, **more}
 
 
 def texts(run: Explanations) -> list[str]:
@@ -63,7 +63,7 @@ def test_each_subject_is_asked_in_order_after_the_checks_run_once() -> None:
 def test_the_model_asked_is_the_setting() -> None:
     # [0013.13]
     with ScriptedOllama(VERSION, TAGS, answer("Qwen's answer.")) as ollama:
-        run = explain([subject(0)], env_for(ollama.address, SAFECLEAN_OLLAMA_MODEL="qwen2.5:7b"))
+        run = explain([subject(0)], env_for(ollama.address, KRESORTER_OLLAMA_MODEL="qwen2.5:7b"))
     assert (run.model, texts(run)) == ("qwen2.5:7b", ["Qwen's answer."])
     assert b'"model": "qwen2.5:7b"' in ollama.received[2].body
 
@@ -146,7 +146,7 @@ def test_failed_checks_ask_for_no_explanation(
 def test_a_refused_setting_connects_nowhere(monkeypatch: pytest.MonkeyPatch) -> None:
     # [0013.13]
     connected = spy_on_connect(monkeypatch)
-    run = explain([subject(0)], {"SAFECLEAN_OLLAMA_URL": "http://192.0.2.1:11434"})
+    run = explain([subject(0)], {"KRESORTER_OLLAMA_URL": "http://192.0.2.1:11434"})
     assert run.unavailable is not None
     assert run.unavailable.reason is Unavailable.CONFIG
     assert (run.model, run.explained, connected) == (None, (), [])
@@ -164,14 +164,14 @@ def spy_on_connect(monkeypatch: pytest.MonkeyPatch) -> list[object]:
     return connected
 
 
-@pytest.mark.parametrize("env", [{}, {"SAFECLEAN_OLLAMA_URL": "https://example.com"}])
+@pytest.mark.parametrize("env", [{}, {"KRESORTER_OLLAMA_URL": "https://example.com"}])
 def test_nothing_to_explain_opens_no_connection(
     monkeypatch: pytest.MonkeyPatch, env: dict[str, str]
 ) -> None:
     # [0013.13] Not even the checks, and no setting is read: nothing is missing either.
     connected = spy_on_connect(monkeypatch)
     with ScriptedOllama(VERSION, TAGS) as ollama:
-        run = explain([], env | {"SAFECLEAN_OLLAMA_MODEL": "?"})
+        run = explain([], env | {"KRESORTER_OLLAMA_MODEL": "?"})
     assert (ollama.connections, connected) == (0, [])
     assert run == Explanations(model=None, explained=(), not_explained=0, unavailable=None)
 

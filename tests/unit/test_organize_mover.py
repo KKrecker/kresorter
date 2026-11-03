@@ -16,12 +16,12 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, deny_stat, make_policy, other_device
-from safeclean.core.preflight import RefusalReason
-from safeclean.core.scanner import ScanContext
-from safeclean.organize.journal import identity, journaled
-from safeclean.organize.mover import BatchState, carry_out, check
-from safeclean.organize.planner import Move, plan
-from safeclean.storage.db import connect
+from kresorter.core.preflight import RefusalReason
+from kresorter.core.scanner import ScanContext
+from kresorter.organize.journal import identity, journaled
+from kresorter.organize.mover import BatchState, carry_out, check
+from kresorter.organize.planner import Move, plan
+from kresorter.storage.db import connect
 from support.files import write
 from support.moves import (
     MOVED,

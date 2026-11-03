@@ -24,8 +24,8 @@ from PySide6.QtWidgets import (
 )
 from pytestqt.qtbot import QtBot
 
-from safeclean.analysis.score import Level
-from safeclean.ui.parts import (
+from kresorter.analysis.score import Level
+from kresorter.ui.parts import (
     BADGE,
     BADGE_HEIGHT,
     CHECK,
@@ -65,7 +65,7 @@ from safeclean.ui.parts import (
     text_ink,
     vbox,
 )
-from safeclean.ui.theme import DARK, LIGHT, Badge, Look, Palette
+from kresorter.ui.theme import DARK, LIGHT, Badge, Look, Palette
 from support.drawn import drawn_in, inked_in
 
 CHECKED, PARTLY, UNCHECKED = (

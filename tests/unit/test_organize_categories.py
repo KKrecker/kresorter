@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.organize.categories import (
+from kresorter.organize.categories import (
     Category,
     CategoryTable,
     default_categories,

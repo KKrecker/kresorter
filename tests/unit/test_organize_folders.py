@@ -13,15 +13,15 @@ from pathlib import Path
 import pytest
 
 from fakes import deny_listing, deny_stat
-from safeclean.core.scanner import ScanContext
-from safeclean.organize.folders import (
+from kresorter.core.scanner import ScanContext
+from kresorter.organize.folders import (
     FolderMarkers,
     FolderReason,
     FolderRefused,
     default_markers,
     load_markers,
 )
-from safeclean.organize.planner import plan
+from kresorter.organize.planner import plan
 from support.files import write
 
 DECISION = Path(__file__).resolve().parents[2] / "docs" / "decisions" / "0012-organize.md"
@@ -92,7 +92,7 @@ def test_a_folder_the_policy_blocks_is_refused(tmp_path: Path, scan: ScanContext
 
 @pytest.mark.parametrize("below", ["", "vault"])
 def test_the_data_directory_is_refused(data_dir: Path, scan: ScanContext, below: str) -> None:
-    # [0012.7] the journal and the vault are safeclean's, whatever the folder holds
+    # [0012.7] the journal and the vault are kresorter's, whatever the folder holds
     folder = data_dir / below
     folder.mkdir(parents=True)
     assert refusal(folder, scan) == (FolderReason.BLOCKED, "app_data")

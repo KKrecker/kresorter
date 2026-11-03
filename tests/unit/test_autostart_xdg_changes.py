@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.autostart.entries import MAX_ENTRY_BYTES, BrokenEntryError
-from safeclean.autostart.models import Scope, entry_digest
-from safeclean.autostart.xdg import parse_keys, read_xdg
-from safeclean.autostart.xdg_changes import STUB, hidden_copy
+from kresorter.autostart.entries import MAX_ENTRY_BYTES, BrokenEntryError
+from kresorter.autostart.models import Scope, entry_digest
+from kresorter.autostart.xdg import parse_keys, read_xdg
+from kresorter.autostart.xdg_changes import STUB, hidden_copy
 from support.files import write_desktop
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"

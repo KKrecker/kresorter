@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.autostart.models import (
+from kresorter.autostart.models import (
     AutostartItem,
     AutostartListing,
     AutostartSkipped,
@@ -20,7 +20,7 @@ from safeclean.autostart.models import (
     Source,
     entry_digest,
 )
-from safeclean.autostart.xdg import MAX_ENTRY_BYTES, autostart_dirs, read_xdg
+from kresorter.autostart.xdg import MAX_ENTRY_BYTES, autostart_dirs, read_xdg
 
 APP = "[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 

@@ -9,8 +9,8 @@ import pytest
 from PySide6.QtCore import QTimer
 from pytestqt.qtbot import QtBot
 
-from safeclean.storage.session import SessionFailed, run_session
-from safeclean.ui.tasks import Task, Tasks
+from kresorter.storage.session import SessionFailed, run_session
+from kresorter.ui.tasks import Task, Tasks
 from support.cli import scan_context
 
 

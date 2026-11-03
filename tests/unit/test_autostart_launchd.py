@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.autostart.entries import MAX_ENTRY_BYTES
-from safeclean.autostart.launchd import launchd_dirs, read_launchd
-from safeclean.autostart.models import (
+from kresorter.autostart.entries import MAX_ENTRY_BYTES
+from kresorter.autostart.launchd import launchd_dirs, read_launchd
+from kresorter.autostart.models import (
     AutostartListing,
     AutostartSkipped,
     Scope,

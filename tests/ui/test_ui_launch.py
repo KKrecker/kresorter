@@ -6,8 +6,8 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QWidget
 from pytestqt.qtbot import QtBot
 
-from safeclean.environment import Environment
-from safeclean.ui import launch
+from kresorter.environment import Environment
+from kresorter.ui import launch
 from support.cli import autostart_context, scan_context
 
 
@@ -31,7 +31,7 @@ def test_main_opens_the_window_and_returns_0_once_it_is_closed(
     QTimer.singleShot(0, close)
 
     assert launch.main([], environment=environment) == 0
-    assert shown == ["safeclean"]
+    assert shown == ["Kresorter"]
     assert [
         w for w in QApplication.topLevelWidgets() if isinstance(w, QWidget) and w.isVisible()
     ] == []

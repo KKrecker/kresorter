@@ -1,4 +1,4 @@
-# safeclean
+# Kresorter
 
 Cross-platform desktop app for **safe** cleanup and triage of files on your PC.
 Open source, local-only, no telemetry.
@@ -22,14 +22,14 @@ Open source, local-only, no telemetry.
 ### Reports: `scan`, `analyze`
 
 ```bash
-safeclean scan                 # default safe zones: ~/.cache and ~/Downloads
-safeclean scan ~/Projects /tmp # explicit roots (Temp only when chosen explicitly)
-safeclean scan --json --no-hash ~/Downloads
-safeclean analyze              # a safety level and the reasons for each finding
-safeclean analyze --json --large 1024 --older-than 365 ~/Downloads
+kresorter scan                 # default safe zones: ~/.cache and ~/Downloads
+kresorter scan ~/Projects /tmp # explicit roots (Temp only when chosen explicitly)
+kresorter scan --json --no-hash ~/Downloads
+kresorter analyze              # a safety level and the reasons for each finding
+kresorter analyze --json --large 1024 --older-than 365 ~/Downloads
 ```
 
-Neither changes the disk, not even safeclean's data directory. `scan` lists junk candidates,
+Neither changes the disk, not even kresorter's data directory. `scan` lists junk candidates,
 duplicate groups and everything it skipped, with the reason. `analyze` rates each finding
 `safe`, `likely_safe` or `review` and says why; which copy of a duplicate group stays is
 decided for you and that copy is never proposed. Large (`--large`, MiB) and old (`--older-than`,
@@ -38,13 +38,13 @@ days unmodified) files are listed for review only.
 ### Quarantine
 
 ```bash
-safeclean quarantine add ~/Downloads/old.iso   # move aside (reversible)
-safeclean quarantine add --from-analysis --level safe        # show what would move
-safeclean quarantine add --from-analysis --level safe --yes  # move it
-safeclean quarantine list                      # ids, original paths, sizes
-safeclean quarantine restore 3                 # put back; never overwrites
-safeclean quarantine purge 3                   # show what would be deleted; deletes nothing
-safeclean quarantine purge --yes 3             # permanently delete the vault copy
+kresorter quarantine add ~/Downloads/old.iso   # move aside (reversible)
+kresorter quarantine add --from-analysis --level safe        # show what would move
+kresorter quarantine add --from-analysis --level safe --yes  # move it
+kresorter quarantine list                      # ids, original paths, sizes
+kresorter quarantine restore 3                 # put back; never overwrites
+kresorter quarantine purge 3                   # show what would be deleted; deletes nothing
+kresorter quarantine purge --yes 3             # permanently delete the vault copy
 ```
 
 Every file is checked again right before it moves. `--from-analysis` takes `safe` findings, or
@@ -55,11 +55,11 @@ refuse (exit code 3) until their backends exist.
 ### Autostart
 
 ```bash
-safeclean autostart list                      # every entry with its id; report only
-safeclean autostart list --json --include-machine  # Windows: also HKLM, services, tasks
-safeclean autostart disable 3f2a9c0d1b7e      # show what would be written
-safeclean autostart disable 3f2a9c0d1b7e --yes
-safeclean autostart enable 81d4e0a6c2f9 --yes # the id from a new 'list'
+kresorter autostart list                      # every entry with its id; report only
+kresorter autostart list --json --include-machine  # Windows: also HKLM, services, tasks
+kresorter autostart disable 3f2a9c0d1b7e      # show what would be written
+kresorter autostart disable 3f2a9c0d1b7e --yes
+kresorter autostart enable 81d4e0a6c2f9 --yes # the id from a new 'list'
 ```
 
 `list` shows each entry's id; any unique beginning of it is enough, and an entry that changed
@@ -68,16 +68,16 @@ and `HKCU` Run values on Windows; every other source is listed, never written. N
 deleted: your own entry is replaced by a copy with `Hidden=true` and the original is kept; a
 system entry is shadowed by a stub in your autostart directory, `/etc` is never written; a Run
 value gets the `StartupApproved` flag the Task Manager writes, the value itself is never
-touched. `enable` puts back only what safeclean changed.
+touched. `enable` puts back only what kresorter changed.
 
 ### Organize
 
 ```bash
-safeclean organize move ~/Downloads        # show the plan; changes nothing
-safeclean organize move ~/Downloads --yes  # sort it: ~/Downloads/<Category>/<name>
-safeclean organize list                    # batches, newest first
-safeclean organize undo 4                  # show what would move back
-safeclean organize undo 4 --yes            # move it back
+kresorter organize move ~/Downloads        # show the plan; changes nothing
+kresorter organize move ~/Downloads --yes  # sort it: ~/Downloads/<Category>/<name>
+kresorter organize list                    # batches, newest first
+kresorter organize undo 4                  # show what would move back
+kresorter organize undo 4 --yes            # move it back
 ```
 
 Only the regular files directly in the folder move, each to `<folder>/<Category>/<its name>`
@@ -96,30 +96,30 @@ and name what blocks them, while `list` and `recover` run.
 ### Recovery
 
 ```bash
-safeclean recover   # close interrupted work of every kind; `autostart recover` is the same
+kresorter recover   # close interrupted work of every kind; `autostart recover` is the same
 ```
 
 The commands that act (`quarantine`, `organize`, `autostart disable|enable`, `recover`) share
 one journal in one data directory, and only one of them runs at a time. The data directory is
-`$XDG_DATA_HOME/safeclean` (by default `~/.local/share/safeclean`) on Linux,
-`~/Library/Application Support/safeclean` on macOS and `%LOCALAPPDATA%\safeclean` on Windows;
-safeclean refuses to use one inside a scan zone. Each command first closes its own interrupted
-work; if work of another kind is left, it changes nothing and names `safeclean recover`.
+`$XDG_DATA_HOME/kresorter` (by default `~/.local/share/kresorter`) on Linux,
+`~/Library/Application Support/kresorter` on macOS and `%LOCALAPPDATA%\kresorter` on Windows;
+kresorter refuses to use one inside a scan zone. Each command first closes its own interrupted
+work; if work of another kind is left, it changes nothing and names `kresorter recover`.
 Recovery decides by what is on the disk or in the registry, never redoing or undoing anything.
-`safeclean recover` needs no open-file check, so it also runs where the quarantine and organize
+`kresorter recover` needs no open-file check, so it also runs where the quarantine and organize
 cannot act; it names the files an interrupted organize batch left sorted and the `organize
 undo` that moves them back.
 
 ### AI explanations (optional)
 
 ```bash
-safeclean llm status                           # what is in place, and how to set up the rest
-safeclean analyze --explain                    # the report, then what its findings are
-safeclean autostart list --json --explain      # four keys added to the JSON
-safeclean organize move ~/Downloads --explain  # the plan, then why files stay; not with --yes
+kresorter llm status                           # what is in place, and how to set up the rest
+kresorter analyze --explain                    # the report, then what its findings are
+kresorter autostart list --json --explain      # four keys added to the JSON
+kresorter organize move ~/Downloads --explain  # the plan, then why files stay; not with --yes
 ```
 
-`--explain` adds plain-language explanations of what safeclean has already decided: what a
+`--explain` adds plain-language explanations of what kresorter has already decided: what a
 cache or a kind of file is, what an autostart program does, why a file stays. They are written
 by a language model running in [Ollama](https://ollama.com) on your machine; they are advisory
 and may be wrong. Levels, plans, refusals, the command's own output and the exit code are those
@@ -131,27 +131,27 @@ are one subject (a thousand `__pycache__` files are one question). With `--json`
 gains `explanations`, `explanations_model`, `explanations_not_explained` and
 `explanations_unavailable`.
 
-Ollama and the model are installed by you, never by safeclean: safeclean launches no program,
-so it does not install, update, start or configure them. `safeclean llm status` says what it
+Ollama and the model are installed by you, never by kresorter: kresorter launches no program,
+so it does not install, update, start or configure them. `kresorter llm status` says what it
 found and what is left to do (exit code 0 when everything is in place, 1 otherwise):
 
 ```text
 Ollama: not reachable at http://127.0.0.1:11434 ([Errno 111] Connection refused)
 Model: llama3.2: not checked
-AI explanations: unavailable; safeclean works as usual without them
-To set them up (safeclean installs nothing itself):
+AI explanations: unavailable; kresorter works as usual without them
+To set them up (kresorter installs nothing itself):
   1. Install Ollama from https://ollama.com/download and start it
   2. Download the model: ollama pull llama3.2
-  3. Check again: safeclean llm status
-Settings: SAFECLEAN_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),
-  SAFECLEAN_OLLAMA_MODEL (default llama3.2)
+  3. Check again: kresorter llm status
+Settings: KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),
+  KRESORTER_OLLAMA_MODEL (default llama3.2)
 ```
 
-Both settings are environment variables. `SAFECLEAN_OLLAMA_URL`, by default
+Both settings are environment variables. `KRESORTER_OLLAMA_URL`, by default
 `http://127.0.0.1:11434`, is `http://HOST[:PORT]` where HOST is `localhost`, an address in
 `127.0.0.0/8` or `[::1]` (an Ollama listening only on `::1` needs `http://[::1]:11434`);
 anything else is refused, proxy settings are ignored and redirects are not followed.
-`SAFECLEAN_OLLAMA_MODEL`, by default `llama3.2`, names a model you pulled.
+`KRESORTER_OLLAMA_MODEL`, by default `llama3.2`, names a model you pulled.
 
 Each explanation is about one subject, and its facts are all that is sent; the explanation is
 labelled with them as `name=value`:
@@ -183,9 +183,9 @@ plan are not refusals.
 The window is an extra: the console commands need none of it.
 
 ```bash
-pip install "safeclean[ui]"   # adds PySide6-Essentials
-safeclean-ui
-python -m safeclean.ui        # the same window
+pip install "kresorter[ui]"   # adds PySide6-Essentials
+kresorter-ui
+python -m kresorter.ui        # the same window
 ```
 
 On Linux, Qt needs a few system libraries; on Debian or Ubuntu:
@@ -194,7 +194,7 @@ On Linux, Qt needs a few system libraries; on Debian or Ubuntu:
 sudo apt-get install libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
 ```
 
-Without PySide6, `safeclean-ui` says which extra to install and exits with 3; when Qt cannot
+Without PySide6, `kresorter-ui` says which extra to install and exits with 3; when Qt cannot
 load one of these libraries, it names the error and the libraries, and exits with 3 too.
 
 The sidebar opens six pages, with the open-file check and the local AI's model under them:
@@ -229,7 +229,7 @@ Nothing changes until you confirm: every action (quarantine, restore, delete per
 organize, undo, disable, enable, recover) first opens a dialog that shows what it will do, with
 Cancel as its default button. The window runs what the commands run, on the same journal and
 the same lock: what one moved the other can restore or undo, and when the window finds
-interrupted work it offers Recover, as `safeclean recover` does. Explain (local AI), under a
+interrupted work it offers Recover, as `kresorter recover` does. Explain (local AI), under a
 finding, an autostart entry or a file that stays in place, asks Ollama about that one result
 only when you press it (see [AI explanations](#ai-explanations-optional)).
 

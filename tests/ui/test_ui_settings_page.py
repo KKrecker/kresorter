@@ -1,6 +1,6 @@
 """The Settings page: the language, which applies the next time the window opens; on Windows
 the machine scope of autostart, turned on only after a confirmation that says what is read; a
-Check of the local AI that runs the checks of ``safeclean llm status`` and shows each; the data
+Check of the local AI that runs the checks of ``kresorter llm status`` and shows each; the data
 directory's path; a card each, the page scrolling under its head. The page says when the
 settings file was not used, and the file is written only when the user changes a setting
 (decision 0014, items 27, 36, 37 and 55)."""
@@ -16,17 +16,17 @@ from PySide6.QtWidgets import QFrame, QLabel, QWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeRegistry
-from safeclean.analysis.score import Level
-from safeclean.autostart.registry import Hive, RegValue, ValueKind
-from safeclean.autostart.run_keys import RUN
-from safeclean.cli_llm import run_status
-from safeclean.core.heuristics import Platform
-from safeclean.llm.settings import MODEL_VARIABLE, URL_VARIABLE, Address
-from safeclean.ui.i18n import Language
-from safeclean.ui.settings import Settings, load
-from safeclean.ui.settings_page import SettingsPage
-from safeclean.ui.theme import LIGHT
-from safeclean.ui.window import Window
+from kresorter.analysis.score import Level
+from kresorter.autostart.registry import Hive, RegValue, ValueKind
+from kresorter.autostart.run_keys import RUN
+from kresorter.cli_llm import run_status
+from kresorter.core.heuristics import Platform
+from kresorter.llm.settings import MODEL_VARIABLE, URL_VARIABLE, Address
+from kresorter.ui.i18n import Language
+from kresorter.ui.settings import Settings, load
+from kresorter.ui.settings_page import SettingsPage
+from kresorter.ui.theme import LIGHT
+from kresorter.ui.window import Window
 from support.cli import autostart_context, run, scan_context
 from support.ollama import TAGS, VERSION, Answer, ScriptedOllama, as_json
 from support.window import FakeDialogs, children, environment, make_window, settled, wait_idle
@@ -46,14 +46,14 @@ AVAILABLE = (
     " that stays in place."
 )
 SETUP = [
-    "Explanations are unavailable; safeclean works as usual without them.",
-    "To set them up (safeclean installs nothing itself):",
+    "Explanations are unavailable; kresorter works as usual without them.",
+    "To set them up (kresorter installs nothing itself):",
 ]
 INSTALL = "Install Ollama from https://ollama.com/download and start it."
 AGAIN = "Check again."
 SETTINGS = (
-    "Settings, from the environment the window started in: SAFECLEAN_OLLAMA_URL (a loopback"
-    " address, default http://127.0.0.1:11434) and SAFECLEAN_OLLAMA_MODEL (default llama3.2)."
+    "Settings, from the environment the window started in: KRESORTER_OLLAMA_URL (a loopback"
+    " address, default http://127.0.0.1:11434) and KRESORTER_OLLAMA_MODEL (default llama3.2)."
 )
 AGENT = RegValue("Agent", ValueKind.REG_SZ, r"C:\agent.exe")
 SYNC = RegValue("Sync", ValueKind.REG_SZ, r"C:\sync.exe")
@@ -385,7 +385,7 @@ def _steps(*steps: str) -> list[str]:
 def test_the_check_runs_the_checks_of_llm_status_and_shows_each(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, script: list[Answer], rest: list[str]
 ) -> None:
-    # [0014.27] The Ollama and Model lines are those of 'safeclean llm status'; nothing is
+    # [0014.27] The Ollama and Model lines are those of 'kresorter llm status'; nothing is
     # asked before the button, and the check asks no explanation.
     with ScriptedOllama(*script, *script) as ollama:
         env = {URL_VARIABLE: ollama.address.url}
@@ -420,7 +420,7 @@ def test_a_refused_setting_is_checked_no_further(
     variables: dict[str, str],
     rest: list[str],
 ) -> None:
-    # [0014.27] As 'safeclean llm status': the refused setting, and no connection.
+    # [0014.27] As 'kresorter llm status': the refused setting, and no connection.
     env = {URL_VARIABLE: _closed().url, **variables}
     shown = _checked(qtbot, tmp_path, zone, data_dir, env)
 
@@ -555,5 +555,5 @@ def test_the_data_folder_from_the_home_folder(
     # [0014.55] The whole path in its tooltip, in secondary text.
     window = _window(qtbot, tmp_path, zone, data_dir)
     page = window.settings
-    assert (page.data_dir.text(), page.data_dir.toolTip()) == ("~/data/safeclean", str(data_dir))
+    assert (page.data_dir.text(), page.data_dir.toolTip()) == ("~/data/kresorter", str(data_dir))
     assert page.data_dir.property("role") == "secondary"

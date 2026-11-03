@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean.analysis.report import AnalysisReport, Finding, LevelTotal, analyze
-from safeclean.analysis.score import Evidence, Level, Reason
-from safeclean.analysis.size_age import DAY_NS, Thresholds
-from safeclean.core.heuristics import JunkClassifier, load_rules
-from safeclean.core.models import FileEntry
-from safeclean.core.preflight import Candidate
-from safeclean.core.scanner import ScanContext, scan
+from kresorter.analysis.report import AnalysisReport, Finding, LevelTotal, analyze
+from kresorter.analysis.score import Evidence, Level, Reason
+from kresorter.analysis.size_age import DAY_NS, Thresholds
+from kresorter.core.heuristics import JunkClassifier, load_rules
+from kresorter.core.models import FileEntry
+from kresorter.core.preflight import Candidate
+from kresorter.core.scanner import ScanContext, scan
 from support.files import snapshot
 
 RULES = """

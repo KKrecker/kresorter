@@ -15,18 +15,18 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeRegistry, RegistryKeys
-from safeclean.autostart import run_changes
-from safeclean.autostart.journal import ChangeRefusal, ChangeResult, ChangeState
-from safeclean.autostart.models import (
+from kresorter.autostart import run_changes
+from kresorter.autostart.journal import ChangeRefusal, ChangeResult, ChangeState
+from kresorter.autostart.models import (
     AutostartItem,
     AutostartListing,
     Scope,
     Source,
     entry_digest,
 )
-from safeclean.autostart.registry import Hive, RegistryError, RegValue, ValueKind
-from safeclean.autostart.run_keys import APPROVED, RUN, RUN_ONCE, read_run_keys
-from safeclean.storage.db import connect
+from kresorter.autostart.registry import Hive, RegistryError, RegValue, ValueKind
+from kresorter.autostart.run_keys import APPROVED, RUN, RUN_ONCE, read_run_keys
+from kresorter.storage.db import connect
 
 NOW = 1_700_000_000 * 1_000_000_000  # 2023-11-14T22:13:20Z, in ns since the Unix epoch
 FILETIME = (133_444_736_000_000_000).to_bytes(8, "little")  # the same instant, Windows time
@@ -161,7 +161,7 @@ def test_the_default_value_is_told_apart_from_one_named_default(conn: sqlite3.Co
 def test_enable_writes_the_flag_the_task_manager_writes(
     conn: sqlite3.Connection, before: bytes
 ) -> None:
-    # Disabled by the Task Manager, not by safeclean: the flag is Windows' own switch, so
+    # Disabled by the Task Manager, not by kresorter: the flag is Windows' own switch, so
     # enabling it edits nothing else (unlike item 74).
     keys: RegistryKeys = {(Hive.HKCU, RUN): [SYNC], (Hive.HKCU, APPROVED): [flag(before)]}
     registry, changes = setup(conn, keys)

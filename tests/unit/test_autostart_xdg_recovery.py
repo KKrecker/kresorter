@@ -20,15 +20,15 @@ from pathlib import Path
 import pytest
 
 from fakes import deny_stat
-from safeclean.autostart import changes, journal
-from safeclean.autostart.changes import AutostartStore, XdgChanges
-from safeclean.autostart.entries import BrokenEntryError
-from safeclean.autostart.journal import ChangeRecovery, ChangeState
-from safeclean.autostart.models import AutostartItem, Source
-from safeclean.autostart.xdg import read_xdg
-from safeclean.autostart.xdg_changes import STUB, hidden_copy
-from safeclean.storage.db import connect
-from safeclean.storage.transactions import transaction
+from kresorter.autostart import changes, journal
+from kresorter.autostart.changes import AutostartStore, XdgChanges
+from kresorter.autostart.entries import BrokenEntryError
+from kresorter.autostart.journal import ChangeRecovery, ChangeState
+from kresorter.autostart.models import AutostartItem, Source
+from kresorter.autostart.xdg import read_xdg
+from kresorter.autostart.xdg_changes import STUB, hidden_copy
+from kresorter.storage.db import connect
+from kresorter.storage.transactions import transaction
 from support.files import write_desktop
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"

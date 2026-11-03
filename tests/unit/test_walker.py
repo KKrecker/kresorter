@@ -12,9 +12,9 @@ from typing import Any
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean.core.models import FileEntry, Skipped, SkipReason
-from safeclean.core.policy import BlockReason
-from safeclean.core.walker import walk
+from kresorter.core.models import FileEntry, Skipped, SkipReason
+from kresorter.core.policy import BlockReason
+from kresorter.core.walker import walk
 
 
 def write(path: Path, data: bytes = b"x") -> Path:

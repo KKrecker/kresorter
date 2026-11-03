@@ -14,7 +14,7 @@ import sys
 
 import pytest
 
-from safeclean.autostart.registry import (
+from kresorter.autostart.registry import (
     Hive,
     Registry,
     RegistryError,
@@ -22,8 +22,8 @@ from safeclean.autostart.registry import (
     UserRegistry,
     ValueKind,
 )
-from safeclean.autostart.run_keys import APPROVED, RUN, RUN_32
-from safeclean.autostart.winregistry import WinRegistry
+from kresorter.autostart.run_keys import APPROVED, RUN, RUN_32
+from kresorter.autostart.winregistry import WinRegistry
 
 ERROR_NO_MORE_ITEMS = 259
 

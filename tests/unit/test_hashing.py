@@ -12,14 +12,14 @@ from typing import Any
 
 import pytest
 
-from safeclean.core import hashing
-from safeclean.core.hashing import (
+from kresorter.core import hashing
+from kresorter.core.hashing import (
     HashedFile,
     group_by_size,
     hash_duplicate_candidates,
     hash_file,
 )
-from safeclean.core.models import FileEntry, Skipped, SkipReason
+from kresorter.core.models import FileEntry, Skipped, SkipReason
 
 
 def blake(data: bytes) -> str:

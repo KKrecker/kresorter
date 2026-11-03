@@ -12,10 +12,10 @@ from PySide6.QtWidgets import QTreeWidgetItem
 from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
-from safeclean.analysis.score import Level
-from safeclean.quarantine.service import QuarantineService
-from safeclean.ui import sessions
-from safeclean.ui.findings import (
+from kresorter.analysis.score import Level
+from kresorter.quarantine.service import QuarantineService
+from kresorter.ui import sessions
+from kresorter.ui.findings import (
     DETAIL_WIDTH,
     PATH,
     SEARCH_WIDTHS,
@@ -23,9 +23,9 @@ from safeclean.ui.findings import (
     folders,
     found_in,
 )
-from safeclean.ui.i18n import Translator
-from safeclean.ui.parts import BADGE, EMPHASIS, QUIET, SECONDARY
-from safeclean.ui.window import Window
+from kresorter.ui.i18n import Translator
+from kresorter.ui.parts import BADGE, EMPHASIS, QUIET, SECONDARY
+from kresorter.ui.window import Window
 from support.files import write
 from support.journal import pending_move_batch, query
 from support.window import (

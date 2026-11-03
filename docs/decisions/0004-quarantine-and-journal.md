@@ -43,9 +43,9 @@ journaled, re-validated right before it happens, and reversible.
 ## The vault is never inside a default scan zone
 
 - The vault lives under the application data directory, never under `~/.cache` or `~/Downloads`:
-  - Linux: `$XDG_DATA_HOME/safeclean` (default `~/.local/share/safeclean`)
-  - Windows: `%LOCALAPPDATA%\safeclean`
-  - macOS: `~/Library/Application Support/safeclean`
+  - Linux: `$XDG_DATA_HOME/kresorter` (default `~/.local/share/kresorter`)
+  - Windows: `%LOCALAPPDATA%\kresorter`
+  - macOS: `~/Library/Application Support/kresorter`
 - If the resolved data directory (for example, through a custom `XDG_DATA_HOME`) falls inside
   any default scan root or matches a junk rule, the quarantine refuses to start.
 - The data directory is also **added to the policy blacklist** (`BlockReason.APP_DATA`), so the

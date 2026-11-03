@@ -1,4 +1,4 @@
-"""`safeclean quarantine add / list / restore / purge`: end-to-end on a real temporary tree.
+"""`kresorter quarantine add / list / restore / purge`: end-to-end on a real temporary tree.
 
 Every quarantine command opens the journal in the app data directory and runs ``recover()``
 first. Purge deletes only with ``--yes``; without it the plan is shown and nothing changes
@@ -13,12 +13,12 @@ from pathlib import Path, PurePath
 import pytest
 
 from fakes import FakeOpenFiles, journal_held
-from safeclean import cli_quarantine, environment
-from safeclean.core.heuristics import Platform
-from safeclean.core.open_files import NoOpenFileCheck, ProcFdChecker
-from safeclean.core.scanner import ScanContext
-from safeclean.quarantine.service import QuarantineService
-from safeclean.storage.lock import InstanceLock
+from kresorter import cli_quarantine, environment
+from kresorter.core.heuristics import Platform
+from kresorter.core.open_files import NoOpenFileCheck, ProcFdChecker
+from kresorter.core.scanner import ScanContext
+from kresorter.quarantine.service import QuarantineService
+from kresorter.storage.lock import InstanceLock
 from support.cli import run, scan_context
 from support.files import write
 from support.journal import query
@@ -198,7 +198,7 @@ def test_a_failed_move_is_rolled_back_and_reported(
 
 def test_unusable_data_directory_exits_3(tmp_path: Path, zone: Path) -> None:
     write(tmp_path / "data")  # a file where the data directory's parent should be
-    context = scan_context(tmp_path, zone, tmp_path / "data" / "safeclean")
+    context = scan_context(tmp_path, zone, tmp_path / "data" / "kresorter")
 
     code, out, err = run(["quarantine", "list"], context)
 
@@ -223,10 +223,10 @@ def test_a_vault_that_cannot_be_created_is_named(context: ScanContext, data_dir:
     code, out, err = run(["quarantine", "list"], context)
 
     assert (code, out) == (3, "")
-    assert err == f"safeclean: cannot use the vault: [Errno 17] File exists: '{vault}'\n"
+    assert err == f"kresorter: cannot use the vault: [Errno 17] File exists: '{vault}'\n"
 
 
-def test_a_journal_failure_stops_and_names_safeclean_recover(
+def test_a_journal_failure_stops_and_names_kresorter_recover(
     context: ScanContext, data_dir: Path, zone: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = write(zone / "a.bin")
@@ -236,33 +236,33 @@ def test_a_journal_failure_stops_and_names_safeclean_recover(
         code, out, err = run(["quarantine", "add", str(path)], context)
 
     assert (code, out) == (3, "")
-    assert err == "safeclean: journal failed: database is locked; run 'safeclean recover'\n"
+    assert err == "kresorter: journal failed: database is locked; run 'kresorter recover'\n"
     assert path.read_bytes() == b"payload"
     assert query(data_dir, "SELECT COUNT(*) FROM operations") == [(0,)]
 
 
 def test_data_directory_inside_a_scan_zone_exits_3(tmp_path: Path, zone: Path) -> None:
-    context = scan_context(tmp_path, zone, zone / "safeclean")
+    context = scan_context(tmp_path, zone, zone / "kresorter")
 
     code, _, err = run(["quarantine", "list"], context)
 
     assert code == 3
     assert "inside scan zone" in err
-    assert not (zone / "safeclean").exists()  # refused before anything is created there
+    assert not (zone / "kresorter").exists()  # refused before anything is created there
 
 
-def test_a_second_safeclean_on_the_same_data_directory_exits_3(
+def test_a_second_kresorter_on_the_same_data_directory_exits_3(
     context: ScanContext, zone: Path, data_dir: Path
 ) -> None:
     write(zone / "a.bin")
     data_dir.mkdir(parents=True)
 
-    with InstanceLock(data_dir / "safeclean.lock"):
+    with InstanceLock(data_dir / "kresorter.lock"):
         code, out, err = run(["quarantine", "add", str(zone / "a.bin")], context)
 
     assert code == 3
     assert out == ""
-    assert "another safeclean" in err
+    assert "another kresorter" in err
     assert (zone / "a.bin").exists()
     assert not (data_dir / "journal.db").exists()  # locked out before the journal is opened
 
@@ -270,7 +270,7 @@ def test_a_second_safeclean_on_the_same_data_directory_exits_3(
 def test_the_lock_is_released_after_each_command(context: ScanContext, data_dir: Path) -> None:
     run(["quarantine", "list"], context)
 
-    with InstanceLock(data_dir / "safeclean.lock"):
+    with InstanceLock(data_dir / "kresorter.lock"):
         pass
 
 

@@ -10,14 +10,14 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.analysis.size_age import (
+from kresorter.analysis.size_age import (
     DAY_NS,
     SizeAgeFinding,
     SizeAgeReason,
     Thresholds,
     find_large_and_old,
 )
-from safeclean.core.models import FileEntry
+from kresorter.core.models import FileEntry
 
 MIB = 1024**2
 NOW = 1_700_000_000_000_000_000

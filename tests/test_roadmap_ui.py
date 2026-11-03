@@ -1,5 +1,5 @@
 """The roadmap records step 7 and its accepted limitations, and the target layout names the
-modules of ``safeclean.ui`` (decision 0014, item 42)."""
+modules of ``kresorter.ui`` (decision 0014, item 42)."""
 
 import re
 from pathlib import Path
@@ -16,8 +16,8 @@ def roadmap() -> str:
 
 
 def modules() -> list[str]:
-    """The modules of ``safeclean.ui``, but its package and its ``__main__``."""
-    found = sorted(path.stem for path in (ROOT / "src" / "safeclean" / "ui").glob("*.py"))
+    """The modules of ``kresorter.ui``, but its package and its ``__main__``."""
+    found = sorted(path.stem for path in (ROOT / "src" / "kresorter" / "ui").glob("*.py"))
     return [name for name in found if not name.startswith("__")]
 
 

@@ -6,8 +6,8 @@
 
 ## Decisions
 
-1. **Commands.** `safeclean quarantine add PATH...`, `list`, `restore ID...`,
-   `purge ID... [--yes]` (module `safeclean.cli_quarantine`). `add` takes files only;
+1. **Commands.** `kresorter quarantine add PATH...`, `list`, `restore ID...`,
+   `purge ID... [--yes]` (module `kresorter.cli_quarantine`). `add` takes files only;
    relative paths are made absolute (not resolved: preflight refuses links itself). A missing
    path is passed on and refused by preflight (`not_found`), like every other refusal.
 2. **Only `purge` needs `--yes`.** `add` and `restore` are reversible. Without `--yes`, `purge`
@@ -30,17 +30,17 @@
    requires the check when it is created, and nothing could have been quarantined there anyway.
 9. **`scan` uses `checker_for_platform()`.** On Linux the report is checked for open files; on
    macOS and Windows the missing check is disclosed, as before.
-10. **`format_size`/`count` live in `safeclean.text`**, shared by both command modules
+10. **`format_size`/`count` live in `kresorter.text`**, shared by both command modules
     (`cli.format_size` stays importable).
 
 ## Addendum (commit 9): single-instance lock
 
-The known limitation above is closed. Two safeclean processes on one data directory (cron,
+The known limitation above is closed. Two kresorter processes on one data directory (cron,
 a double click, a second terminal) would each treat the other's in-flight operation as
 interrupted, and the journal would disagree with the disk.
 
 1. **`storage.lock.InstanceLock`** takes an exclusive, non-blocking OS advisory lock on
-   `<data dir>/safeclean.lock`: `fcntl.flock` on Linux/macOS, `msvcrt.locking` (first byte) on
+   `<data dir>/kresorter.lock`: `fcntl.flock` on Linux/macOS, `msvcrt.locking` (first byte) on
    Windows. The lock belongs to the open file, so the kernel releases it when the holder exits
    or crashes: no stale locks, no pid files, no cleanup.
 2. **The lock file is created 0600 (tightened if loosened) and never deleted** (0001).

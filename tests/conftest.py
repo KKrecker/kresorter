@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from safeclean.core.scanner import ScanContext
+from kresorter.core.scanner import ScanContext
 from support.cli import scan_context
 from support.live import guard
 
@@ -104,8 +104,8 @@ def no_live_system(
 
 @pytest.fixture
 def data_dir(tmp_path: Path) -> Path:
-    """safeclean's data directory, not made: commands make it, after checking where it is."""
-    return tmp_path / "data" / "safeclean"
+    """kresorter's data directory, not made: commands make it, after checking where it is."""
+    return tmp_path / "data" / "kresorter"
 
 
 @pytest.fixture
@@ -133,7 +133,7 @@ def scan(tmp_path: Path, zone: Path, data_dir: Path) -> ScanContext:
 @pytest.fixture
 def without_qt(monkeypatch: pytest.MonkeyPatch) -> None:
     """PySide6 and shiboken6, and every module under them, cannot be imported, nor any module
-    of the window but ``safeclean.ui`` and its launch: imported again, they need Qt (decision
+    of the window but ``kresorter.ui`` and its launch: imported again, they need Qt (decision
     0014, items 1 and 9)."""
     for name in [name for name in sys.modules if name.split(".")[0] in _QT_ROOTS]:
         monkeypatch.setitem(sys.modules, name, None)
@@ -170,9 +170,9 @@ def qt_without_its_library(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _forget_the_window(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every module of the window but ``safeclean.ui`` and its launch is imported again."""
-    window = sys.modules.get("safeclean.ui")
-    for name in [name for name in sys.modules if name.startswith("safeclean.ui.")]:
-        if name != "safeclean.ui.launch":
+    """Every module of the window but ``kresorter.ui`` and its launch is imported again."""
+    window = sys.modules.get("kresorter.ui")
+    for name in [name for name in sys.modules if name.startswith("kresorter.ui.")]:
+        if name != "kresorter.ui.launch":
             monkeypatch.delitem(sys.modules, name)
             monkeypatch.delattr(window, name.rsplit(".", 1)[-1], raising=False)

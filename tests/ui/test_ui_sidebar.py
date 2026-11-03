@@ -12,12 +12,12 @@ from PySide6.QtWidgets import QApplication, QLabel, QListWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
-from safeclean.analysis.score import Level
-from safeclean.llm.settings import MODEL_VARIABLE, URL_VARIABLE
-from safeclean.ui import icons
-from safeclean.ui.sidebar import ICONS, NAV_ROW, WIDTH, nav_style
-from safeclean.ui.theme import DARK, LIGHT, Palette
-from safeclean.ui.window import PAGES, Window
+from kresorter.analysis.score import Level
+from kresorter.llm.settings import MODEL_VARIABLE, URL_VARIABLE
+from kresorter.ui import icons
+from kresorter.ui.sidebar import ICONS, NAV_ROW, WIDTH, nav_style
+from kresorter.ui.theme import DARK, LIGHT, Palette
+from kresorter.ui.window import PAGES, Window
 from support.drawn import drawn_in
 from support.ollama import TAGS, VERSION, ScriptedOllama, as_json
 from support.window import environment, junk_tree, make_window, scanned, wait_idle
@@ -89,7 +89,7 @@ def test_the_sidebar_is_232_px_wide_on_surface_with_a_border_at_its_right(
 
 
 @pytest.mark.parametrize("scheme", ["light", "dark"])
-def test_the_mark_is_the_shield_on_the_accent_and_beside_it_safeclean(
+def test_the_mark_is_the_shield_on_the_accent_and_beside_it_kresorter(
     request: pytest.FixtureRequest, window: Window, scheme: str
 ) -> None:
     # [0014.45]
@@ -107,7 +107,7 @@ def test_the_mark_is_the_shield_on_the_accent_and_beside_it_safeclean(
     assert drawn_in(shown, palette.primary_text, palette.accent)
     brand = window.sidebar.findChild(QLabel, "brand")
     assert brand is not None
-    assert brand.text() == "safeclean"
+    assert brand.text() == "Kresorter"
 
 
 # --- the pages -----------------------------------------------------------------------------------

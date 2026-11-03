@@ -1,9 +1,9 @@
 """Organize's categories in the window's language, their directories by their names on disk
 (decision 0014, item 44). No Qt is needed here."""
 
-from safeclean.organize.categories import default_table
-from safeclean.ui.i18n import LANGUAGES, Translator
-from safeclean.ui.labels import CATEGORIES
+from kresorter.organize.categories import default_table
+from kresorter.ui.i18n import LANGUAGES, Translator
+from kresorter.ui.labels import CATEGORIES
 
 NAMES = default_table().names
 

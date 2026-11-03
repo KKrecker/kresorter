@@ -17,7 +17,7 @@ its checks.
 ## Status
 
 ### Step 1: done
-Scanner core and `safeclean scan` (read-only report).
+Scanner core and `kresorter scan` (read-only report).
 
 ### Step 2: done
 - `storage`: SQLite journal (WAL, foreign keys, `synchronous=FULL`), versioned all-or-nothing
@@ -27,7 +27,7 @@ Scanner core and `safeclean scan` (read-only report).
 - `quarantine`: preflight re-validation, private vault, journal-before-move, atomic batch with a
   rollback that trusts the disk, `recover()`, restore (never overwrites), two-step purge with
   the single deletion point `quarantine/purge.py`.
-- CLI: `safeclean quarantine add / list / restore / purge [--yes]`, exit codes 0/1/2/3.
+- CLI: `kresorter quarantine add / list / restore / purge [--yes]`, exit codes 0/1/2/3.
 - Decisions 0004-0009. 415 tests, 100 % line and branch coverage.
 
 ### Accepted limitations carried into step 3
@@ -54,8 +54,8 @@ Scanner core and `safeclean scan` (read-only report).
   user-facing reasons; large/old never raise a level; only `SAFE`/`LIKELY_SAFE` are proposed.
 - `analysis.report`: one read-only pass that merges all evidence into one finding per file;
   a kept copy is never proposed, even when it is junk; absolute paths everywhere.
-- CLI: `safeclean analyze [paths] [--json] [--large MIB] [--older-than DAYS]` (read-only) and
-  `safeclean quarantine add --from-analysis [paths] --level {safe,likely_safe} [--yes]` (plan
+- CLI: `kresorter analyze [paths] [--json] [--large MIB] [--older-than DAYS]` (read-only) and
+  `kresorter quarantine add --from-analysis [paths] --level {safe,likely_safe} [--yes]` (plan
   without `--yes`, every file re-checked by preflight at move time).
 - Decision 0010 (with the 6b addendum). 512 tests, 100 % line and branch coverage.
 
@@ -76,7 +76,7 @@ Scanner core and `safeclean scan` (read-only report).
   not "unused".
 - **Junk rules are static data** (`core/junk_rules.toml`, 14 rules); no user-defined rules yet.
 - **`REVIEW` is never moved in bulk**; large/old files go to the quarantine only when named by
-  hand (`safeclean quarantine add PATH`).
+  hand (`kresorter quarantine add PATH`).
 
 ### Step 4: done
 - `autostart` readers, one listing per platform (`autostart.listing`): XDG autostart and
@@ -93,8 +93,8 @@ Scanner core and `safeclean scan` (read-only report).
 - `recover()` per domain closes interrupted changes by what is on disk or in the registry,
   never redoing or undoing; unfinished work in either domain blocks both (`storage.pending`),
   and each domain's `recover()` is never blocked.
-- CLI: `safeclean autostart list [--json] [--include-machine]` (read-only, shows `id` and
-  `disableable`), `safeclean autostart recover`, `safeclean autostart disable|enable ID
+- CLI: `kresorter autostart list [--json] [--include-machine]` (read-only, shows `id` and
+  `disableable`), `kresorter autostart recover`, `kresorter autostart disable|enable ID
   [--yes]` (preview without `--yes`), sharing the journal session with the quarantine
   (`cli_journal`); exit codes 0/1/2/3 as in the quarantine.
 - Decision 0011 with its addenda (items 1-109). 1024 tests, 100 % line and branch coverage.
@@ -115,7 +115,7 @@ Scanner core and `safeclean scan` (read-only report).
 - **No compare-and-swap** (items 69, 85): between the last check and the write an entry can
   still change; the compensation is the same as in the quarantine (journal first, state read
   back, `recover()`).
-- **An entry disabled elsewhere cannot be enabled by safeclean** (item 74, `foreign`), and an
+- **An entry disabled elsewhere cannot be enabled by kresorter** (item 74, `foreign`), and an
   entry that exists but cannot be read blocks autostart changes until the user fixes or moves
   it (item 97).
 - **The autostart store is never purged** (item 66): originals, staged copies and removed stubs
@@ -134,7 +134,7 @@ Scanner core and `safeclean scan` (read-only report).
   `storage.journal.insert_row()` and a clock given to each domain (B3), `quarantine.journal`
   and `quarantine.recovery`, which needs no open-file check (B7); tests share helpers in
   `tests/support/` and fixtures in `tests/conftest.py` (B10).
-- `safeclean recover` closes the interrupted work of every domain, `autostart recover` is its
+- `kresorter recover` closes the interrupted work of every domain, `autostart recover` is its
   alias, and `storage.pending.pending_domains` names the domain whose work is left (B4).
 - README: every command, the data directory, recovery and exit codes (A5).
 - Decision 0011, items 110-127. 1063 tests, 100 % line and branch coverage.
@@ -148,9 +148,9 @@ Scanner core and `safeclean scan` (read-only report).
   read-only planner (the folder refused as a whole, every file that stays with its reason), the
   mover (checked again, journal first, rename only, all or nothing), recovery by the file's
   identity, undo as a batch of its own.
-- CLI: `safeclean organize move FOLDER [--yes]`, `organize list`, `organize undo BATCH
+- CLI: `kresorter organize move FOLDER [--yes]`, `organize list`, `organize undo BATCH
   [--yes]`; `move` and `undo` refuse on macOS and Windows, and on Linux when the open-file
-  check is not reliable, before the journal is opened; `safeclean recover` closes organize's
+  check is not reliable, before the journal is opened; `kresorter recover` closes organize's
   batches too, on every system. `ScanContext.platform`, required, is the system a context was
   made for, and the refusal reads it.
 
@@ -164,7 +164,7 @@ Scanner core and `safeclean scan` (read-only report).
   any other.
 
 ### Step 6: done (llm)
-- Decision 0013: optional explanations from a local Ollama of what safeclean has already
+- Decision 0013: optional explanations from a local Ollama of what kresorter has already
   decided, advisory and never acted on; every item cited by a test, the meta-test's pending
   list empty.
 - `llm.settings`: the address, loopback only (`localhost`, `127.0.0.0/8`, `[::1]`), and the
@@ -178,7 +178,7 @@ Scanner core and `safeclean scan` (read-only report).
 - `llm.subjects`: the facts per kind (finding, autostart entry, file that stays), nothing of
   the files; one subject per set of facts. `llm.explain`: at most 20 per run, stopping at the
   first failure, no connection when there is nothing to explain.
-- CLI: `safeclean llm status` (exit 0 or 1) and `--explain` on `analyze`, `autostart list`
+- CLI: `kresorter llm status` (exit 0 or 1) and `--explain` on `analyze`, `autostart list`
   and `organize move` without `--yes`: same stdout and exit code, the explanations after the
   command's own output (text) or in four added keys (JSON), one line on stderr when they are
   missing. Guards: no program launched, one network point, what `llm` imports, no file opened
@@ -191,14 +191,14 @@ Scanner core and `safeclean scan` (read-only report).
 - **Explanations** (decision 0013): English only, and the model can be wrong; nothing is
   cached, so each run asks again; at most 20 subjects per run, one at a time, without
   streaming; `localhost` is `127.0.0.1`, so an Ollama listening only on `::1` needs
-  `SAFECLEAN_OLLAMA_URL=http://[::1]:11434`; anything listening on the port that answers like
+  `KRESORTER_OLLAMA_URL=http://[::1]:11434`; anything listening on the port that answers like
   Ollama is believed to be it (it gets only the facts and its answer is untrusted text); names
   steer the model, never a level, a plan or an action; the default model may be missing, and
-  safeclean never installs it.
+  kresorter never installs it.
 
 ### Before step 7
 - Refactor without behaviour change (B8): `cli.main` takes one `Environment`
-  (`safeclean.environment`: the scan and autostart contexts, the settings environment of `llm`
+  (`kresorter.environment`: the scan and autostart contexts, the settings environment of `llm`
   and its limits) instead of a factory per parameter; `detect_platform` and `default_context`
   live there, so the CLI and the UI make the same contexts.
 
@@ -208,9 +208,9 @@ Scanner core and `safeclean scan` (read-only report).
 - Refactor first, without behaviour change: the journal session in `storage.session`,
   `analysis.run`, `autostart.changers` and `quarantine.journal.quarantined`, which the CLI and
   the window share.
-- The extra `ui` (`PySide6-Essentials`), `safeclean-ui` and `python -m safeclean.ui`
+- The extra `ui` (`PySide6-Essentials`), `kresorter-ui` and `python -m kresorter.ui`
   (`ui.launch`); without PySide6 one line and exit 3. The core still depends on nothing and no
-  module outside `safeclean.ui` imports Qt; the window imports only `QtCore`, `QtGui` and
+  module outside `kresorter.ui` imports Qt; the window imports only `QtCore`, `QtGui` and
   `QtWidgets`, no CLI module, and reaches the network only through `llm`.
 - `ui.i18n`, `ui.texts`, `ui.labels`: English and Russian, counts in each language's forms, a
   label for every value shown. `ui.theme`: the tokens, their contrast, light and dark as the
@@ -272,7 +272,7 @@ Scanner core and `safeclean scan` (read-only report).
 ## Target package layout
 
 ```
-src/safeclean/
+src/kresorter/
 ├── core/         # step 1: models, policy, walker, hashing, heuristics, open_files, scanner
 ├── quarantine/   # step 2: move with metadata, restore, purge, recovery
 ├── storage/      # step 2: SQLite journal, data directory, lock, unfinished work by domain

@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.autostart.entries import MAX_ENTRY_BYTES
-from safeclean.autostart.models import (
+from kresorter.autostart.entries import MAX_ENTRY_BYTES
+from kresorter.autostart.models import (
     AutostartItem,
     AutostartListing,
     AutostartSkipped,
@@ -21,7 +21,7 @@ from safeclean.autostart.models import (
     Source,
     entry_digest,
 )
-from safeclean.autostart.systemd import read_systemd_user, systemd_user_dir
+from kresorter.autostart.systemd import read_systemd_user, systemd_user_dir
 
 SYNC = "[Unit]\nDescription=Sync\n\n[Service]\nExecStart=/usr/bin/sync --serve\n"
 

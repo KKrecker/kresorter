@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.analysis.score import Level
-from safeclean.ui.theme import (
+from kresorter.analysis.score import Level
+from kresorter.ui.theme import (
     DARK,
     LIGHT,
     Badge,

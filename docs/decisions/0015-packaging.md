@@ -16,11 +16,11 @@ command that prints it (A4); a changelog that is the log of the development (A6)
 tools with lower bounds only (B5); nothing built or published (B6). The window has never
 opened on Windows or macOS, where a GUI script has no standard error (B1).
 
-What safeclean is decides what can be shipped:
+What kresorter is decides what can be shipped:
 
 - The core is pure Python with no dependency (0001 item 5) and the window is the extra `ui`
   (`PySide6-Essentials`, LGPLv3; 0014 item 8). One wheel, `py3-none-any`, and an sdist serve
-  every system with Python 3.11 to 3.14; `pipx install "safeclean[ui]"` installs both commands
+  every system with Python 3.11 to 3.14; `pipx install "kresorter[ui]"` installs both commands
   in a virtual environment of their own, and pip installs Qt from its own wheels, with its
   own licences.
 - The quarantine and organize act only where the open-file check can be trusted (0005, 0012):
@@ -52,22 +52,22 @@ tests that build an artifact build it once per run, offline, into a temporary fo
 
 ## The version
 
-2. **Written once.** `safeclean.__version__` is the version; `pyproject.toml` has
-   `dynamic = ["version"]`, reads it from `src/safeclean/__init__.py` and has no version of
+2. **Written once.** `kresorter.__version__` is the version; `pyproject.toml` has
+   `dynamic = ["version"]`, reads it from `src/kresorter/__init__.py` and has no version of
    its own. The first release is `0.1.0`.
-3. **`safeclean --version`** (and `python -m safeclean --version`) prints `safeclean 0.1.0` on
+3. **`kresorter --version`** (and `python -m kresorter --version`) prints `kresorter 0.1.0` on
    stdout and exits with 0; it reads no setting, opens no journal and creates no data
    directory.
-4. **The window names it**: the Settings page shows `safeclean 0.1.0` under the data folder,
+4. **The window names it**: the Settings page shows `kresorter 0.1.0` under the data folder,
    in both languages.
 
 ## Licences and metadata
 
 5. **The licence is in the repository and in every artifact.** `LICENSE` at the root is the
    MIT licence with "Copyright (c) 2026 KKrecker"; `pyproject.toml` declares
-   `license = "MIT"` and `license-files = ["LICENSE", "src/safeclean/ui/icons/LICENSE"]`
+   `license = "MIT"` and `license-files = ["LICENSE", "src/kresorter/ui/icons/LICENSE"]`
    (PEP 639). The wheel's `.dist-info/licenses/` and the sdist have both files, and the
-   README's License section names both: MIT for safeclean, ISC for Lucide's icons.
+   README's License section names both: MIT for kresorter, ISC for Lucide's icons.
 6. **Nothing of Qt is shipped**: neither artifact has a file of PySide6, shiboken6 or Qt.
 7. **Metadata**: `authors` (the holder of item 5, with no e-mail address), `project.urls` (Homepage, Source, Issues,
    Changelog), `keywords`, and the classifiers Development Status :: 3 - Alpha, Environment ::
@@ -79,21 +79,21 @@ tests that build an artifact build it once per run, offline, into a temporary fo
 
 ## The artifacts
 
-8. **One wheel for every system**, `safeclean-0.1.0-py3-none-any.whl`: the package's modules,
+8. **One wheel for every system**, `kresorter-0.1.0-py3-none-any.whl`: the package's modules,
    `py.typed`, the icons and their licence, and no test, document or other file; its entry
    points are those of 0014 item 8.
 9. **The sdist makes the same wheel**: it has `src`, `tests`, `docs`, `README.md`,
    `CHANGELOG.md`, `LICENSE`, `pyproject.toml` and the `PKG-INFO` it is given, and nothing
    else; the wheel built from it has the same files as the wheel built from the repository.
 10. **Installed from the wheel, offline**: in a new virtual environment,
-   `pip install --no-index` of the wheel installs nothing else; `safeclean --version`,
-   `safeclean scan --json` on a made-up tree and `safeclean-ui` without PySide6 (one line,
+   `pip install --no-index` of the wheel installs nothing else; `kresorter --version`,
+   `kresorter scan --json` on a made-up tree and `kresorter-ui` without PySide6 (one line,
    exit 3) behave as from the source tree.
 11. **Uninstalling keeps the user's data**: `pip uninstall` removes every file the wheel
     installed and nothing of the data directory, where the journal, the vault with the
     quarantined files, the autostart store and `settings.json` stay. The README's
     "Uninstalling" says so, names the data directory, says that quarantined files are still in
-    it (`safeclean quarantine list`; restore or purge them first) and that removing the
+    it (`kresorter quarantine list`; restore or purge them first) and that removing the
     folder is the user's own step.
 
 ## The changelog
@@ -119,8 +119,8 @@ tests that build an artifact build it once per run, offline, into a temporary fo
 15. **The artifacts are built once**, in a job after the checks: the sdist, then the wheel
     from the sdist, items 8 to 10 checked on them, both kept as the run's artifacts.
 16. **The installed wheel runs on each system**: a job per system installs the artifact of
-    item 15 in a new virtual environment with the extra `ui`, runs `safeclean --version` and
-    `safeclean scan` on a made-up tree, and opens the window offscreen, shows each page and
+    item 15 in a new virtual environment with the extra `ui`, runs `kresorter --version` and
+    `kresorter scan` on a made-up tree, and opens the window offscreen, shows each page and
     closes it, exit 0.
 17. **A tag publishes, nothing else.** A tag `vX.Y.Z` publishes the artifacts of item 15 to
     PyPI by trusted publishing (OpenID Connect, the environment `pypi`): no token in the
@@ -129,7 +129,7 @@ tests that build an artifact build it once per run, offline, into a temporary fo
 
 ## Windows: a GUI script has no console (B1)
 
-18. **The line becomes a message box.** On Windows, when `safeclean-ui` has no standard error
+18. **The line becomes a message box.** On Windows, when `kresorter-ui` has no standard error
     and cannot open the window (0014 item 9), its line is shown in a system message box
     (`MessageBoxW` through `ctypes`, which needs no Qt). Elsewhere nothing is shown.
 19. **An uncaught error is a dialog.** An exception that reaches Qt's event loop is shown in a
@@ -155,7 +155,7 @@ tests that build an artifact build it once per run, offline, into a temporary fo
     on a screen, a scan, each page, the refusals of the quarantine and organize on macOS and
     Windows); the job of item 17 fails without it.
 23. **The README installs with pipx**: its first install commands are
-    `pipx install safeclean` and `pipx install "safeclean[ui]"`, then pip in a virtual
+    `pipx install kresorter` and `pipx install "kresorter[ui]"`, then pip in a virtual
     environment; it says where the quarantine and organize refuse.
 24. **The roadmap records step 8**: a section `Step 8: done (packaging)` and what it carries
     after it.

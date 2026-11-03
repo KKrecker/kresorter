@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from safeclean.storage.db import connect
+from kresorter.storage.db import connect
 
 Row = tuple[object, ...]
 

@@ -8,20 +8,20 @@ import pytest
 from PySide6.QtCore import Qt
 from pytestqt.qtbot import QtBot
 
-from safeclean.autostart.changes import XdgChanges
-from safeclean.autostart.journal import ChangeRecovery
-from safeclean.core.scanner import ScanContext
-from safeclean.organize import recovery as organize_recovery
-from safeclean.organize.journal import BatchKind, BatchState
-from safeclean.organize.recovery import RecoveredBatch
-from safeclean.quarantine.recovery import RecoveryReport
-from safeclean.storage.lock import InstanceLock
-from safeclean.storage.pending import Domain
-from safeclean.ui.dialogs import Confirmation
-from safeclean.ui.i18n import Language, Translator
-from safeclean.ui.recovery import autostart_lines, organize_lines, quarantine_lines
-from safeclean.ui.sessions import Unclosed
-from safeclean.ui.window import Window
+from kresorter.autostart.changes import XdgChanges
+from kresorter.autostart.journal import ChangeRecovery
+from kresorter.core.scanner import ScanContext
+from kresorter.organize import recovery as organize_recovery
+from kresorter.organize.journal import BatchKind, BatchState
+from kresorter.organize.recovery import RecoveredBatch
+from kresorter.quarantine.recovery import RecoveryReport
+from kresorter.storage.lock import InstanceLock
+from kresorter.storage.pending import Domain
+from kresorter.ui.dialogs import Confirmation
+from kresorter.ui.i18n import Language, Translator
+from kresorter.ui.recovery import autostart_lines, organize_lines, quarantine_lines
+from kresorter.ui.sessions import Unclosed
+from kresorter.ui.window import Window
 from support.cli import autostart_context, run
 from support.files import write
 from support.interrupted import (
@@ -205,7 +205,7 @@ def test_recover_asks_first_and_a_cancel_recovers_nothing(
     assert _banner(window) == ["Unfinished work: Quarantine, Organize."]
 
 
-def test_recover_closes_every_domain_as_safeclean_recover_does(
+def test_recover_closes_every_domain_as_kresorter_recover_does(
     qtbot: QtBot,
     tmp_path: Path,
     zone: Path,
@@ -214,7 +214,7 @@ def test_recover_closes_every_domain_as_safeclean_recover_does(
     scan: ScanContext,
 ) -> None:
     # [0014.13] [0014.25] The quarantine first, then organize, then autostart; after it,
-    # `safeclean recover` finds nothing.
+    # `kresorter recover` finds nothing.
     quarantined(scan, zone)
     interrupted_xdg_disable(tmp_path, data_dir)
     left_pending(data_dir)
@@ -332,13 +332,13 @@ def test_nothing_to_recover(
 def test_a_recovery_that_cannot_run_says_why(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs
 ) -> None:
-    # [0014.25] Another safeclean holds the lock: Recover is still offered.
+    # [0014.25] Another kresorter holds the lock: Recover is still offered.
     pending_quarantine(data_dir)
     window = _window(qtbot, tmp_path, zone, data_dir, dialogs)
-    with InstanceLock(data_dir / "safeclean.lock"):
+    with InstanceLock(data_dir / "kresorter.lock"):
         _recover(qtbot, window)
     assert _banner(window) == [
-        f"safeclean is busy elsewhere: another safeclean is using {data_dir}; try again later",
+        f"kresorter is busy elsewhere: another kresorter is using {data_dir}; try again later",
         "Unfinished work: Quarantine.",
     ]
     assert query(data_dir, "SELECT state FROM operations") == [("pending",)]
@@ -465,7 +465,7 @@ def test_a_restore_refuses_while_another_domain_s_work_is_unfinished(
 
 
 def test_what_each_domain_s_recovery_closed_in_the_window_s_words(tmp_path: Path) -> None:
-    # [0014.25] As `safeclean recover` reports it.
+    # [0014.25] As `kresorter recover` reports it.
     en = Translator("en")
     paths = (tmp_path / "a", tmp_path / "b")
     found = RecoveryReport(quarantined=paths[:1], lost=paths[1:], warnings=("lost: b",))

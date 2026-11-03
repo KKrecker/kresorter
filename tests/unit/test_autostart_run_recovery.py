@@ -16,19 +16,19 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeRegistry, RegistryKeys
-from safeclean.autostart import run_changes
-from safeclean.autostart.journal import (
+from kresorter.autostart import run_changes
+from kresorter.autostart.journal import (
     Change,
     ChangeRecovery,
     ChangeState,
     finish_change,
     insert_change,
 )
-from safeclean.autostart.models import Source
-from safeclean.autostart.registry import Hive, RegistryError, RegValue, ValueKind
-from safeclean.autostart.run_keys import APPROVED, RUN, read_run_keys
-from safeclean.storage.db import connect
-from safeclean.storage.transactions import transaction
+from kresorter.autostart.models import Source
+from kresorter.autostart.registry import Hive, RegistryError, RegValue, ValueKind
+from kresorter.autostart.run_keys import APPROVED, RUN, read_run_keys
+from kresorter.storage.db import connect
+from kresorter.storage.transactions import transaction
 
 DISABLE = b"\x03\x00\x00\x00" + (133_444_736_000_000_000).to_bytes(8, "little")
 ENABLE = b"\x02" + bytes(11)

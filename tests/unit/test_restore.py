@@ -14,13 +14,13 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean.core.heuristics import JunkClassifier
-from safeclean.core.models import FileEntry
-from safeclean.core.policy import PathPolicy
-from safeclean.core.preflight import Candidate
-from safeclean.quarantine.journal import OperationState
-from safeclean.quarantine.service import QuarantineError, QuarantineService, RestoreRefusal
-from safeclean.storage.db import connect
+from kresorter.core.heuristics import JunkClassifier
+from kresorter.core.models import FileEntry
+from kresorter.core.policy import PathPolicy
+from kresorter.core.preflight import Candidate
+from kresorter.quarantine.journal import OperationState
+from kresorter.quarantine.service import QuarantineError, QuarantineService, RestoreRefusal
+from kresorter.storage.db import connect
 from support.files import write
 from support.journal import rows
 

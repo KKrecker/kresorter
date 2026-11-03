@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 
 from fakes import BrokenOpenFiles, FakeOpenFiles, make_policy
-from safeclean.core.hashing import hash_file
-from safeclean.core.models import FileEntry
-from safeclean.core.open_files import NoOpenFileCheck
-from safeclean.core.policy import BlockReason, PathPolicy
-from safeclean.core.preflight import (
+from kresorter.core.hashing import hash_file
+from kresorter.core.models import FileEntry
+from kresorter.core.open_files import NoOpenFileCheck
+from kresorter.core.policy import BlockReason, PathPolicy
+from kresorter.core.preflight import (
     Candidate,
     Cleared,
     Preflight,

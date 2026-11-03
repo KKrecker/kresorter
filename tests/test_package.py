@@ -1,13 +1,13 @@
 import tomllib
 from pathlib import Path
 
-import safeclean
+import kresorter
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_version_is_exposed() -> None:
-    assert safeclean.__version__ == "0.0.1"
+    assert kresorter.__version__ == "0.0.1"
 
 
 def test_a_warning_fails_the_tests() -> None:

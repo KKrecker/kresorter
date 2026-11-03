@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.organize.journal import BatchState
-from safeclean.organize.mover import carry_out
-from safeclean.organize.recovery import RecoveredBatch, RecoveryReport, recover
-from safeclean.storage.db import connect
+from kresorter.organize.journal import BatchState
+from kresorter.organize.mover import carry_out
+from kresorter.organize.recovery import RecoveredBatch, RecoveryReport, recover
+from kresorter.storage.db import connect
 from support.files import write
 from support.moves import (
     MOVED,

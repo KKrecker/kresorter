@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.storage.db import StorageError, connect, transaction
-from safeclean.storage.migrations import MIGRATIONS, SCHEMA_VERSION, migrate
+from kresorter.storage.db import StorageError, connect, transaction
+from kresorter.storage.migrations import MIGRATIONS, SCHEMA_VERSION, migrate
 
 
 @pytest.fixture

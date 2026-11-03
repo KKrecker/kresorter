@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.core.scanner import ScanContext
-from safeclean.storage.lock import InstanceLock
-from safeclean.storage.session import (
+from kresorter.core.scanner import ScanContext
+from kresorter.storage.lock import InstanceLock
+from kresorter.storage.session import (
     JOURNAL_NAME,
     LOCK_NAME,
     SessionFailed,
@@ -62,13 +62,13 @@ def test_a_data_directory_in_a_scan_zone_is_refused_before_anything_is_made(
     tmp_path: Path, zone: Path
 ) -> None:
     # [0014.11]
-    inside = scan_context(tmp_path, zone, zone / "safeclean")
+    inside = scan_context(tmp_path, zone, zone / "kresorter")
 
     failed = run_session(inside, never)
 
     assert isinstance(failed, SessionFailed)
     assert failed.failure is SessionFailure.DATA_DIR
-    assert failed.detail == f"data directory {zone / 'safeclean'} is inside scan zone {zone}"
+    assert failed.detail == f"data directory {zone / 'kresorter'} is inside scan zone {zone}"
     assert list(zone.iterdir()) == []
 
 

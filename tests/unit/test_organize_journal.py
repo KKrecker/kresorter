@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.organize.journal import (
+from kresorter.organize.journal import (
     BatchState,
     Held,
     Identity,
@@ -29,7 +29,7 @@ from safeclean.organize.journal import (
     set_move,
     settle,
 )
-from safeclean.storage.db import connect
+from kresorter.storage.db import connect
 from support.files import write
 
 FILE = b"the file"

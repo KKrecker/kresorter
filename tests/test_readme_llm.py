@@ -1,7 +1,7 @@
 """The README's section on AI explanations (decision 0013, item 16).
 
-The section says that Ollama and the model are installed by the user, never by safeclean,
-shows the steps and both settings as ``safeclean llm status`` prints them, run here against a
+The section says that Ollama and the model are installed by the user, never by kresorter,
+shows the steps and both settings as ``kresorter llm status`` prints them, run here against a
 port nothing listens on, and lists what is sent for each kind of subject (item 17) and that
 nothing else is. The section is read as Markdown: up to the next heading of its level or above,
 a ``#`` inside a code block being no heading.
@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from safeclean import cli
-from safeclean.cli_llm import AGAIN, INSTALL, PULL, SETTINGS
-from safeclean.environment import Environment
-from safeclean.llm.settings import DEFAULT_ADDRESS, DEFAULT_MODEL, MODEL_VARIABLE, URL_VARIABLE
+from kresorter import cli
+from kresorter.cli_llm import AGAIN, INSTALL, PULL, SETTINGS
+from kresorter.environment import Environment
+from kresorter.llm.settings import DEFAULT_ADDRESS, DEFAULT_MODEL, MODEL_VARIABLE, URL_VARIABLE
 from support.markdown import blocks, headings, section
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,7 +75,7 @@ def readme() -> list[str]:
 
 
 def status_when_nothing_answers() -> list[str]:
-    """What ``safeclean llm status`` prints when nothing listens at the address."""
+    """What ``kresorter llm status`` prints when nothing listens at the address."""
     with socket.create_server(("127.0.0.1", 0)) as taken:
         url = f"http://127.0.0.1:{taken.getsockname()[1]}"
     out, err = io.StringIO(), io.StringIO()
@@ -93,7 +93,7 @@ MADE_UP = """# Title
 ## Usage
 ```bash
 # a comment, not a heading
-safeclean scan
+kresorter scan
 ```
 ### AI explanations (optional)
 - `one`: `a`,
@@ -120,7 +120,7 @@ def test_a_section_ends_at_a_heading_of_its_level_or_above() -> None:
     ]
     usage = section(MADE_UP, "Usage")
     assert (usage[0], usage[-1], len(usage)) == ("```bash", "```", 14)
-    assert blocks(usage, "bash") == [["# a comment, not a heading", "safeclean scan"]]
+    assert blocks(usage, "bash") == [["# a comment, not a heading", "kresorter scan"]]
     assert blocks(usage, "text") == [["## Not a heading"]]
     assert prose(usage) == (
         "### AI explanations (optional) - `one`: `a`, `b` - nested, `c` - `two`, ```d``` "
@@ -142,11 +142,11 @@ def test_a_title_must_be_a_heading_exactly_once(text: str) -> None:
 # --- the README ------------------------------------------------------------------------------
 
 
-def test_ollama_and_the_model_are_installed_by_the_user_never_by_safeclean() -> None:
+def test_ollama_and_the_model_are_installed_by_the_user_never_by_kresorter() -> None:
     # [0013.16]
     text = prose(readme())
-    assert "Ollama and the model are installed by you, never by safeclean" in text
-    assert "safeclean launches no program" in text
+    assert "Ollama and the model are installed by you, never by kresorter" in text
+    assert "kresorter launches no program" in text
 
 
 def test_the_steps_and_the_settings_are_those_llm_status_prints() -> None:
@@ -197,7 +197,7 @@ def test_the_commands_that_explain() -> None:
     # [0013.16] Never with --yes; a comment is not part of a command.
     commands = [line.split("#")[0].strip() for block in blocks(readme(), "bash") for line in block]
     for command in EXPLAINED:
-        given = [line for line in commands if line.startswith(f"safeclean {command} ")]
+        given = [line for line in commands if line.startswith(f"kresorter {command} ")]
         assert any(line.endswith(" --explain") for line in given), command
     assert [line for line in commands if "--explain" in line and "--yes" in line] == []
-    assert "safeclean llm status" in commands
+    assert "kresorter llm status" in commands

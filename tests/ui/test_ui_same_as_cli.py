@@ -11,13 +11,13 @@ from PySide6.QtWidgets import QTreeWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeRegistry
-from safeclean.analysis.score import Level
-from safeclean.autostart.models import Scope, Source
-from safeclean.autostart.registry import Hive, RegValue, ValueKind
-from safeclean.autostart.run_keys import RUN
-from safeclean.organize.planner import StayReason
-from safeclean.ui.i18n import Translator
-from safeclean.ui.window import Window
+from kresorter.analysis.score import Level
+from kresorter.autostart.models import Scope, Source
+from kresorter.autostart.registry import Hive, RegValue, ValueKind
+from kresorter.autostart.run_keys import RUN
+from kresorter.organize.planner import StayReason
+from kresorter.ui.i18n import Translator
+from kresorter.ui.window import Window
 from support.cli import autostart_context, run, scan_context
 from support.files import write
 from support.interrupted import APP

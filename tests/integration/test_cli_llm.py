@@ -1,4 +1,4 @@
-"""``safeclean llm status`` and ``--explain``, end to end (decision 0013).
+"""``kresorter llm status`` and ``--explain``, end to end (decision 0013).
 
 Ollama is the scripted server of ``support.ollama``, on loopback; a script is in the order of
 the requests: ``version``, ``tags``, then one ``generate`` per subject. The commands run on real
@@ -21,14 +21,14 @@ from typing import Any, TypeVar
 import pytest
 
 from fakes import FakeRegistry
-from safeclean import cli
-from safeclean.autostart.listing import AutostartContext
-from safeclean.autostart.registry import Hive, RegValue, ValueKind
-from safeclean.autostart.run_keys import RUN, RUN_ONCE
-from safeclean.core.scanner import ScanContext
-from safeclean.environment import Environment
-from safeclean.llm.settings import Address
-from safeclean.llm.transport import LIMITS, Limits
+from kresorter import cli
+from kresorter.autostart.listing import AutostartContext
+from kresorter.autostart.registry import Hive, RegValue, ValueKind
+from kresorter.autostart.run_keys import RUN, RUN_ONCE
+from kresorter.core.scanner import ScanContext
+from kresorter.environment import Environment
+from kresorter.llm.settings import Address
+from kresorter.llm.transport import LIMITS, Limits
 from support.cli import autostart_context, scan_context
 from support.files import snapshot, write
 from support.journal import query
@@ -48,14 +48,14 @@ HEADER = (
 )
 UNAVAILABLE = re.compile(
     r"AI explanations unavailable: (?P<reason>[a-z_]+) \((?P<detail>.+)\);"
-    r" 'safeclean llm status' shows how to set them up\n"
+    r" 'kresorter llm status' shows how to set them up\n"
 )
 
 Outcome = tuple[int, str, str]
 T = TypeVar("T")
 
 
-def safeclean(
+def kresorter(
     args: list[str],
     scan: ScanContext | None = None,
     *,
@@ -63,7 +63,7 @@ def safeclean(
     auto: AutostartContext | None = None,
     limits: Limits = LIMITS,
 ) -> Outcome:
-    """``safeclean <args>`` with the settings in ``env``: exit code, stdout, stderr."""
+    """``kresorter <args>`` with the settings in ``env``: exit code, stdout, stderr."""
     out, err = io.StringIO(), io.StringIO()
     code = cli.main(
         args,
@@ -89,7 +89,7 @@ def given(context: T | None) -> Callable[[], T]:
 
 
 def env_for(address: Address, **more: str) -> dict[str, str]:
-    return {"SAFECLEAN_OLLAMA_URL": address.url, **more}
+    return {"KRESORTER_OLLAMA_URL": address.url, **more}
 
 
 def free_address() -> Address:
@@ -166,7 +166,7 @@ class Case:
     labels: list[str]
 
     def run(self, *more: str, env: Mapping[str, str] | None = None, **options: Any) -> Outcome:
-        return safeclean([*self.args, *more], self.scan, env=env, auto=self.auto, **options)
+        return kresorter([*self.args, *more], self.scan, env=env, auto=self.auto, **options)
 
 
 def make_case(name: str, tmp_path: Path, zone: Path, scan: ScanContext) -> Case:
@@ -205,15 +205,15 @@ def texts_for(case: Case) -> list[str]:
 # --- llm status ----------------------------------------------------------------------------------
 
 SETTINGS = (
-    "Settings: SAFECLEAN_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
-    "  SAFECLEAN_OLLAMA_MODEL (default llama3.2)\n"
+    "Settings: KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
+    "  KRESORTER_OLLAMA_MODEL (default llama3.2)\n"
 )
 UNAVAILABLE_SETUP = (
-    "AI explanations: unavailable; safeclean works as usual without them\n"
-    "To set them up (safeclean installs nothing itself):\n"
+    "AI explanations: unavailable; kresorter works as usual without them\n"
+    "To set them up (kresorter installs nothing itself):\n"
 )
 INSTALL = "Install Ollama from https://ollama.com/download and start it"
-AGAIN = "Check again: safeclean llm status"
+AGAIN = "Check again: kresorter llm status"
 
 
 def setup(*steps: str) -> str:
@@ -224,7 +224,7 @@ def setup(*steps: str) -> str:
 def test_status_when_everything_is_in_place() -> None:
     # [0013.15]
     with ScriptedOllama(VERSION, TAGS) as ollama:
-        code, out, err = safeclean(["llm", "status"], env=env_for(ollama.address))
+        code, out, err = kresorter(["llm", "status"], env=env_for(ollama.address))
     assert (code, err) == (0, "")
     assert out == (
         f"Ollama: running at {ollama.address.url} (version 0.6.2)\n"
@@ -237,8 +237,8 @@ def test_status_when_everything_is_in_place() -> None:
 def test_status_names_the_model_of_the_setting() -> None:
     # [0013.15]
     with ScriptedOllama(VERSION, TAGS) as ollama:
-        env = env_for(ollama.address, SAFECLEAN_OLLAMA_MODEL="qwen2.5:7b")
-        code, out, _ = safeclean(["llm", "status"], env=env)
+        env = env_for(ollama.address, KRESORTER_OLLAMA_MODEL="qwen2.5:7b")
+        code, out, _ = kresorter(["llm", "status"], env=env)
     assert code == 0
     assert out.splitlines()[1] == "Model: qwen2.5:7b: installed"
 
@@ -246,26 +246,26 @@ def test_status_names_the_model_of_the_setting() -> None:
 def test_status_when_ollama_is_not_reached() -> None:
     # [0013.15] Every step, numbered from 1.
     address = free_address()
-    code, out, err = safeclean(["llm", "status"], env=env_for(address))
+    code, out, err = kresorter(["llm", "status"], env=env_for(address))
     first, rest = out.split("\n", 1)
     assert (code, err) == (1, "")
     assert re.fullmatch(rf"Ollama: not reachable at {re.escape(address.url)} \(.+\)", first)
     assert rest == (
         "Model: llama3.2: not checked\n"
-        "AI explanations: unavailable; safeclean works as usual without them\n"
-        "To set them up (safeclean installs nothing itself):\n"
+        "AI explanations: unavailable; kresorter works as usual without them\n"
+        "To set them up (kresorter installs nothing itself):\n"
         "  1. Install Ollama from https://ollama.com/download and start it\n"
         "  2. Download the model: ollama pull llama3.2\n"
-        "  3. Check again: safeclean llm status\n"
-        "Settings: SAFECLEAN_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
-        "  SAFECLEAN_OLLAMA_MODEL (default llama3.2)\n"
+        "  3. Check again: kresorter llm status\n"
+        "Settings: KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
+        "  KRESORTER_OLLAMA_MODEL (default llama3.2)\n"
     )
 
 
 def test_status_when_ollama_does_not_answer_in_time() -> None:
     # [0013.15]
     with ScriptedOllama(LATE_VERSION) as ollama:
-        code, out, _ = safeclean(["llm", "status"], env=env_for(ollama.address), limits=QUICK)
+        code, out, _ = kresorter(["llm", "status"], env=env_for(ollama.address), limits=QUICK)
     assert code == 1
     assert out == (
         f"Ollama: not reachable at {ollama.address.url} (no whole answer before the deadline)\n"
@@ -284,7 +284,7 @@ def test_status_when_ollama_does_not_answer_in_time() -> None:
 def test_status_of_something_else(script: list[Answer], detail: str) -> None:
     # [0013.15]
     with ScriptedOllama(*script) as ollama:
-        code, out, _ = safeclean(["llm", "status"], env=env_for(ollama.address))
+        code, out, _ = kresorter(["llm", "status"], env=env_for(ollama.address))
     assert code == 1
     assert out == (
         f"Ollama: {ollama.address.url} does not answer as Ollama ({detail})\n"
@@ -295,42 +295,42 @@ def test_status_of_something_else(script: list[Answer], detail: str) -> None:
 def test_status_when_the_model_is_missing() -> None:
     # [0013.15] Ollama runs: no step to install it, the others numbered from 1.
     with ScriptedOllama(VERSION, NO_MODELS) as ollama:
-        code, out, _ = safeclean(["llm", "status"], env=env_for(ollama.address))
+        code, out, _ = kresorter(["llm", "status"], env=env_for(ollama.address))
     assert code == 1
     assert out == (
         f"Ollama: running at {ollama.address.url} (version 0.6.2)\n"
         "Model: llama3.2: not installed\n"
-        "AI explanations: unavailable; safeclean works as usual without them\n"
-        "To set them up (safeclean installs nothing itself):\n"
+        "AI explanations: unavailable; kresorter works as usual without them\n"
+        "To set them up (kresorter installs nothing itself):\n"
         "  1. Download the model: ollama pull llama3.2\n"
-        "  2. Check again: safeclean llm status\n"
-        "Settings: SAFECLEAN_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
-        "  SAFECLEAN_OLLAMA_MODEL (default llama3.2)\n"
+        "  2. Check again: kresorter llm status\n"
+        "Settings: KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
+        "  KRESORTER_OLLAMA_MODEL (default llama3.2)\n"
     )
 
 
 URL_REFUSED = (
-    "refused setting SAFECLEAN_OLLAMA_URL='https://example.com'"
+    "refused setting KRESORTER_OLLAMA_URL='https://example.com'"
     " (not http://HOST[:PORT] with a loopback HOST)"
 )
-MODEL_REFUSED = "refused setting SAFECLEAN_OLLAMA_MODEL='?' (not a model name)"
+MODEL_REFUSED = "refused setting KRESORTER_OLLAMA_MODEL='?' (not a model name)"
 
 
 @pytest.mark.parametrize(
     ("env", "lines", "steps"),
     [
         (
-            {"SAFECLEAN_OLLAMA_URL": "https://example.com", "SAFECLEAN_OLLAMA_MODEL": "qwen2.5:7b"},
+            {"KRESORTER_OLLAMA_URL": "https://example.com", "KRESORTER_OLLAMA_MODEL": "qwen2.5:7b"},
             [f"Ollama: {URL_REFUSED}", "Model: qwen2.5:7b: not checked"],
             ["Download the model: ollama pull qwen2.5:7b", AGAIN],
         ),
         (
-            {"SAFECLEAN_OLLAMA_URL": "http://127.0.0.1:9", "SAFECLEAN_OLLAMA_MODEL": "?"},
+            {"KRESORTER_OLLAMA_URL": "http://127.0.0.1:9", "KRESORTER_OLLAMA_MODEL": "?"},
             ["Ollama: not checked", f"Model: {MODEL_REFUSED}"],
             [AGAIN],
         ),
         (
-            {"SAFECLEAN_OLLAMA_URL": "https://example.com", "SAFECLEAN_OLLAMA_MODEL": "?"},
+            {"KRESORTER_OLLAMA_URL": "https://example.com", "KRESORTER_OLLAMA_MODEL": "?"},
             [f"Ollama: {URL_REFUSED}", f"Model: {MODEL_REFUSED}"],
             [AGAIN],
         ),
@@ -342,7 +342,7 @@ def test_status_with_a_refused_setting(
 ) -> None:
     # [0013.15] Nothing is contacted.
     connected = spy_on_connect(monkeypatch)
-    code, out, _ = safeclean(["llm", "status"], env=env)
+    code, out, _ = kresorter(["llm", "status"], env=env)
     assert (code, connected) == (1, [])
     assert out == "".join(f"{line}\n" for line in lines) + setup(*steps)
 
@@ -369,9 +369,9 @@ def test_without_explain_nothing_is_contacted(
             ["organize", "list"],
             ["quarantine", "list"],
         ):
-            assert safeclean(args, scan, env=env)[0] in (0, 1)
+            assert kresorter(args, scan, env=env)[0] in (0, 1)
         for args in (["autostart", "list"], ["autostart", "list", "--json"], ["recover"]):
-            assert safeclean(args, scan, env=env, auto=auto)[0] == 0
+            assert kresorter(args, scan, env=env, auto=auto)[0] == 0
     assert (ollama.connections, connected) == (0, [])
 
 
@@ -423,7 +423,7 @@ def test_other_commands_have_no_explain(
 ) -> None:
     # [0013.3] [0013.25]
     with pytest.raises(SystemExit) as raised:
-        safeclean([*args, "--explain"], scan)
+        kresorter([*args, "--explain"], scan)
     assert raised.value.code == 2
     assert "unrecognized arguments: --explain" in capsys.readouterr().err
 
@@ -466,7 +466,7 @@ def test_explain_sends_nothing_of_the_files(tmp_path: Path, zone: Path, scan: Sc
     ]
     for args, listing, subjects in runs:
         with ScriptedOllama(VERSION, TAGS, answer("Explained.")) as ollama:
-            explained = safeclean(
+            explained = kresorter(
                 [*args, "--explain"], scan, env=env_for(ollama.address), auto=listing
             )
         assert HEADER in explained[1]
@@ -486,7 +486,7 @@ def test_without_ollama_nothing_changes(case: Case, reason: str) -> None:
     details = {
         "model_missing": "'llama3.2' is not among the 0 models listed",
         "timeout": "no whole answer before the deadline",
-        "config": "SAFECLEAN_OLLAMA_URL='http://192.0.2.1:11434': not a loopback address",
+        "config": "KRESORTER_OLLAMA_URL='http://192.0.2.1:11434': not a loopback address",
     }
     script = [VERSION, NO_MODELS] if reason == "model_missing" else [LATE_VERSION]
     with ScriptedOllama(*script) as ollama:
@@ -494,7 +494,7 @@ def test_without_ollama_nothing_changes(case: Case, reason: str) -> None:
             "unreachable": env_for(free_address()),
             "model_missing": env_for(ollama.address),
             "timeout": env_for(ollama.address),
-            "config": {"SAFECLEAN_OLLAMA_URL": "http://192.0.2.1:11434"},
+            "config": {"KRESORTER_OLLAMA_URL": "http://192.0.2.1:11434"},
         }[reason]
         code, out, err = case.run("--explain", env=env, limits=QUICK)
     assert (code, out) == without[:2]
@@ -532,7 +532,7 @@ def test_the_section(tmp_path: Path, zone: Path, scan: ScanContext) -> None:
     organize = make_case("organize", tmp_path, zone, scan)
     first = "A temporary file.\nPrograms leave these behind."
     with ScriptedOllama(VERSION, TAGS, answer(first), answer("An unknown kind.")) as ollama:
-        env = env_for(ollama.address, SAFECLEAN_OLLAMA_MODEL="qwen2.5:7b")
+        env = env_for(ollama.address, KRESORTER_OLLAMA_MODEL="qwen2.5:7b")
         _, out, _ = organize.run("--explain", env=env)
     assert out.endswith(
         "Nothing was moved. Re-run with --yes to move these files.\n"
@@ -554,7 +554,7 @@ def test_the_section_counts_what_the_budget_left_out(zone: Path, scan: ScanConte
         write(folder / f"f{n:02}.q{n:02}", b"?")
     with ScriptedOllama(VERSION, TAGS, answer("Unknown.")) as ollama:
         args = ["organize", "move", str(folder), "--explain"]
-        code, out, _ = safeclean(args, scan, env=env_for(ollama.address))
+        code, out, _ = kresorter(args, scan, env=env_for(ollama.address))
     assert code == 1
     assert out.endswith(
         "  reason=unknown_kind, extension=.q19\n"
@@ -568,11 +568,11 @@ def test_nothing_to_explain_means_no_section(tmp_path: Path, zone: Path, scan: S
     # [0013.26] An empty zone, a refused folder: no section, no line, no connection.
     with ScriptedOllama(VERSION, TAGS) as ollama:
         env = env_for(ollama.address)
-        empty = safeclean(["analyze", str(zone)], scan, env=env)
-        assert safeclean(["analyze", "--explain", str(zone)], scan, env=env) == empty
-        refused = safeclean(["organize", "move", str(tmp_path / "nowhere")], scan, env=env)
+        empty = kresorter(["analyze", str(zone)], scan, env=env)
+        assert kresorter(["analyze", "--explain", str(zone)], scan, env=env) == empty
+        refused = kresorter(["organize", "move", str(tmp_path / "nowhere")], scan, env=env)
         args = ["organize", "move", str(tmp_path / "nowhere"), "--explain"]
-        assert safeclean(args, scan, env=env) == refused
+        assert kresorter(args, scan, env=env) == refused
     assert ollama.connections == 0
 
 
@@ -605,7 +605,7 @@ def test_each_output_has_its_own_order(tmp_path: Path, scan: ScanContext) -> Non
     for more in ([], ["--json"]):
         with ScriptedOllama(VERSION, TAGS, answer("Explained.")) as ollama:
             args = ["autostart", "list", "--include-machine", "--explain", *more]
-            safeclean(args, scan, env=env_for(ollama.address), auto=auto)
+            kresorter(args, scan, env=env_for(ollama.address), auto=auto)
         prompts = [json.loads(json.loads(r.body)["prompt"]) for r in ollama.received[2:]]
         asked["json" if more else "text"] = [prompt["name"] for prompt in prompts]
     assert asked == {"text": ["Sync", "Agent", "Once"], "json": ["Sync", "Once", "Agent"]}
@@ -688,7 +688,7 @@ def test_json_counts_what_the_budget_left_out(tmp_path: Path, scan: ScanContext)
     auto = autostart_context("linux", tmp_path)
     with ScriptedOllama(VERSION, TAGS, answer("Explained.")) as ollama:
         args = ["autostart", "list", "--json", "--explain"]
-        data = json.loads(safeclean(args, scan, env=env_for(ollama.address), auto=auto)[1])
+        data = json.loads(kresorter(args, scan, env=env_for(ollama.address), auto=auto)[1])
     assert (len(data["explanations"]), data["explanations_not_explained"]) == (20, 2)
 
 
@@ -696,7 +696,7 @@ def test_json_with_nothing_to_explain(zone: Path, scan: ScanContext) -> None:
     # [0013.27]
     with ScriptedOllama(VERSION, TAGS) as ollama:
         args = ["analyze", "--json", "--explain", str(zone)]
-        code, out, err = safeclean(args, scan, env=env_for(ollama.address))
+        code, out, err = kresorter(args, scan, env=env_for(ollama.address))
     data = json.loads(out)
     assert (code, err, ollama.connections) == (0, "", 0)
     assert {key: data[key] for key in FOUR} == dict(zip(FOUR, [[], None, 0, None], strict=True))
@@ -722,10 +722,10 @@ def test_answers_that_try_to_act(
     write(folder / "old.tmp", b"t")
     (folder / "old").mkdir()
     organize = ["organize", "move", str(folder)]
-    code, out, err = safeclean(organize, scan)
+    code, out, err = kresorter(organize, scan)
     before = snapshot(tmp_path)
     with ScriptedOllama(VERSION, TAGS, *map(answer, ACTING)) as ollama:
-        explained = safeclean([*organize, "--explain"], scan, env=env_for(ollama.address))
+        explained = kresorter([*organize, "--explain"], scan, env=env_for(ollama.address))
     labels = [
         "reason=not_regular, extension=",
         "reason=junk, extension=.tmp",

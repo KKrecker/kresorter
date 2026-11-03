@@ -1,4 +1,4 @@
-"""`safeclean autostart disable|enable ID [--yes]`: end-to-end (step 4, commit 12c2b).
+"""`kresorter autostart disable|enable ID [--yes]`: end-to-end (step 4, commit 12c2b).
 
 The id is the beginning of an entry's digest, as `autostart list` shows it (12 characters); any
 beginning that names one entry is accepted. A changed entry has another digest, so its old id
@@ -15,15 +15,15 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeRegistry, deny_stat, journal_held
-from safeclean.autostart.journal import ChangeResult, ChangeState
-from safeclean.autostart.listing import AutostartContext
-from safeclean.autostart.models import AutostartItem
-from safeclean.autostart.registry import Hive, RegistryError, RegValue, ValueKind
-from safeclean.autostart.run_changes import RunKeyChanges
-from safeclean.autostart.run_keys import APPROVED, RUN, RUN_ONCE
-from safeclean.autostart.xdg_changes import STUB, hidden_copy
-from safeclean.core.scanner import ScanContext
-from safeclean.storage.db import connect
+from kresorter.autostart.journal import ChangeResult, ChangeState
+from kresorter.autostart.listing import AutostartContext
+from kresorter.autostart.models import AutostartItem
+from kresorter.autostart.registry import Hive, RegistryError, RegValue, ValueKind
+from kresorter.autostart.run_changes import RunKeyChanges
+from kresorter.autostart.run_keys import APPROVED, RUN, RUN_ONCE
+from kresorter.autostart.xdg_changes import STUB, hidden_copy
+from kresorter.core.scanner import ScanContext
+from kresorter.storage.db import connect
 from support.cli import autostart_context, run
 from support.files import write
 
@@ -100,7 +100,7 @@ def test_an_id_naming_nothing_says_the_entry_may_have_changed(
     assert code == 1
     assert out == (
         f"No autostart entry has id {old}; it may have changed since it was listed."
-        " Run 'safeclean autostart list'.\n"
+        " Run 'kresorter autostart list'.\n"
     )
     assert rows(data_dir) == []
 
@@ -190,7 +190,7 @@ def test_enable_without_yes_says_nothing_is_deleted(
     assert out == (
         "Would enable app (xdg_autostart, user):\n"
         f"  location: {entry}\n"
-        "  if safeclean disabled it, what it changed is put back (the original from the store,"
+        "  if kresorter disabled it, what it changed is put back (the original from the store,"
         " or the stub moved to the store); nothing is deleted\n"
         "Nothing was changed. Re-run with --yes to enable it.\n"
     )
@@ -242,14 +242,14 @@ def test_an_entry_already_in_that_state_has_nothing_to_do(
 
 
 def test_a_refusal_of_the_change_is_shown(tmp_path: Path, scan: ScanContext, user: Path) -> None:
-    write(user / "app.desktop", hidden_copy(APP))  # disabled, but not by safeclean
+    write(user / "app.desktop", hidden_copy(APP))  # disabled, but not by kresorter
     auto = autostart_context("linux", tmp_path)
 
     code, out, _ = run(["autostart", "enable", only_id(scan, auto), "--yes"], scan, auto)
 
     assert code == 1
     assert (
-        out == "Refused: foreign: not disabled by safeclean; enabling it would edit its content\n"
+        out == "Refused: foreign: not disabled by kresorter; enabling it would edit its content\n"
     )
 
 
@@ -271,7 +271,7 @@ def test_an_interrupted_change_is_recovered_first(
     )
 
 
-def test_unfinished_quarantine_work_names_safeclean_recover(
+def test_unfinished_quarantine_work_names_kresorter_recover(
     tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
 ) -> None:
     entry = write(user / "app.desktop", APP)
@@ -287,13 +287,13 @@ def test_unfinished_quarantine_work_names_safeclean_recover(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: the journal has unfinished quarantine work; run 'safeclean recover' first;"
+        "kresorter: the journal has unfinished quarantine work; run 'kresorter recover' first;"
         " nothing was changed\n"
     )
     assert entry.read_bytes() == APP
 
 
-def test_unfinished_organize_work_names_safeclean_recover(
+def test_unfinished_organize_work_names_kresorter_recover(
     tmp_path: Path, scan: ScanContext, user: Path, data_dir: Path
 ) -> None:
     # [0012.32] a pending move batch blocks autostart changes too
@@ -311,7 +311,7 @@ def test_unfinished_organize_work_names_safeclean_recover(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: the journal has unfinished organize work; run 'safeclean recover' first;"
+        "kresorter: the journal has unfinished organize work; run 'kresorter recover' first;"
         " nothing was changed\n"
     )
     assert entry.read_bytes() == APP
@@ -336,7 +336,7 @@ def test_a_check_before_acting_that_fails_stops_with_the_reason(
     monkeypatch.undo()
     assert (code, out) == (3, "")
     assert err == (
-        f"safeclean: cannot disable app: [Errno 13] Permission denied: '{user}';"
+        f"kresorter: cannot disable app: [Errno 13] Permission denied: '{user}';"
         " nothing was changed\n"
     )
     assert rows(data_dir) == []
@@ -360,7 +360,7 @@ def test_a_journal_failure_stops_and_names_autostart_recover(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: journal failed: database is locked; run 'safeclean autostart recover'\n"
+        "kresorter: journal failed: database is locked; run 'kresorter autostart recover'\n"
     )
     assert rows(data_dir) == []
     assert entry.read_bytes() == APP
@@ -451,8 +451,8 @@ def test_a_failed_change_says_how_to_recover(
 
     assert (code, out) == (3, "")
     assert err == (
-        "safeclean: change 7 failed: the flag is something else;"
-        " run 'safeclean autostart recover'\n"
+        "kresorter: change 7 failed: the flag is something else;"
+        " run 'kresorter autostart recover'\n"
     )
 
 
@@ -469,6 +469,6 @@ def test_a_flag_that_cannot_be_read_back_stops_with_the_reason(
 
     assert code == 3
     assert err == (
-        "safeclean: an unfinished autostart change cannot be checked: access denied; fix or move"
-        " what is there, then run 'safeclean autostart recover' again\n"
+        "kresorter: an unfinished autostart change cannot be checked: access denied; fix or move"
+        " what is there, then run 'kresorter autostart recover' again\n"
     )

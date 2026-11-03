@@ -16,9 +16,9 @@ from typing import Any, Literal
 
 import pytest
 
-from safeclean.llm.failure import ExplanationUnavailable, Unavailable
-from safeclean.llm.settings import Address, address_from
-from safeclean.llm.transport import LIMITS, Answer, Limits, request
+from kresorter.llm.failure import ExplanationUnavailable, Unavailable
+from kresorter.llm.settings import Address, address_from
+from kresorter.llm.transport import LIMITS, Answer, Limits, request
 from support.ollama import (
     ScriptedOllama,
     after,
@@ -98,7 +98,7 @@ def test_an_answer_is_its_status_and_body() -> None:
 def test_no_resolver_is_asked(host: str, resolvers: list[str]) -> None:
     # [0013.10] localhost is 127.0.0.1 from the settings on: the socket gets an address.
     with ScriptedOllama() as ollama:
-        address = address_from({"SAFECLEAN_OLLAMA_URL": f"http://{host}:{ollama.address.port}"})
+        address = address_from({"KRESORTER_OLLAMA_URL": f"http://{host}:{ollama.address.port}"})
         assert get(address).status == 200
     assert resolvers == []
     assert ollama.received[0].header("Host") == f"127.0.0.1:{ollama.address.port}"
@@ -107,7 +107,7 @@ def test_no_resolver_is_asked(host: str, resolvers: list[str]) -> None:
 def test_ipv6_loopback_without_a_resolver(resolvers: list[str]) -> None:
     # [0013.10]
     with ScriptedOllama(host="::1") as ollama:
-        address = address_from({"SAFECLEAN_OLLAMA_URL": f"http://[::1]:{ollama.address.port}"})
+        address = address_from({"KRESORTER_OLLAMA_URL": f"http://[::1]:{ollama.address.port}"})
         assert get(address).status == 200
     assert resolvers == []
     assert ollama.received[0].header("Host") == f"[::1]:{ollama.address.port}"
@@ -133,8 +133,8 @@ def test_proxy_settings_are_ignored_from_the_first_request() -> None:
         env |= {name: proxy.address.url for name in PROXY_VARIABLES}
         env["PYTHONPATH"] = str(SRC)
         code = (
-            "from safeclean.llm.settings import Address\n"
-            "from safeclean.llm.transport import request\n"
+            "from kresorter.llm.settings import Address\n"
+            "from kresorter.llm.transport import request\n"
             f"address = Address('127.0.0.1', {ollama.address.port})\n"
             "print(request(address, 'GET', '/api/version', seconds=5).status)\n"
         )

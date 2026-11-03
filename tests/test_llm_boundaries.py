@@ -1,8 +1,8 @@
 """What the ``llm`` package may touch: its imports, who imports it, no file (decision 0013).
 
-The guards read the AST of ``src`` (``support.imports``). From safeclean, ``llm`` imports only
+The guards read the AST of ``src`` (``support.imports``). From kresorter, ``llm`` imports only
 the package itself (for its version), its own modules and the results it explains, and only the
-command-line modules, ``safeclean.environment`` and the window import ``llm`` [0013.21]
+command-line modules, ``kresorter.environment`` and the window import ``llm`` [0013.21]
 [0014.7]. ``llm`` opens, reads and writes no file [0013.22].
 """
 
@@ -10,14 +10,14 @@ import pytest
 
 from support.imports import file_uses, imports, ours, sources
 
-LLM = "safeclean.llm"
-UI = "safeclean.ui"
+LLM = "kresorter.llm"
+UI = "kresorter.ui"
 EXPLAINED = frozenset(
     {
-        "safeclean.analysis.report",
-        "safeclean.analysis.score",
-        "safeclean.autostart.models",
-        "safeclean.organize.planner",
+        "kresorter.analysis.report",
+        "kresorter.analysis.score",
+        "kresorter.autostart.models",
+        "kresorter.organize.planner",
     }
 )
 
@@ -27,13 +27,13 @@ def _in_llm(name: str) -> bool:
 
 
 def llm_may_import(name: str) -> bool:
-    return not ours(name) or name == "safeclean" or _in_llm(name) or name in EXPLAINED
+    return not ours(name) or name == "kresorter" or _in_llm(name) or name in EXPLAINED
 
 
 def may_import_llm(module: str) -> bool:
-    """``llm`` itself, ``safeclean.cli`` or ``safeclean.cli_*``, ``safeclean.environment`` (it
+    """``llm`` itself, ``kresorter.cli`` or ``kresorter.cli_*``, ``kresorter.environment`` (it
     carries the settings environment and the limits to the commands) and the modules of
-    ``safeclean.ui`` (0014 item 7 amends 0013 item 21)."""
+    ``kresorter.ui`` (0014 item 7 amends 0013 item 21)."""
     last = module.rsplit(".", 1)[-1]
     command_line = last == "cli" or last.startswith("cli_")
     front = module.count(".") == 1 and (command_line or last == "environment")
@@ -47,18 +47,18 @@ def may_import_llm(module: str) -> bool:
 @pytest.mark.parametrize(
     ("source", "module", "resolved"),
     [
-        ("from safeclean import __version__", "safeclean.llm.transport", "safeclean"),
-        ("from safeclean import text", "safeclean.llm.client", "safeclean.text"),
-        ("from safeclean import llm", "safeclean.core.walker", "safeclean.llm"),
-        ("from safeclean.llm.explain import explain", "safeclean.cli", "safeclean.llm.explain"),
-        ("from . import clean", "safeclean.llm.client", "safeclean.llm.clean"),
-        ("from .. import text", "safeclean.llm.client", "safeclean.text"),
-        ("from ..core.policy import PathPolicy", "safeclean.llm.client", "safeclean.core.policy"),
-        ("from .llm import client", "safeclean.text", "safeclean.llm.client"),
-        ("from .settings import Address", "safeclean.llm", "safeclean.llm.settings"),
-        ("import safeclean.storage.db", "safeclean.llm.client", "safeclean.storage.db"),
-        ("importlib.import_module('safeclean.cli')", "safeclean.llm.client", "safeclean.cli"),
-        ("__import__('safeclean.text')", "safeclean.llm.client", "safeclean.text"),
+        ("from kresorter import __version__", "kresorter.llm.transport", "kresorter"),
+        ("from kresorter import text", "kresorter.llm.client", "kresorter.text"),
+        ("from kresorter import llm", "kresorter.core.walker", "kresorter.llm"),
+        ("from kresorter.llm.explain import explain", "kresorter.cli", "kresorter.llm.explain"),
+        ("from . import clean", "kresorter.llm.client", "kresorter.llm.clean"),
+        ("from .. import text", "kresorter.llm.client", "kresorter.text"),
+        ("from ..core.policy import PathPolicy", "kresorter.llm.client", "kresorter.core.policy"),
+        ("from .llm import client", "kresorter.text", "kresorter.llm.client"),
+        ("from .settings import Address", "kresorter.llm", "kresorter.llm.settings"),
+        ("import kresorter.storage.db", "kresorter.llm.client", "kresorter.storage.db"),
+        ("importlib.import_module('kresorter.cli')", "kresorter.llm.client", "kresorter.cli"),
+        ("__import__('kresorter.text')", "kresorter.llm.client", "kresorter.text"),
     ],
 )
 def test_imports_are_resolved(source: str, module: str, resolved: str) -> None:
@@ -70,17 +70,17 @@ def test_imports_are_resolved(source: str, module: str, resolved: str) -> None:
 @pytest.mark.parametrize(
     ("name", "allowed"),
     [
-        ("safeclean", True),
-        ("safeclean.llm.subjects", True),
-        ("safeclean.analysis.report", True),
-        ("safeclean.organize.planner", True),
+        ("kresorter", True),
+        ("kresorter.llm.subjects", True),
+        ("kresorter.analysis.report", True),
+        ("kresorter.organize.planner", True),
         ("json", True),
-        ("safeclean.text", False),
-        ("safeclean.cli", False),
-        ("safeclean.analysis.duplicates", False),
-        ("safeclean.organize.mover", False),
-        ("safeclean.storage.db", False),
-        ("safeclean.llmx", False),
+        ("kresorter.text", False),
+        ("kresorter.cli", False),
+        ("kresorter.analysis.duplicates", False),
+        ("kresorter.organize.mover", False),
+        ("kresorter.storage.db", False),
+        ("kresorter.llmx", False),
     ],
 )
 def test_what_llm_may_import(name: str, allowed: bool) -> None:
@@ -91,19 +91,19 @@ def test_what_llm_may_import(name: str, allowed: bool) -> None:
 @pytest.mark.parametrize(
     ("module", "allowed"),
     [
-        ("safeclean.cli", True),
-        ("safeclean.cli_analyze", True),
-        ("safeclean.llm.explain", True),
-        ("safeclean.environment", True),
-        ("safeclean.ui", True),
-        ("safeclean.ui.findings", True),
-        ("safeclean.text", False),
-        ("safeclean.core.cli_tools", False),
-        ("safeclean.core.environment", False),
-        ("safeclean.uix", False),
-        ("safeclean.core.ui", False),
-        ("safeclean.organize.planner", False),
-        ("safeclean.client", False),
+        ("kresorter.cli", True),
+        ("kresorter.cli_analyze", True),
+        ("kresorter.llm.explain", True),
+        ("kresorter.environment", True),
+        ("kresorter.ui", True),
+        ("kresorter.ui.findings", True),
+        ("kresorter.text", False),
+        ("kresorter.core.cli_tools", False),
+        ("kresorter.core.environment", False),
+        ("kresorter.uix", False),
+        ("kresorter.core.ui", False),
+        ("kresorter.organize.planner", False),
+        ("kresorter.client", False),
     ],
 )
 def test_who_may_import_llm(module: str, allowed: bool) -> None:
@@ -198,8 +198,8 @@ def test_the_guards_see_llm_and_its_importers() -> None:
         and any(_in_llm(name) for _, name in imports(path.read_text(encoding="utf-8"), module))
     }
     assert importers == {
-        "safeclean.cli_analyze",
-        "safeclean.cli_autostart",
-        "safeclean.cli_llm",
-        "safeclean.environment",
+        "kresorter.cli_analyze",
+        "kresorter.cli_autostart",
+        "kresorter.cli_llm",
+        "kresorter.environment",
     }

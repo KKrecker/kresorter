@@ -1,4 +1,4 @@
-"""The icons: Lucide's, shipped in ``safeclean/ui/icons`` with their licence, drawn in one
+"""The icons: Lucide's, shipped in ``kresorter/ui/icons`` with their licence, drawn in one
 colour of the palette (decision 0014, item 47)."""
 
 from importlib.resources import files
@@ -7,11 +7,11 @@ import pytest
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 
-from safeclean.ui import icons
-from safeclean.ui.theme import DARK, LIGHT
+from kresorter.ui import icons
+from kresorter.ui.theme import DARK, LIGHT
 from support.drawn import ink, inked_in
 
-_SHIPPED = files("safeclean.ui").joinpath("icons")
+_SHIPPED = files("kresorter.ui").joinpath("icons")
 
 
 def test_every_icon_is_shipped_and_every_shipped_icon_is_named() -> None:

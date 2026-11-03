@@ -10,9 +10,9 @@ from PySide6.QtWidgets import QTreeWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
-from safeclean.ui.dialogs import Confirmation
-from safeclean.ui.parts import QUIET, SECONDARY
-from safeclean.ui.window import Window
+from kresorter.ui.dialogs import Confirmation
+from kresorter.ui.parts import QUIET, SECONDARY
+from kresorter.ui.window import Window
 from support.cli import run
 from support.files import write
 from support.journal import query

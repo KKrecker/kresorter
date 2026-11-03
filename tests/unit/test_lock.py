@@ -1,7 +1,7 @@
 """Single-instance lock on the data directory (decision 0009, addendum).
 
-Two safeclean processes on one data directory would each treat the other's in-flight operation
-as interrupted. The lock is an OS advisory lock on ``<data dir>/safeclean.lock``: ``flock`` on
+Two kresorter processes on one data directory would each treat the other's in-flight operation
+as interrupted. The lock is an OS advisory lock on ``<data dir>/kresorter.lock``: ``flock`` on
 Linux/macOS, ``msvcrt.locking`` on Windows. The kernel drops it when the holder dies, so a crash
 never leaves a stale lock. The lock file itself is never deleted (decision 0001).
 """
@@ -14,21 +14,21 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.storage.lock import (
+from kresorter.storage.lock import (
     FlockBackend,
     InstanceLock,
     LockedError,
     MsvcrtBackend,
     backend_for_platform,
 )
-from safeclean.storage.transactions import StorageError
+from kresorter.storage.transactions import StorageError
 
 posix_only = pytest.mark.skipif(sys.platform == "win32", reason="flock backend")
 
 HOLDER = """
 import sys
 from pathlib import Path
-from safeclean.storage.lock import InstanceLock
+from kresorter.storage.lock import InstanceLock
 
 with InstanceLock(Path(sys.argv[1])):
     print("locked", flush=True)
@@ -38,7 +38,7 @@ with InstanceLock(Path(sys.argv[1])):
 
 @pytest.fixture
 def lock_path(tmp_path: Path) -> Path:
-    return tmp_path / "safeclean.lock"
+    return tmp_path / "kresorter.lock"
 
 
 def hold_in_another_process(lock_path: Path) -> subprocess.Popen[str]:
@@ -72,7 +72,7 @@ def test_a_loosened_lock_file_is_made_private_again(lock_path: Path) -> None:
 
 
 def test_second_lock_in_the_same_process_is_refused(lock_path: Path) -> None:
-    with InstanceLock(lock_path), pytest.raises(LockedError, match="another safeclean"):
+    with InstanceLock(lock_path), pytest.raises(LockedError, match="another kresorter"):
         InstanceLock(lock_path).__enter__()
 
 
@@ -113,7 +113,7 @@ def test_a_crashed_holder_leaves_no_stale_lock(lock_path: Path) -> None:
 
 def test_missing_directory_is_an_os_error(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
-        InstanceLock(tmp_path / "nope" / "safeclean.lock").__enter__()
+        InstanceLock(tmp_path / "nope" / "kresorter.lock").__enter__()
 
 
 def test_locked_error_is_a_storage_error() -> None:

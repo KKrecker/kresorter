@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QWidget
 from pytestqt.qtbot import QtBot
 
-from safeclean.ui.theme import DARK, LIGHT, Look, style_sheet
+from kresorter.ui.theme import DARK, LIGHT, Look, style_sheet
 
 
 def test_the_scheme_qt_reports_decides_and_a_change_applies_at_once(

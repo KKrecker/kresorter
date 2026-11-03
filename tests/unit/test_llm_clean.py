@@ -10,7 +10,7 @@ import unicodedata
 
 import pytest
 
-from safeclean.llm.clean import cleaned_answer
+from kresorter.llm.clean import cleaned_answer
 
 REMOVED = frozenset({"Cc", "Cf", "Co", "Cs", "Cn", "Zl", "Zp"})
 

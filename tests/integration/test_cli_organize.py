@@ -1,4 +1,4 @@
-"""``safeclean organize move | list | undo`` on Linux (decision 0012, items 1-5, 7, 29, 30 and
+"""``kresorter organize move | list | undo`` on Linux (decision 0012, items 1-5, 7, 29, 30 and
 33-36).
 
 Every command opens the journal and recovers organize's own batches first; ``move`` and
@@ -16,9 +16,9 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, other_device
-from safeclean import cli_organize
-from safeclean.core.scanner import ScanContext
-from safeclean.organize.mover import carry_out
+from kresorter import cli_organize
+from kresorter.core.scanner import ScanContext
+from kresorter.organize.mover import carry_out
 from support.cli import run, scan_context
 from support.files import write
 from support.journal import query
@@ -120,7 +120,7 @@ def test_the_plan_comes_after_recovering_organize(
     assert code == 1
     assert out == (
         "Recovered 1 interrupted organize batch:\n"
-        "  [1] failed: 2 files still sorted; 'safeclean organize undo 1' moves them back\n"
+        "  [1] failed: 2 files still sorted; 'kresorter organize undo 1' moves them back\n"
         f"    {folder / MOVED[A]}\n"
         f"    {folder / MOVED[B]}\n"
         f"Would move 1 file, 5 B, in {folder}:\n"
@@ -204,7 +204,7 @@ def test_yes_moves_and_says_what_moved(scan: ScanContext, zone: Path, data_dir: 
         "  not_regular: old\n"
         "  folder_metadata: .hidden\n"
         "  junk: old.tmp (temp-files)\n"
-        "'safeclean organize undo 1' moves them back\n"
+        "'kresorter organize undo 1' moves them back\n"
     )
     assert tree(folder) == {
         **content(SORTED),
@@ -229,7 +229,7 @@ def test_one_file_moved_says_it_moves_back(scan: ScanContext, zone: Path) -> Non
         f"Moved 1 file, 5 B, in {folder} (batch 1):\n"
         "  Images: 1 file, 5 B\n"
         f"    {A} -> Images/\n"
-        "'safeclean organize undo 1' moves it back\n"
+        "'kresorter organize undo 1' moves it back\n"
     )
 
 
@@ -268,7 +268,7 @@ def test_a_taken_destination_is_never_overwritten(scan: ScanContext, zone: Path)
         "Stays 2:\n"
         "  not_regular: Images\n"
         "  conflict: a.jpg\n"
-        "'safeclean organize undo 1' moves them back\n",
+        "'kresorter organize undo 1' moves them back\n",
     )
     assert tree(folder) == {
         A: A.encode(),
@@ -297,7 +297,7 @@ def test_a_file_refused_at_move_time_stays_and_the_rest_moves(
         "    c.mp3 -> Audio/\n"
         "Refused 1:\n"
         f"  open_file: {folder / B}\n"
-        "'safeclean organize undo 1' moves them back\n",
+        "'kresorter organize undo 1' moves them back\n",
     )
     assert tree(folder) == {
         **content({A: MOVED[A], B: B, C: MOVED[C]}),
@@ -360,7 +360,7 @@ def test_a_batch_that_stopped_names_the_files_still_sorted(
     assert (code, out) == (
         3,
         f"Stopped: [Errno 13] refused before the move: '{folder / C}'\n"
-        "  [1] failed: 1 file still sorted; 'safeclean organize undo 1' moves it back\n"
+        "  [1] failed: 1 file still sorted; 'kresorter organize undo 1' moves it back\n"
         f"    {folder / MOVED[A]}\n",
     )
     assert query(data_dir, "SELECT state FROM move_batches") == [("failed",)]
@@ -375,7 +375,7 @@ def test_another_domain_unfinished_refuses_move_and_undo(
     refused = (
         3,
         "",
-        "safeclean: the journal has unfinished quarantine work; run 'safeclean recover' first;"
+        "kresorter: the journal has unfinished quarantine work; run 'kresorter recover' first;"
         " nothing was changed\n",
     )
 
@@ -395,7 +395,7 @@ def test_a_data_directory_that_cannot_be_used_exits_3(
     code, out, err = run(organize("move", folder, "--yes"), scan)
 
     assert (code, out) == (3, "")
-    assert err.startswith("safeclean: cannot use the data directory: ")
+    assert err.startswith("kresorter: cannot use the data directory: ")
     assert tree(folder) == content(SOURCES)
 
 
@@ -540,7 +540,7 @@ def test_an_undo_that_stopped_names_the_batch_it_undoes(
         3,
         f"Stopped: [Errno 13] refused before the move: '{folder / MOVED[A]}'\n"
         "  [2] rolled_back: the undo of batch 1 stopped;"
-        " 'safeclean organize undo 1' moves back the files still sorted\n",
+        " 'kresorter organize undo 1' moves back the files still sorted\n",
     )
     assert tree(folder) == {**content(SORTED), **CATEGORIES}
 

@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 
 from fakes import deny_stat, relist
-from safeclean.core.scanner import ScanContext
-from safeclean.organize.planner import Move, Plan, Stay, StayReason, plan
+from kresorter.core.scanner import ScanContext
+from kresorter.organize.planner import Move, Plan, Stay, StayReason, plan
 from support.files import write
 
 NFC = "caf\u00e9"  # é as one code point

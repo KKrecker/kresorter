@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from safeclean.environment import Environment
-from safeclean.llm.client import status
+from kresorter.environment import Environment
+from kresorter.llm.client import status
 from support.live import HOME_VARIABLES, LiveSystemError
 
 

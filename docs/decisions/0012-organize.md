@@ -10,7 +10,7 @@
 ## Context
 
 Step 5 adds the third domain that changes the disk: the user chooses a folder (typically
-`~/Downloads` or `~/Desktop`) and safeclean proposes to sort its files into category
+`~/Downloads` or `~/Desktop`) and kresorter proposes to sort its files into category
 directories. A file moved away from what expects it is broken as surely as a deleted one, so
 the organizer has to know what must not move, say why, and be able to put everything back.
 
@@ -150,7 +150,7 @@ limitations) is prose.
     and the rename is the one 0007 accepts.
 27. **A batch is all or nothing as far as the disk allows**: what 0004 item 4 calls atomic,
     with the rollback of 0006 item 4. It guarantees that:
-    - safeclean overwrites, copies and deletes no file, and never leaves one at both of its
+    - kresorter overwrites, copies and deletes no file, and never leaves one at both of its
       paths or at neither: one rename moves it (item 26);
     - a move that fails stops the batch: no later move is tried, and the files already moved
       go back newest first, each one tried even when one before it could not go back, and
@@ -214,25 +214,25 @@ limitations) is prose.
     (item 29 takes `done` moves only); the user decides. Each pending batch then closes `done`
     when every move is `done`, `rolled_back` when every move is `rolled_back`, and `failed`
     otherwise: recovery completes no batch and rolls none back, and its message names the files
-    still at their destinations and `safeclean organize undo BATCH`. Each move is settled in a
+    still at their destinations and `kresorter organize undo BATCH`. Each move is settled in a
     transaction of its own and the batch is closed last, so a recovery interrupted or crashed
     anywhere and run again settles the same. It needs no open-file check (as 0011 item 124).
     The message, on stdout: `Recovered <n> interrupted organize batch:` (`batches` for more
     than one), then a line per batch, oldest first, `  [<id>] <state>`. An organize batch
     that left files at their destinations adds
-    `: <n> files still sorted; 'safeclean organize undo <id>' moves them back` (`1 file`,
+    `: <n> files still sorted; 'kresorter organize undo <id>' moves them back` (`1 file`,
     `moves it back`), then one line `    <destination>` per file; an undo batch that is not
     `done` adds
-    `: the undo of batch <B> stopped; 'safeclean organize undo <B>' moves back the files still sorted`.
-    Each warning goes to stderr as `safeclean: <warning>`.
+    `: the undo of batch <B> stopped; 'kresorter organize undo <B>' moves back the files still sorted`.
+    Each warning goes to stderr as `kresorter: <warning>`.
 32. **Organize is a domain of `pending_domains`** (`Domain.ORGANIZE`, 0011 item 125): its
     pending moves block the quarantine and autostart changes, and theirs block it; the message
-    names `safeclean recover` (0011 item 127), which closes the quarantine's work first, then the
+    names `kresorter recover` (0011 item 127), which closes the quarantine's work first, then the
     moves, then the autostart changes.
 
 ## Command line
 
-33. **`safeclean organize move FOLDER [--yes]`**: without `--yes`, the plan (per category:
+33. **`kresorter organize move FOLDER [--yes]`**: without `--yes`, the plan (per category:
     files, size, each `name -> Category/`; then what stays, by reason) and exit 1. With
     `--yes`, the plan is made again inside the lock and carried out; the output lists exactly
     what moved, what was refused and what stays (0010 items 16, 17). On stdout, the plan:
@@ -256,7 +256,7 @@ limitations) is prose.
       <reason>: <path>
     Stays <n>:
       <reason>: <name>
-    'safeclean organize undo <id>' moves them back
+    'kresorter organize undo <id>' moves them back
     ```
 
     `<files>` is `<n> files, <size>` (`1 file`), the size as `scan` writes it; `<folder>` is the
@@ -270,7 +270,7 @@ limitations) is prose.
     file refused at move time, `Nothing was moved in <folder>.`, the refusals and what stays,
     and no batch; for a batch that stopped, `Stopped: <error>`, the error that stopped it, and
     the batch's line as recovery writes it (item 31), then the refusals and what stays.
-34. **`safeclean organize list`**: the batches, newest first (id, kind, folder, date, files
+34. **`kresorter organize list`**: the batches, newest first (id, kind, folder, date, files
     moved, state, undone or not). It changes nothing and runs while another domain's work is
     unfinished, as `quarantine list` does. On stdout, `Organize batches: <n>`, then one line
     per batch, its fields two spaces apart:
@@ -283,7 +283,7 @@ limitations) is prose.
     `<n> files moved` (`1 file moved`) counts its `done` moves; `<state>` is `done`,
     `rolled_back` or `failed`, followed by `, undone` when every file it moved was moved back
     and by `, partly undone` when some were. Without batches: `No organize batches.`
-35. **`safeclean organize undo BATCH [--yes]`**: the plan without `--yes` (exit 1), the moves
+35. **`kresorter organize undo BATCH [--yes]`**: the plan without `--yes` (exit 1), the moves
     back with it. On stdout, as for `move` (item 33), each file named by its path in the
     folder, in journal order:
 
@@ -326,10 +326,10 @@ limitations) is prose.
     This is a conservative limit, kept as a whole while any blocker of the system remains.
     Exit 3; the message names the system, gives one line per blocker in table order and says
     that nothing was changed. On stderr:
-    `safeclean: organize does not move files on <system>; nothing was changed`, `<system>`
+    `kresorter: organize does not move files on <system>; nothing was changed`, `<system>`
     one of `Linux`, `macOS` and `Windows`, then `  - <line>` for each blocker, its line of
     item 38; on Linux, the line of `no_open_file_check` alone. `organize list` and
-    `safeclean recover` run everywhere, without a reliable open-file check too: neither moves
+    `kresorter recover` run everywhere, without a reliable open-file check too: neither moves
     a file, and recovery needs no open-file check (item 31).
 38. **The blockers are a pinned table, as data** (`organize.platforms.Blocker`, a `StrEnum`,
     each with its one line for the message):
@@ -400,7 +400,7 @@ and every device of the user, which "local only" (0001 item 4) does not cover; a
 placeholder whose data is elsewhere (Files On-Demand, files evicted by Optimize Mac Storage);
 and the sync client renames and restores files by itself, so a disk that disagrees with the
 journal (item 31) no longer means a crash, and undo meets files it did not expect. Nothing
-tells safeclean yet which folders are synced.
+tells kresorter yet which folders are synced.
 
 **Windows: sharing violations** (`sharing_violations`). A file that another program opened
 without `FILE_SHARE_DELETE`, as most programs open files, cannot be renamed: `os.rename`
@@ -464,7 +464,7 @@ committed.
 7. The mover: journal, preflight, rename, all or nothing, directories (19, 25-28); a rename
    that fails before or after it moves, forward and back; a partial rollback; a newcomer at a
    source; a taken destination; an interrupt.
-8. Recovery by the file's identity, and `safeclean recover` with it (31, 32): crashes before
+8. Recovery by the file's identity, and `kresorter recover` with it (31, 32): crashes before
    and after a rename and during the rollback, a recovery interrupted, or crashed at each of
    its statements, and run again, a device or inode changed by a remount, both paths taken by
    something else, the file at both.

@@ -12,7 +12,7 @@ from pathlib import PurePath, PurePosixPath, PureWindowsPath
 
 import pytest
 
-from safeclean.core.heuristics import (
+from kresorter.core.heuristics import (
     JunkCategory,
     JunkClassifier,
     JunkMatch,

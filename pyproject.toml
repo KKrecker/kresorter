@@ -3,7 +3,7 @@ requires = ["hatchling>=1.24"]
 build-backend = "hatchling.build"
 
 [project]
-name = "safeclean"
+name = "kresorter"
 version = "0.0.1"
 description = "Safe, local-first file cleanup analyzer: report first, quarantine, delete only after confirmation."
 readme = "README.md"
@@ -24,24 +24,24 @@ dev = [
 ]
 
 [project.scripts]
-safeclean = "safeclean.cli:main"
+kresorter = "kresorter.cli:main"
 
 [project.gui-scripts]
-safeclean-ui = "safeclean.ui.launch:main"
+kresorter-ui = "kresorter.ui.launch:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/safeclean"]
+packages = ["src/kresorter"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
-addopts = "-ra --strict-markers --cov=safeclean --cov-branch --cov-report=term-missing --cov-fail-under=100"
+addopts = "-ra --strict-markers --cov=kresorter --cov-branch --cov-report=term-missing --cov-fail-under=100"
 qt_api = "pyside6"
 # A deprecation fails the tests when it is announced (pre-step-8 audit, A3).
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ["safeclean"]
+source = ["kresorter"]
 branch = true
 
 [tool.coverage.report]
@@ -63,13 +63,13 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "PT", "RUF", "TID", "ANN", "PTH"
 
 [tool.ruff.lint.isort]
 # A red test imports a module before it exists: it is still ours.
-known-first-party = ["safeclean"]
+known-first-party = ["kresorter"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN401"]
 # The window's Russian texts: their Cyrillic letters are meant (decision 0014, item 28).
-"src/safeclean/ui/labels.py" = ["RUF001"]
-"src/safeclean/ui/texts.py" = ["RUF001"]
+"src/kresorter/ui/labels.py" = ["RUF001"]
+"src/kresorter/ui/texts.py" = ["RUF001"]
 
 # Safety principle: deletion goes only through the quarantine API (see docs/decisions/0001).
 # Applies to src AND tests. Path.unlink/rmdir are method calls ruff cannot ban;

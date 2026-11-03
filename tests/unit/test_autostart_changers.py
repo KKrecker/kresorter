@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeRegistry
-from safeclean.autostart.changers import changes_for
-from safeclean.autostart.changes import XdgChanges
-from safeclean.autostart.registry import UserRegistry
-from safeclean.autostart.run_changes import RunKeyChanges
-from safeclean.storage.db import connect
+from kresorter.autostart.changers import changes_for
+from kresorter.autostart.changes import XdgChanges
+from kresorter.autostart.registry import UserRegistry
+from kresorter.autostart.run_changes import RunKeyChanges
+from kresorter.storage.db import connect
 from support.cli import autostart_context
 
 

@@ -1,9 +1,9 @@
-"""`safeclean autostart list`: end-to-end on real temporary trees and a fake registry.
+"""`kresorter autostart list`: end-to-end on real temporary trees and a fake registry.
 
 Report only: nothing is created, changed or deleted, the scan context is never built, and the
 registry is read only on Windows. Entries are grouped by source in reader order; machine-wide
 entries on Windows need ``--include-machine``, and the report says when they were not read.
-Each entry says whether safeclean can disable and enable it (``disableable``, item 8).
+Each entry says whether kresorter can disable and enable it (``disableable``, item 8).
 """
 
 import io
@@ -13,14 +13,14 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeRegistry
-from safeclean import cli, environment
-from safeclean.autostart.listing import AutostartContext
-from safeclean.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
-from safeclean.autostart.run_keys import RUN
-from safeclean.autostart.xdg import read_xdg
-from safeclean.core.heuristics import Platform
-from safeclean.core.scanner import ScanContext
-from safeclean.environment import Environment
+from kresorter import cli, environment
+from kresorter.autostart.listing import AutostartContext
+from kresorter.autostart.registry import Hive, RegValue, UserRegistry, ValueKind
+from kresorter.autostart.run_keys import RUN
+from kresorter.autostart.xdg import read_xdg
+from kresorter.core.heuristics import Platform
+from kresorter.core.scanner import ScanContext
+from kresorter.environment import Environment
 from support.files import snapshot
 
 APP = "[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
@@ -84,7 +84,7 @@ def test_text_report_groups_entries_by_source(tmp_path: Path, linux: AutostartCo
 
     assert code == 0
     assert out == (
-        "safeclean autostart list - report only, nothing was changed\n"
+        "kresorter autostart list - report only, nothing was changed\n"
         "Entries: 2, 1 disabled\n"
         "\n"
         "XDG autostart: 2\n"
@@ -109,7 +109,7 @@ def test_an_empty_system_is_an_empty_report(tmp_path: Path) -> None:
 
     assert code == 0
     assert out == (
-        "safeclean autostart list - report only, nothing was changed\n"
+        "kresorter autostart list - report only, nothing was changed\n"
         "Entries: 0, 0 disabled\n"
         "\n"
         "Skipped: 0\n"

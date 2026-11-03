@@ -35,7 +35,7 @@ NETWORK_MODULES = frozenset(
     }
 )
 ALLOWED: dict[str, frozenset[str]] = {
-    "src/safeclean/llm/transport.py": frozenset({"http.client", "socket"}),
+    "src/kresorter/llm/transport.py": frozenset({"http.client", "socket"}),
 }
 
 
@@ -118,7 +118,7 @@ def test_only_the_allowlist_imports_the_network() -> None:
 def test_the_allowlist_is_pinned() -> None:
     # [0013.10] The transport, with http.client and socket: never urllib, whose opener reads
     # proxy settings and follows redirects. Growing this needs a decision, not a quiet edit.
-    assert {"src/safeclean/llm/transport.py": frozenset({"http.client", "socket"})} == ALLOWED
+    assert {"src/kresorter/llm/transport.py": frozenset({"http.client", "socket"})} == ALLOWED
 
 
 def test_what_is_allowed_is_really_imported() -> None:

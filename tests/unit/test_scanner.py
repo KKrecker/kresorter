@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from safeclean.core import hashing
-from safeclean.core.heuristics import JunkCategory, JunkClassifier, load_rules
-from safeclean.core.models import FileEntry, Skipped, SkipReason
-from safeclean.core.policy import BlockReason
-from safeclean.core.scanner import DuplicateGroup, ScanContext, scan
+from kresorter.core import hashing
+from kresorter.core.heuristics import JunkCategory, JunkClassifier, load_rules
+from kresorter.core.models import FileEntry, Skipped, SkipReason
+from kresorter.core.policy import BlockReason
+from kresorter.core.scanner import DuplicateGroup, ScanContext, scan
 from support.files import write
 
 RULES = """

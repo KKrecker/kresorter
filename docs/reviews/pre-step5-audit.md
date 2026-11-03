@@ -79,10 +79,10 @@ which means "refused, not confirmed or a preview". `main` has no top-level handl
 | B1 | The data-directory policy lives in quarantine: `cli_journal` imports `check_data_dir` and `QuarantineError` from `quarantine.service`, `PRIVATE` from `quarantine.vault` | organize would depend on quarantine for its data directory | `storage/data_dir.py` with `DataDirError` (refactor) |
 | B2 | `autostart/changes.py` (404 lines) mixes the store, the journal, the XDG logic and `recover()`; `run_changes.py` imports the journal from the XDG module | layering | `autostart/journal.py`: `Change`, `insert_change`, `finish_change`, `ChangeState`, `ChangeRefusal`, `ChangeResult`, `ChangeRecovery`, `refused` (refactor) |
 | B3 | Journal helpers twice (`_insert` in `service.py` and `insert_change`, both with a pragma on `lastrowid`); `time.time_ns()` hard-wired in `service.py` and `changes.py`, while `RunKeyChanges` takes `now` | a third copy in organize | `storage/journal.py`: `insert_row()` and an injected clock |
-| B4 | `has_pending` knows two tables; the "go to the other domain" messages are hand-written pairs (`cli_quarantine`, `_outcome` assumes a pending refusal after recover is quarantine's); quarantine has no `recover` and points to `quarantine list` | three domains, six pairs | `pending_domains(conn) -> set[Domain]` and one `safeclean recover` (decision 2) |
+| B4 | `has_pending` knows two tables; the "go to the other domain" messages are hand-written pairs (`cli_quarantine`, `_outcome` assumes a pending refusal after recover is quarantine's); quarantine has no `recover` and points to `quarantine list` | three domains, six pairs | `pending_domains(conn) -> set[Domain]` and one `kresorter recover` (decision 2) |
 | B5 | Growing enumerations in `CHECK` (`operations.kind`, `autostart_changes.source`): SQLite cannot alter a `CHECK` | organize needs a new kind of operation | a table of its own, `moves`, as in item 57 (decision 3) |
 | B6 | Decision 0002 §3 says moves go "through the same quarantine/journal API as deletions", but `QuarantineService` is vault-bound (the destination is a vault slot) and needs a reliable open-file check, Linux only | literal reuse does not fit | 0012 amends 0002 §3: the same journal principles and primitives, not the same service (decision 4) |
-| B7 | `QuarantineService` cannot be built without a reliable checker, so its `recover()` is unavailable without one, though it does not need it | blocks a common `safeclean recover` | recovery apart from the checker |
+| B7 | `QuarantineService` cannot be built without a reliable checker, so its `recover()` is unavailable without one, though it does not need it | blocks a common `kresorter recover` | recovery apart from the checker |
 | B8 | `cli.main` collects factory parameters (`context_factory`, `autostart_context`, ...) | one more would come | one `Environment` object (platform, env, home, clock, registry factory, checker) |
 | B9 | XDG details: (a) `XdgChanges.__init__` creates the store even for a preview or an empty recover; (b) `_create_stub` journals `vault_path` after the rename, `_reconcile` before it, so a crash in between leaves a partial stub in the store that no row names (nothing is lost); (c) `FileExistsError` from `O_EXCL` is `failed` although nothing of ours was touched; (d) no index on `autostart_changes(location)` | honesty of the journal | (a)-(c) small pairs now; (d) skipped (decision 5) |
 | B10 | Test helpers repeated: `write` x6, `run` x6, `snapshot` x3, `data_dir`/`scan`/`ctx` x3-4, `query`/`zone` x2; `tests/conftest.py` is empty; tests cite only 14 of the 109 items | organize would add a seventh copy | `tests/support/` with explicit imports; for 0012, every item cited by a test, checked by a meta-test (0011 is not retrofitted) |
@@ -94,7 +94,7 @@ which means "refused, not confirmed or a preview". `main` has no top-level handl
 1. **A journal failure in the middle of a command exits with 3**, as the lock and a `failed`
    change do: its end cannot be trusted. A new code 4 would break the 0/1/2/3 contract for no
    gain. Message: `journal failed: <reason>; run '<command> recover'`.
-2. **One `safeclean recover` for every domain**; `safeclean autostart recover` stays as an
+2. **One `kresorter recover` for every domain**; `kresorter autostart recover` stays as an
    alias, since messages of one domain name its own command (12c2, option (b)). B7 separates
    the quarantine's recovery from the checker anyway, and a second command would follow; one
    command and an alias are cheaper than three entry points.
@@ -122,7 +122,7 @@ is committed:
 5. B9 (a)-(c).
 6. Refactors without behaviour change: B1, B2, B3 (tests change their imports only).
 7. B10: `tests/support/`.
-8. B4 and B7: `pending_domains`, `safeclean recover` (decision 2).
+8. B4 and B7: `pending_domains`, `kresorter recover` (decision 2).
 9. Documentation: README (A5), roadmap, decision items.
 
 Then the draft of decision 0012 (organize), answering B5 and B6.

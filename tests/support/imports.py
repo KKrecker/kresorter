@@ -1,6 +1,6 @@
 """The imports of ``src``'s modules, read from their AST as Python resolves them.
 
-``from safeclean import text`` is ``safeclean.text``, a relative import is taken from the
+``from kresorter import text`` is ``kresorter.text``, a relative import is taken from the
 module's package, and a literal name given to ``__import__`` or ``importlib.import_module``
 counts too. ``file_uses`` finds the ways a module opens, reads or writes a file. Shared by the
 guards of decisions 0013 and 0014.
@@ -64,11 +64,11 @@ def imports(source: str, module: str, *, is_package: bool = False) -> list[tuple
 
 
 def ours(name: str) -> bool:
-    return name == "safeclean" or name.startswith("safeclean.")
+    return name == "kresorter" or name.startswith("kresorter.")
 
 
 def sources() -> list[tuple[str, Path]]:
-    return [(module_name(path), path) for path in sorted((SRC / "safeclean").rglob("*.py"))]
+    return [(module_name(path), path) for path in sorted((SRC / "kresorter").rglob("*.py"))]
 
 
 def _opens(node: ast.Name | ast.Attribute) -> bool:

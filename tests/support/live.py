@@ -1,6 +1,6 @@
 """What keeps the window's tests off the running system (decision 0014, item 39).
 
-``guard`` refuses the contexts of the running system (``safeclean.environment`` builds them only
+``guard`` refuses the contexts of the running system (``kresorter.environment`` builds them only
 through ``default_context`` and ``default_autostart_context``), points home and the data and
 settings folders at an empty temporary home, and gives the local AI an address that is refused
 before any connection. The network guard of 0013 item 29 applies to every test already.
@@ -13,7 +13,7 @@ from typing import NoReturn
 
 import pytest
 
-from safeclean import environment
+from kresorter import environment
 
 REFUSED_URL = "http://192.0.2.1:11434"  # not loopback: refused as a setting, never connected
 HOME_VARIABLES = (
@@ -47,4 +47,4 @@ def guard(monkeypatch: pytest.MonkeyPatch, home: Path) -> None:
     }
     for name in HOME_VARIABLES:
         monkeypatch.setenv(name, str(places[name]))
-    monkeypatch.setenv("SAFECLEAN_OLLAMA_URL", REFUSED_URL)
+    monkeypatch.setenv("KRESORTER_OLLAMA_URL", REFUSED_URL)
