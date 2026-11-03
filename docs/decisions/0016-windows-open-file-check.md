@@ -1,6 +1,6 @@
 # 0016. Windows open-file check: an exclusive open, then the quarantine on Windows
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-03
 - Builds on: 0003, 0004 (items 3-5, 9), 0005, 0012 (item 37), 0015
 - Amends: 0004 item 9 and 0005 (Windows gets a reliable backend, an exclusive open rather than
@@ -34,9 +34,8 @@ file at the destination on both systems; `os.rename` replaces it on Linux (the s
 the race the quarantine accepts on Linux (a file appearing at the destination between the
 check and the rename) is closed on Windows. A file another program opens without sharing
 deletion, between the check and the rename, makes the rename fail; for the quarantine that
-rolls the batch back (0004 item 4). Organize keeps its refusal on Windows (0012 item 37): a
-batch of organize is undone file by file, and two other blockers remain (the path length
-limit, cloud sync).
+rolls the batch back (0004 item 4). Organize's other blockers on Windows are reviewed by 0017;
+this decision lifts only the open-file one.
 
 Every numbered item below is a behaviour a test can show, and is cited by one (item 12). What
 only Windows can show runs on CI's Windows job (0015 item 20); this machine runs Linux and
@@ -57,8 +56,9 @@ checks the same code through fakes.
    cloud (`FILE_FLAG_OPEN_NO_RECALL`).
 4. **Long paths.** The path is made absolute and given with `\\?\` (`\\?\UNC\` for a share),
    so a path over 260 characters is checked like any other.
-5. **Windows gets it.** `checker_for_platform("win32")` returns `ShareModeChecker`; macOS and
-   every other system other than Linux still get `NoOpenFileCheck`. A scan on Windows reports
+5. **Windows gets it.** `checker_for_platform` returns `ShareModeChecker` for Windows, named
+   `windows` (the system a scan context is made for) or `win32` (`sys.platform`); macOS and
+   every system other than Linux still get `NoOpenFileCheck`. A scan on Windows reports
    `"open_file_check": true`, and Overview's note about an unreliable check is not shown
    there.
 6. **Testable everywhere.** The checker takes the calls it needs (`CreateFileW`,
@@ -84,12 +84,12 @@ checks the same code through fakes.
    `kresorter quarantine restore` puts them back with their `mtime_ns`, and `kresorter
    quarantine purge` deletes the vault's copies; a file a child process holds open is refused
    `open_file`; where the runner has a second drive, a file on it is refused `cross_device`.
-10. **Organize still refuses on Windows**, with the three lines of its system's blockers
-    (sharing violations, the path length limit, cloud sync) and no longer the line of
-    `no_open_file_check`; the window's Organize page says the same.
+10. **Organize's open-file blocker is lifted on Windows**: with `ShareModeChecker`, the
+    blockers of Windows no longer include `no_open_file_check` (0012 item 39), and its line
+    leaves organize's refusal there; the other blockers of its column are 0017's to lift.
 11. **The README**: the quarantine needs a reliable open-file check, which Linux and Windows
     have, and on macOS the commands refuse; what the Windows check cannot see, in one
-    sentence; organize moves files on Linux only.
+    sentence.
 
 ## The meta-test
 
@@ -122,4 +122,7 @@ the pending list in that commit, and no earlier test cites them.
   once; an antivirus that holds the file makes it "open" for a while.
 - **One drive**: a file on another drive than the data directory is refused (`cross_device`),
   as across file systems on Linux.
-- **Organize stays refused on Windows** (0012 item 37).
+
+## The owner's answers
+
+- Accepted as proposed (2026-11-03); organize is wanted on Windows too, which 0017 decides.

@@ -1,9 +1,9 @@
 # 0015. Packaging: a Windows installer and a portable zip, a wheel on PyPI, one version, the licences in every artifact
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-03
-- Builds on: 0001 (items 1, 5), 0004, 0005, 0012, 0014 (items 8-10), 0016, the pre-step-8
-  audit (A4, A6, B1, B5, B6)
+- Builds on: 0001 (items 1, 5), 0004, 0005, 0012, 0014 (items 8-10), 0016, 0017, the
+  pre-step-8 audit (A4, A6, B1, B5, B6)
 - Amends: 0014 item 9 (on Windows, the line a GUI script cannot write is shown in a message
   box)
 
@@ -21,8 +21,8 @@ is decides how:
 
 - The quarantine acts only where the open-file check can be trusted (0004, 0005): Linux today.
   Decision 0016 gives Windows its check first, so the Windows application can quarantine,
-  restore and purge, not only report. Organize stays refused on Windows for the reasons of
-  0012 item 37 (a file held open halfway through a batch, the path length limit, cloud sync).
+  restore and purge, not only report. Decision 0017 then lifts organize's refusal there (0012
+  item 37): renames tried again, a path limit, synced folders refused.
 - The window needs Python and Qt. A one-folder build (PyInstaller) carries both, with Qt's
   libraries as files of their own, so its LGPL duties hold: Qt's licence, where its source is,
   and a way to replace its libraries. A one-file executable unpacks itself at every start,
@@ -194,12 +194,12 @@ Windows can build is checked by CI there (items 21, 22).
 28. **Clean machines before the tag.** `docs/releases/<version>.md` records a run on each of
     Windows 10 and Windows 11 (the installer and the portable zip) and on an Ubuntu LTS
     (pipx): the system and its version, how it was installed, and what was done and seen (the
-    window on a screen, a scan, a file quarantined and restored, each page, organize's refusal
-    on Windows, the uninstall); the job of item 23 fails without it.
+    window on a screen, a scan, a file quarantined and restored, each page, a folder sorted
+    and its batch undone, the uninstall); the job of item 23 fails without it.
 29. **The README installs Kresorter**: Windows first (the installer or the portable zip from
     the releases, how to pass SmartScreen, how to check `SHA256SUMS.txt`), then Linux with
     `pipx install "kresorter[ui]"` and `pipx install kresorter`; it says what each system can
-    do (organize on Linux only) and how to uninstall.
+    do (organize on Linux and Windows, not on macOS) and how to uninstall.
 30. **The roadmap records step 8**: a section `Step 8: done (packaging)` and what it carries
     after it.
 
@@ -226,12 +226,13 @@ the pending list in that commit, and no earlier test cites them.
 7. Windows without a console: the message box; an uncaught error in a dialog [24, 25].
 8. The self-test; Kresorter's own files never findings [16, 17].
 9. Decision 0016, by its own plan: the Windows open-file check, the quarantine on Windows.
-10. CI on two systems, and what fails on Windows fixed, each with its test [20].
-11. The Windows application: the folder, its licences, the zip, the installer [12-15].
-12. CI: the artifacts, what is built is run, publishing from a tag [21-23].
-13. The screenshots and the README's images [26, 27].
-14. The changelog of 0.1.0, the README, the roadmap [18, 29, 30].
-15. The release record, after the owner's runs on clean machines [28]; then the tag, by the
+10. Decision 0017, by its own plan: organize on Windows.
+11. CI on two systems, and what fails on Windows fixed, each with its test [20].
+12. The Windows application: the folder, its licences, the zip, the installer [12-15].
+13. CI: the artifacts, what is built is run, publishing from a tag [21-23].
+14. The screenshots and the README's images [26, 27].
+15. The changelog of 0.1.0, the README, the roadmap [18, 29, 30].
+16. The release record, after the owner's runs on clean machines [28]; then the tag, by the
     owner, once the repository is public.
 
 ## Accepted limitations
@@ -239,7 +240,8 @@ the pending list in that commit, and no earlier test cites them.
 - **Unsigned**: SmartScreen warns before the installer and `Kresorter.exe` run; signing (a
   certificate, or SignPath for open-source projects) is a later decision.
 - **The Windows application is the window**: the commands come with `pipx install kresorter`.
-- **Organize refuses on Windows** (0012 item 37); the quarantine works there after 0016.
+- **Organize on Windows leaves synced folders alone** (0017): Desktop and Documents moved into
+  OneDrive are not sorted.
 - **No macOS build**, and macOS is not claimed by the metadata.
 - **No Flatpak, no Snap**, for the reason in the context.
 
@@ -253,3 +255,4 @@ the pending list in that commit, and no earlier test cites them.
 - The clean machines of item 28: the owner runs them.
 - The screenshots: the English window only (item 26).
 - The first version: `0.1.0`, Alpha, with a changelog for its users (item 18).
+- Accepted (2026-11-03), with organize on Windows in 0.1.0 (0017).
