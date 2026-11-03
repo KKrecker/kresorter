@@ -24,13 +24,14 @@ def project_files() -> list[Path]:
 
 def naming(paths: list[Path]) -> dict[str, int]:
     """Each file whose path or text has the old name, in any case, with the times its text has
-    it."""
+    it; a file is read as bytes, so that an image is read too."""
     found: dict[str, int] = {}
+    old = OLD.encode("ascii")
     for path in paths:
         name = path.relative_to(ROOT).as_posix()
-        text = path.read_text(encoding="utf-8").lower()
-        if OLD in name.lower() or OLD in text:
-            found[name] = text.count(OLD)
+        data = path.read_bytes().lower()
+        if OLD in name.lower() or old in data:
+            found[name] = data.count(old)
     return found
 
 
