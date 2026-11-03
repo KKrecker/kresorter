@@ -227,6 +227,13 @@ Scanner core and `safeclean scan` (read-only report).
   language (0014 item 44): a plan's group shows the label and, in Russian, the directory beside
   it; the directories, every path, the journal and the CLI keep the English names. 2500 tests,
   100 % line and branch coverage.
+- Then the prototype's look (0014 items 45-55), page by page: Lucide's icons (`ui.icons`, ISC
+  licence), the parts every page is made of (`ui.parts`: heads, cards, chips, badges, fields,
+  check boxes, switches, rows of 44 px), the sidebar with its status lines, Overview's cards,
+  the confirmation, Findings with its detail and the explanation card, Quarantine, Organize's
+  category cards and recent batches, Autostart's switches and search, Settings' cards; how a
+  path and a moment are shown (`ui.shown`). Light and dark, English and Russian, every margin on
+  the grid. 2673 tests, 100 % line and branch coverage.
 
 ### Accepted limitations carried into step 8
 - Everything from steps 2 to 6 still holds.

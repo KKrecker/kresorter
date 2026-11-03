@@ -196,24 +196,31 @@ sudo apt-get install libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
 
 Without PySide6, `safeclean-ui` says which extra to install and exits with 3.
 
-The sidebar opens six pages:
+The sidebar opens six pages, with the open-file check and the local AI's model under them:
 
-- **Overview**: the folders to scan (the safe zones, and folders you add) and Scan, which only
-  reads; then each level's files and size, the duplicate groups and the skipped paths.
-- **Findings**: grouped by their strongest reason, with level filters and a search, and the
-  detail of each. Only what is proposed at the Safe level is selected at first; a Review
-  finding is selected only by its own check box, the copy a duplicate group keeps never. Move
-  to quarantine moves the selection.
-- **Organize**: a folder's plan by category and the files that stay, the move as one batch, the
-  batches and their undo; where `organize` refuses (not Linux, or no reliable open-file check),
-  the page says why. The Russian window names the categories in Russian, but the directories
-  keep their English names (`Images`, `Documents`, ...) in every language, so `organize undo`
-  moves back what the window sorted, and the window what the command sorted.
-- **Autostart**: the entries by source, with their state, scope and location; Disable and Enable
-  for those that can change.
+- **Overview**: the folders to scan (the safe zones, and folders you add) and Scan now, which
+  only reads; then a card per level with its files, size and strongest reasons, which opens
+  Findings with that level only, and a card each for Quarantine, Organize and Autostart.
+- **Findings**: grouped by their strongest reason, with a chip per level and a search, and at
+  the right the detail of the file chosen, with why it was found. Only what is proposed at the
+  Safe level is selected at first; a Review finding is selected only by its own check box, the
+  copy a duplicate group keeps never. Move to quarantine, in the bar at the bottom, moves the
+  selection.
+- **Organize**: a folder's plan as a card per category and the files that stay, with their
+  reasons; Sort moves the plan as one batch, and the recent batches can be undone. Where
+  `organize` refuses (not Linux, or no reliable open-file check), the page says why. The
+  Russian window names the categories in Russian, but the directories keep their English names
+  (`Images`, `Documents`, ...) in every language, so `organize undo` moves back what the window
+  sorted, and the window what the command sorted.
+- **Autostart**: the entries by source, each with its location, its scope and a switch that is
+  on while it starts, and a search over names and locations; the switch of an entry that can
+  change disables or enables it, and an entry that cannot has a lock.
 - **Quarantine**: the quarantined files; Restore, or Delete permanently, the one red button.
-- **Settings**: the language, on Windows the machine-wide autostart entries (off until you turn
-  them on), a Check of the local AI and the data folder.
+- **Settings**: a card each for the language, on Windows the machine-wide autostart entries
+  (off until you turn them on), the local AI with its Check, and the data folder.
+
+The window follows the system's light or dark scheme; its icons are
+[Lucide](https://lucide.dev)'s, shipped with it under their ISC licence.
 
 Nothing changes until you confirm: every action (quarantine, restore, delete permanently,
 organize, undo, disable, enable, recover) first opens a dialog that shows what it will do, with
