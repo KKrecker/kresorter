@@ -10,14 +10,19 @@ selected at first; a Review finding is selected only by its own check box, a kep
 selecting a group or a level takes only what the analysis proposes, and only what is shown.
 Moving asks first, runs as a task that acts, and says what moved, what was refused and why;
 what moved leaves the list, the selection made stays for the rest.
+
+Tens of thousands of findings are common in a cache folder, so the tree is changed a group at a
+time: a group's rows are made apart and go in with it, many check states change without the
+model announcing each row, and what moved leaves its group in one go (pre-step-8 audit, A2).
 """
 
 from __future__ import annotations
 
+import functools
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QTreeWidget, QTreeWidgetItem, QWidget
 
 from safeclean.analysis.report import AnalysisReport, Finding
@@ -303,9 +308,10 @@ class FindingsPage(QWidget):
         self._window.sidebar.set_count("findings", len(self._findings))
 
     def _add_group(self, evidence: Evidence, found: list[Finding]) -> None:
+        """A group and its rows, made apart and added to the tree together."""
         translator = self._window.translator
         level = found[0].level
-        group = QTreeWidgetItem(self.tree)
+        group = QTreeWidgetItem()
         group.setData(_NAME, _EVIDENCE, evidence.value)
         group.setText(_NAME, translator.label(evidence))
         group.setData(_NAME, EMPHASIS, True)
@@ -315,10 +321,12 @@ class FindingsPage(QWidget):
         group.setData(_LEVEL, BADGE, level.value)
         group.setCheckState(_NAME, _UNCHECKED)
         home = Path.home()
+        folder = functools.cache(lambda parent: shown_path(parent, home))  # a folder holds many
+        rows = []
         for finding in found:
             path = Path(finding.entry.path)
-            item = QTreeWidgetItem(group, [path.name, translator.size(finding.entry.size)])
-            item.setData(_NAME, SECONDARY, shown_path(path.parent, home))
+            item = QTreeWidgetItem([path.name, translator.size(finding.entry.size)])
+            item.setData(_NAME, SECONDARY, folder(path.parent))
             item.setData(_NAME, PATH, str(path))
             item.setData(_SIZE, QUIET, True)
             item.setTextAlignment(_SIZE, _RIGHT)
@@ -328,6 +336,9 @@ class FindingsPage(QWidget):
             else:  # the copy that stays: never moved, so never selected
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
             self._items[str(path)] = item
+            rows.append(item)
+        group.addChildren(rows)
+        self.tree.addTopLevelItem(group)
 
     def show_only(self, level: Level) -> None:
         """Only the findings of ``level``, and no search (item 48)."""
@@ -381,10 +392,11 @@ class FindingsPage(QWidget):
         return [item for item in items if self._finding(item).keeps is None]
 
     def _set(self, items: list[QTreeWidgetItem], state: Qt.CheckState) -> None:
-        self._syncing = True
-        for item in items:
-            item.setCheckState(_NAME, state)
-        self._syncing = False
+        """Many check states, not announced row by row: the rows are drawn again once."""
+        with QSignalBlocker(self.tree.model()):
+            for item in items:
+                item.setCheckState(_NAME, state)
+        self.tree.viewport().update()
 
     def _changed(self, item: QTreeWidgetItem, column: int) -> None:
         if self._syncing:
@@ -502,15 +514,22 @@ class FindingsPage(QWidget):
         self._refresh()
 
     def _remove(self, gone: set[str]) -> None:
-        """What moved leaves the list, and a group left empty with it."""
+        """What moved leaves the list, a group at a time, and a group left empty with it; the
+        current finding stays current if it stays."""
         root = self.tree.invisibleRootItem()
+        current = self.tree.currentItem()
         for group in self._groups():
-            for child in _children(group):
-                if child.data(_NAME, PATH) in gone:
-                    group.removeChild(child)
-            if group.childCount() == 0:
+            rows = _children(group)
+            kept = [row for row in rows if row.data(_NAME, PATH) not in gone]
+            if not kept:
                 root.removeChild(group)
+            elif len(kept) < len(rows):
+                group.takeChildren()
+                group.addChildren(kept)
+        if current is not None and current.treeWidget() is self.tree:
+            self.tree.setCurrentItem(current)
         for key in gone:
             del self._findings[key]
             del self._items[key]
+        self._filter()
         self._window.sidebar.set_count("findings", len(self._findings))

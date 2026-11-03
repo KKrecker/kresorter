@@ -5,7 +5,8 @@ A page never opens a dialog itself: it receives ``Dialogs``, two functions, whic
 binds to the dialogs below and a test answers in their place. A confirmation names its action
 and shows what it would do; Cancel is its default button, Escape cancels as well, and only the
 action's own button confirms. It is drawn as the prototype's: 520 px wide, the details in a box
-on surface that scrolls past eight lines. The folder dialog is the window's own: Qt's file
+on surface that scrolls past eight lines, plain text, which lays out only the lines it shows
+(pre-step-8 audit, A2). The folder dialog is the window's own: Qt's file
 dialog would keep its state in Qt's settings file (item 35).
 """
 
@@ -16,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import QDir, QModelIndex, QPersistentModelIndex, Qt
+from PySide6.QtGui import QTextLayout, QTextOption
 from PySide6.QtWidgets import (
     QDialog,
     QFileSystemModel,
@@ -23,8 +25,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QPushButton,
-    QScrollArea,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -56,13 +58,15 @@ class Dialogs:
 
 WIDTH = 520  # px: the confirmation's width
 LINES = 8  # the details shown before they scroll
+_PADDING = (12, 8, 12, 8)  # px: around the details, inside their box
+_WRAP = QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere  # a long path wraps anywhere
 
 
 class ConfirmDialog(QDialog):
     """A confirmation: its title as the ``question`` (semibold, 18 px), its ``text`` in secondary
-    text, the ``details`` in a box on surface that scrolls past eight lines (``listed`` holds
-    them, a line each), then ``cancel``, bordered and the default button, and the ``action`` as
-    the primary button, or the danger one."""
+    text, the ``details`` in a box on surface that scrolls past eight lines (a line each), then
+    ``cancel``, bordered and the default button, and the ``action`` as the primary button, or
+    the danger one."""
 
     def __init__(self, parent: QWidget, translator: Translator, confirmation: Confirmation) -> None:
         super().__init__(parent)
@@ -72,18 +76,16 @@ class ConfirmDialog(QDialog):
         self.question.setProperty("role", "question")
         self.question.setWordWrap(True)
         self.text = Note(self, confirmation.text, role="secondary")
-        self.listed = QLabel("\n".join(confirmation.details))
-        self.listed.setWordWrap(True)
-        self.listed.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.listed.setContentsMargins(12, 8, 12, 8)
-        self.details = QScrollArea()
+        self.details = QPlainTextEdit()
         self.details.setProperty("role", "details")
+        self.details.setReadOnly(True)
         self.details.setFrameShape(QFrame.Shape.NoFrame)
-        self.details.setWidgetResizable(True)
         self.details.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.details.setWidget(self.listed)
-        self.listed.setAutoFillBackground(False)  # the box's surface shows through
-        self.details.viewport().setAutoFillBackground(False)
+        self.details.setWordWrapMode(_WRAP)
+        self.details.setViewportMargins(*_PADDING)
+        self.details.document().setDocumentMargin(0)
+        self.details.viewport().setAutoFillBackground(False)  # the box's surface shows through
+        self.details.setPlainText("\n".join(confirmation.details))
         self.details.setHidden(not confirmation.details)
         self.cancel = QPushButton(translator.text("button.cancel"))
         self.cancel.setDefault(True)
@@ -106,19 +108,28 @@ class ConfirmDialog(QDialog):
         layout.addLayout(buttons)
         self.cancel.setFocus()
         if confirmation.details:
-            self._fit()
+            self._fit(confirmation.details)
 
-    def _fit(self) -> None:
-        """The box as high as its details, up to eight lines."""
+    def _fit(self, details: tuple[str, ...]) -> None:
+        """The box as high as its details' lines, up to eight: only the first lines are laid
+        out, as the box will (one pixel more, which the box keeps under its last line)."""
         self.ensurePolished()
-        self.listed.ensurePolished()
-        width = WIDTH - 48
-        probe = QLabel("\n".join(["M"] * LINES))
-        probe.setWordWrap(True)
-        probe.setFont(self.listed.font())
-        probe.setContentsMargins(self.listed.contentsMargins())
-        most = probe.heightForWidth(width)
-        self.details.setFixedHeight(min(self.listed.heightForWidth(width), most))
+        self.details.ensurePolished()
+        left, top, right, bottom = _PADDING
+        width = WIDTH - 48 - left - right
+        option = QTextOption()
+        option.setWrapMode(_WRAP)
+        heights: list[float] = []
+        for detail in details[:LINES]:
+            layout = QTextLayout(detail, self.details.font())
+            layout.setTextOption(option)
+            layout.beginLayout()
+            while (line := layout.createLine()).isValid():
+                line.setLineWidth(width)
+                heights.append(line.height())
+            layout.endLayout()
+        shown = sum(int(height) for height in heights[:LINES])
+        self.details.setFixedHeight(shown + 1 + top + bottom)
 
 
 def confirm(parent: QWidget, translator: Translator, confirmation: Confirmation) -> bool:

@@ -192,7 +192,7 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
         ('QLabel[role="caption"]', {"color": p.secondary, "font-size": "13px"}),
         ('QLabel[role="question"]', {"font-size": "18px", "font-weight": "600"}),
         (
-            'QScrollArea[role="details"]',
+            'QPlainTextEdit[role="details"]',
             {"background-color": p.surface, "border": "none", "border-radius": "8px"},
         ),
         (
