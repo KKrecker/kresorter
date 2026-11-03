@@ -15,7 +15,7 @@ from typing import Literal
 
 from kresorter.autostart.listing import AutostartContext, default_autostart_context
 from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
-from kresorter.core.open_files import checker_for_platform
+from kresorter.core.open_files import NoOpenFileCheck, OpenFileChecker, checker_for_platform
 from kresorter.core.policy import PathPolicy
 from kresorter.core.scanner import ScanContext
 from kresorter.llm.transport import LIMITS, Limits
@@ -47,9 +47,11 @@ def default_context(
     home: Path | None = None,
 ) -> ScanContext:
     """Context for the current system (arguments exist for tests). The folders kresorter runs
-    from are the running system's: a context made for another has none."""
+    from and the open-file check are the running system's: a context made for another has no
+    folder and no check (decision 0015, item 16; 0016, item 5)."""
     current = platform or detect_platform()
-    program = program_folders() if current == detect_platform() else ()
+    running = current == detect_platform()
+    program = program_folders() if running else ()
     if current == "windows":
         policy = PathPolicy.for_windows(os.environ if env is None else env, program_dirs=program)
     else:
@@ -60,7 +62,7 @@ def default_context(
             env=os.environ if env is None else env,
             program_dirs=program,
         )
-    open_files = checker_for_platform(current)
+    open_files: OpenFileChecker = checker_for_platform(current) if running else NoOpenFileCheck()
     return ScanContext(
         policy=policy,
         open_files=open_files,
