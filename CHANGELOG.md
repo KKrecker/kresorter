@@ -104,6 +104,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `autostart.xdg.read_xdg()`: an autostart directory that exists but cannot be listed is now skipped with `cannot read: <reason>` instead of silently reading as empty; nothing it could change is shown: no items at all for the user directory, and for a system directory only the names found in the directories before it (decision 0011, item 32).
 
 ### Changed
+- On Windows the autostart stub, its staged copy and the settings file are opened with `O_BINARY`: `os.open` is otherwise in text mode there, and each `\n` written would become `\r\n` (decision 0015, item 20).
 - The lock's `flock` backend takes `fcntl` as a module, imported only when used, as the `msvcrt` backend does: both are type-checked and tested on Linux and on Windows (decision 0015, item 20).
 - CI checks on two systems: Linux for every Python of the matrix, Windows for 3.11 and 3.14 while the repository is private; every push is checked, a step's branch too, and one failing job stops no other. Qt's system libraries are installed on Linux only; the window's tests run offscreen on both. `.gitattributes` keeps LF line endings in a Windows checkout (decision 0015, item 20).
 - The README's organize: it moves files on Linux and Windows, not on macOS; on Windows a folder a sync client keeps is refused and a file whose new path would pass 259 characters stays; the window's Organize page refuses on macOS or without a reliable open-file check (decision 0017, item 14).

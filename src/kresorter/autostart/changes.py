@@ -42,6 +42,9 @@ from kresorter.storage.pending import has_pending
 from kresorter.storage.transactions import transaction
 
 ENTRY_MODE = 0o644
+# A new file only; with O_BINARY on Windows, where os.open is otherwise in text mode: each \n
+# written would become \r\n.
+_NEW_FILE = os.O_WRONLY | os.O_CREAT | os.O_EXCL
 _AS_BEFORE = "the entry is as it was before the change"
 _NEITHER = "the entry is neither as before nor as after the change"
 _NOT_KEPT = "the entry is as after the change, but the store does not hold what it kept"
@@ -249,7 +252,7 @@ class XdgChanges:
         stub = plan.location
         with contextlib.suppress(FileExistsError):  # an existing directory keeps its mode
             self._user_dir.mkdir(mode=PRIVATE, parents=True)
-        fd = os.open(stub, os.O_WRONLY | os.O_CREAT | os.O_EXCL, ENTRY_MODE)
+        fd = os.open(stub, _NEW_FILE | getattr(os, "O_BINARY", 0), ENTRY_MODE)
         try:
             _write_and_close(fd, STUB)
         except BaseException:
@@ -299,7 +302,7 @@ class XdgChanges:
 
 
 def _write_new(path: Path, data: bytes) -> None:
-    _write_and_close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, ENTRY_MODE), data)
+    _write_and_close(os.open(path, _NEW_FILE | getattr(os, "O_BINARY", 0), ENTRY_MODE), data)
 
 
 def _write_and_close(fd: int, data: bytes) -> None:

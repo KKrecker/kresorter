@@ -43,6 +43,8 @@ LanguageSetting = Literal["system", "en", "ru"]
 LANGUAGE_SETTINGS: tuple[LanguageSetting, ...] = ("system", "en", "ru")
 _LANGUAGES: dict[str, LanguageSetting] = {setting: setting for setting in LANGUAGE_SETTINGS}
 _NO_FOLLOW = getattr(os, "O_NOFOLLOW", 0)  # POSIX: never write through a link
+# With O_BINARY on Windows, where os.open is otherwise in text mode: each \n would be \r\n.
+_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _NO_FOLLOW
 
 
 @dataclass(frozen=True)
@@ -121,7 +123,7 @@ def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
 
 def _replace(data_dir: Path, data: bytes) -> None:
     temp = data_dir / TEMP_NAME
-    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _NO_FOLLOW, PRIVATE_FILE)
+    fd = os.open(temp, _FLAGS | getattr(os, "O_BINARY", 0), PRIVATE_FILE)
     with os.fdopen(fd, "wb") as stream:
         temp.chmod(PRIVATE_FILE)  # a file left behind keeps its mode when it is opened
         stream.write(data)
