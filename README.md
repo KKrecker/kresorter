@@ -91,10 +91,12 @@ refused as a whole (the home directory or above it, a game library, a project, a
 directory), and every file that stays is listed with its reason: links, the folder's own
 metadata, downloads in progress, junk, unknown kinds (web pages included), files with
 companions (`movie.mkv` and `movie.srt`), programs next to their libraries. Every file is
-checked again right before it moves; a batch that stops puts back what it moved. Organize moves
-files only where nothing blocks it, today Linux with its open-file check: on macOS and Windows,
-and on Linux if the open-file check cannot be trusted, `move` and `undo` refuse (exit code 3)
-and name what blocks them, while `list` and `recover` run.
+checked again right before it moves; a batch that stops puts back what it moved. On Windows a
+folder a sync client keeps (OneDrive, Dropbox, iCloud and any other client Windows knows of) is
+refused as a whole, since a move there reaches every device, and a file whose new path would
+pass 259 characters stays where it is. Organize moves files on Linux and Windows, with their
+open-file checks: on macOS, and wherever the open-file check cannot be trusted, `move` and
+`undo` refuse (exit code 3) and name what blocks them, while `list` and `recover` run.
 
 ### Recovery
 
@@ -212,7 +214,7 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
   selection.
 - **Organize**: a folder's plan as a card per category and the files that stay, with their
   reasons; Sort moves the plan as one batch, and the recent batches can be undone. Where
-  `organize` refuses (not Linux, or no reliable open-file check), the page says why. The
+  `organize` refuses (macOS, or no reliable open-file check), the page says why. The
   Russian window names the categories in Russian, but the directories keep their English names
   (`Images`, `Documents`, ...) in every language, so `organize undo` moves back what the window
   sorted, and the window what the command sorted.
