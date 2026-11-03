@@ -17,6 +17,7 @@ from kresorter.core.open_files.windows import ShareModeChecker
 from kresorter.core.policy import BlockReason, Verdict
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
+from kresorter.organize.synced import NoSyncedFolders
 from support.files import snapshot, write
 from support.kernel import FakeKernel
 
@@ -42,6 +43,7 @@ def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
         classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checked,
         platform="linux",
+        synced=NoSyncedFolders(),
     )
 
 
@@ -185,6 +187,7 @@ def test_explicit_scan_never_lists_the_app_data_dir(tmp_path: Path, tree: Path) 
         classifier=base.classifier,
         open_files_checked=True,
         platform="linux",
+        synced=NoSyncedFolders(),
     )
     _, out = run(["scan", "--json", str(tree)], context)
     data = json.loads(out)

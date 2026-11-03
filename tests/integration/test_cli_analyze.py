@@ -14,6 +14,7 @@ from kresorter.analysis.duplicates import KeepReason
 from kresorter.core.heuristics import JunkClassifier, default_rules
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
+from kresorter.organize.synced import NoSyncedFolders
 from support.files import snapshot
 
 DAY_NS = 86_400 * 10**9
@@ -50,6 +51,7 @@ def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
         classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checked,
         platform="linux",
+        synced=NoSyncedFolders(),
     )
 
 

@@ -7,13 +7,15 @@ each junk rule and each extension has one. They are compared folded, as the name
 a wrong match only refuses a folder, a missed one breaks what is in it.
 """
 
+import dataclasses
 import re
-from pathlib import Path
+from pathlib import Path, PurePath, PurePosixPath
 
 import pytest
 
 from fakes import deny_listing, deny_stat
 from kresorter.core.scanner import ScanContext
+from kresorter.core.scanner import scan as scan_of
 from kresorter.organize.folders import (
     FolderMarkers,
     FolderReason,
@@ -21,8 +23,11 @@ from kresorter.organize.folders import (
     default_markers,
     load_markers,
 )
+from kresorter.organize.mover import check
 from kresorter.organize.planner import plan
+from kresorter.ui.i18n import Translator
 from support.files import write
+from support.synced import FakeSynced
 
 DECISION = Path(__file__).resolve().parents[2] / "docs" / "decisions" / "0012-organize.md"
 
@@ -148,6 +153,7 @@ def test_the_folder_reasons_are_pinned() -> None:
         "blocked",
         "home",
         "unreadable",
+        "cloud_sync",
         "game_library",
         "project",
         "cache_or_temp",
@@ -253,6 +259,114 @@ def test_markers_one_level_down_refuse_nothing(zone: Path, scan: ScanContext) ->
     for relative in ("app/.git/HEAD", "app/Makefile", "game/libraryfolders.vdf", "a.jpg"):
         write(folder / relative)
     assert [move.source.name for move in plan(folder, scan).moves] == ["a.jpg"]
+
+
+# --- a folder a sync client keeps (decision 0017, item 8) ---------------------------------------
+
+
+def syncing(scan: ScanContext, *roots: PurePath, error: str | None = None) -> ScanContext:
+    return dataclasses.replace(scan, synced=FakeSynced(roots, error))
+
+
+@pytest.mark.parametrize("relative", ["OneDrive", "OneDrive/Documents", "OneDrive/a/b"])
+def test_a_synced_folder_and_any_folder_in_it_are_refused(
+    zone: Path, scan: ScanContext, relative: str
+) -> None:
+    # [0017.8] as a whole; the detail is the synced folder
+    root = zone / "OneDrive"
+    write(zone / relative / "a.jpg")
+    assert refusal(zone / relative, syncing(scan, root)) == (FolderReason.CLOUD_SYNC, str(root))
+
+
+def test_a_folder_beside_or_above_a_synced_one_is_sorted(zone: Path, scan: ScanContext) -> None:
+    # [0017.8] OneDrive2 is not in OneDrive; Cloud holds one, a directory that stays (0012.2)
+    context = syncing(scan, zone / "OneDrive", zone / "Cloud" / "Box")
+    write(zone / "OneDrive2" / "a.jpg")
+    write(zone / "Cloud" / "Box" / "b.jpg")
+    write(zone / "Cloud" / "c.jpg")
+    assert [m.source.name for m in plan(zone / "OneDrive2", context).moves] == ["a.jpg"]
+    assert [m.source.name for m in plan(zone / "Cloud", context).moves] == ["c.jpg"]
+
+
+def test_synced_folders_are_compared_ignoring_case(zone: Path, scan: ScanContext) -> None:
+    # [0017.8] as NTFS compares paths
+    root = PurePosixPath(str(zone / "OneDrive").upper())
+    folder = zone / "OneDrive" / "Documents"
+    folder.mkdir(parents=True)
+    assert refusal(folder, syncing(scan, root)) == (FolderReason.CLOUD_SYNC, str(root))
+
+
+def test_the_first_synced_folder_holding_it_is_named(zone: Path, scan: ScanContext) -> None:
+    # [0017.8] in the order they were given
+    folder = zone / "OneDrive" / "Documents"
+    folder.mkdir(parents=True)
+    context = syncing(scan, zone / "Box", folder, zone / "OneDrive")
+    assert refusal(folder, context) == (FolderReason.CLOUD_SYNC, str(folder))
+
+
+def test_what_comes_before_not_a_directory_comes_first(zone: Path, scan: ScanContext) -> None:
+    # [0017.8] the synced folders are not even asked
+    root = zone / "OneDrive"
+    context = syncing(scan, root)
+    (zone / "real").mkdir()
+    root.mkdir()
+    (root / "link").symlink_to(zone / "real")
+    assert refusal(root / "missing", context) == (FolderReason.NOT_FOUND, "")
+    assert refusal(write(root / "notes.txt"), context) == (FolderReason.NOT_A_DIRECTORY, "")
+    assert refusal(root / "link", context) == (FolderReason.LINK, str(zone / "real"))
+    assert isinstance(context.synced, FakeSynced)
+    assert context.synced.reads == 0
+
+
+@pytest.mark.parametrize(
+    ("folder", "made"),
+    [
+        ("app/__pycache__", "app/__pycache__/a.pyc"),  # cache_or_temp
+        ("steamapps/common", "steamapps/common/a.jpg"),  # game_library, by a path name
+        ("Steam", "Steam/libraryfolders.vdf"),  # game_library, by an entry
+        ("app", "app/.git/HEAD"),  # project, by version control
+        ("app", "app/Makefile"),  # project, by an entry
+    ],
+)
+def test_a_synced_folder_comes_before_what_breaks_when_moved(
+    zone: Path, scan: ScanContext, folder: str, made: str
+) -> None:
+    # [0017.8] before cache_or_temp, and so before the markers
+    root = zone / "OneDrive"
+    write(root / made)
+    assert refusal(root / folder, syncing(scan, root)) == (FolderReason.CLOUD_SYNC, str(root))
+
+
+def test_unknown_synced_folders_refuse_every_folder(zone: Path, scan: ScanContext) -> None:
+    # [0017.8] [0017.10] failing closed
+    write(zone / "Downloads" / "a.jpg")
+    context = syncing(scan, error="access denied")
+    assert refusal(zone / "Downloads", context) == (
+        FolderReason.CLOUD_SYNC,
+        "synced folders unknown: access denied",
+    )
+
+
+def test_the_synced_folders_are_asked_each_time_a_folder_is_planned_only(
+    zone: Path, scan: ScanContext
+) -> None:
+    # [0017.10] planning asks, once a plan; the check before a batch and a scan do not
+    synced = FakeSynced()
+    context = dataclasses.replace(scan, synced=synced)
+    write(zone / "Downloads" / "a.jpg")
+    found = plan(zone / "Downloads", context)
+    plan(zone / "Downloads", context)
+    assert synced.reads == 2
+    check(found.moves, zone / "Downloads", context)
+    scan_of([zone], context)
+    assert synced.reads == 2
+
+
+def test_the_window_names_a_synced_folder_in_english_and_russian() -> None:
+    # [0017.8]
+    reason = FolderReason("cloud_sync")
+    assert Translator("en").label(reason) == "A synced folder"
+    assert Translator("ru").label(reason) == "Синхронизируемая папка"
 
 
 # --- the markers, as data ----------------------------------------------------------------------

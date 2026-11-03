@@ -40,6 +40,7 @@ from support.moves import (
     three_files,
     tree,
 )
+from support.synced import FakeSynced
 
 SORTED = {A: MOVED[A], B: MOVED[B], C: MOVED[C]}
 CATEGORIES = {"Audio": "dir", "Documents": "dir", "Images": "dir"}
@@ -175,6 +176,25 @@ def test_a_refused_folder_plans_nothing(
 
 def files_of(folder: Path) -> dict[str, bytes]:
     return {path.name: path.read_bytes() for path in folder.iterdir()}
+
+
+@pytest.mark.parametrize("yes", [[], ["--yes"]], ids=["plan", "yes"])
+def test_a_synced_folder_plans_nothing(
+    tmp_path: Path, zone: Path, data_dir: Path, yes: list[str]
+) -> None:
+    # [0017.8] the synced folder that holds it
+    root = zone / "OneDrive"
+    folder = three_files(root)
+    context = scan_context(tmp_path, zone, data_dir, synced=FakeSynced([root]))
+    before = tree(zone)
+
+    assert run(organize("move", folder, *yes), context) == (
+        1,
+        f"Refused: {folder}: cloud_sync ({root})\n",
+        "",
+    )
+    assert tree(zone) == before
+    assert query(data_dir, "SELECT COUNT(*) FROM move_batches") == [(0,)]
 
 
 def test_a_relative_folder_is_taken_from_the_working_directory(

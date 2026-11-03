@@ -24,6 +24,7 @@ from kresorter.core.heuristics import JunkClassifier, load_rules
 from kresorter.core.models import FileEntry
 from kresorter.core.preflight import Candidate
 from kresorter.core.scanner import ScanContext, scan
+from kresorter.organize.synced import NoSyncedFolders
 
 DIGEST = "ab" * 32
 SIZE = 4096
@@ -218,6 +219,7 @@ def test_a_scanned_group_feeds_the_decision(tmp_path: Path) -> None:
         classifier=CLASSIFIER,
         open_files_checked=True,
         platform="linux",
+        synced=NoSyncedFolders(),
     )
     (group,) = scan([root], context).duplicates
 

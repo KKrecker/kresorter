@@ -25,6 +25,7 @@ from kresorter.core.heuristics import JunkClassifier, default_rules
 from kresorter.core.open_files import NoOpenFileCheck
 from kresorter.core.scanner import ScanContext
 from kresorter.organize.mover import carry_out
+from kresorter.organize.synced import NoSyncedFolders
 from kresorter.organize.undo import plan_undo
 from kresorter.storage.db import connect
 from kresorter.storage.lock import InstanceLock
@@ -443,7 +444,7 @@ def test_an_unsafe_data_directory_is_refused_before_anything_is_created(
     rules = [r for r in default_rules() if r.id != "posix-temp"]
     policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=zone)
     classifier = JunkClassifier(rules, platform="linux")
-    unsafe = ScanContext(policy, FakeOpenFiles(), classifier, True, "linux")
+    unsafe = ScanContext(policy, FakeOpenFiles(), classifier, True, "linux", NoSyncedFolders())
 
     code, _, err = run(["autostart", "recover"], unsafe, autostart_context("linux", tmp_path))
 

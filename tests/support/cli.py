@@ -15,6 +15,7 @@ from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
 from kresorter.core.open_files import OpenFileChecker
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
+from kresorter.organize.synced import NoSyncedFolders, SyncedFolders
 
 
 def scan_context(
@@ -24,11 +25,13 @@ def scan_context(
     open_files: OpenFileChecker | None = None,
     *,
     platform: Platform = "linux",
+    synced: SyncedFolders | None = None,
 ) -> ScanContext:
     """``zone`` the one default root, ``data_dir`` the data directory, every default rule but
     ``posix-temp``: tmp_path lives under /tmp, which it marks as junk, so the data directory
     itself would look like junk and be refused. ``platform`` is the system the context says it
-    was made for; its rules stay Linux's, which read the temporary paths of the tests."""
+    was made for; its rules stay Linux's, which read the temporary paths of the tests. No folder
+    is synced unless ``synced`` names some."""
     rules = [r for r in default_rules() if r.id != "posix-temp"]
     checker = open_files or FakeOpenFiles()
     policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=data_dir)
@@ -38,6 +41,7 @@ def scan_context(
         classifier=JunkClassifier(rules, platform="linux"),
         open_files_checked=checker.reliable,
         platform=platform,
+        synced=NoSyncedFolders() if synced is None else synced,
     )
 
 

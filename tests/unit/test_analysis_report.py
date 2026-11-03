@@ -20,6 +20,7 @@ from kresorter.core.heuristics import JunkClassifier, load_rules
 from kresorter.core.models import FileEntry
 from kresorter.core.preflight import Candidate
 from kresorter.core.scanner import ScanContext, scan
+from kresorter.organize.synced import NoSyncedFolders
 from support.files import snapshot
 
 RULES = """
@@ -65,6 +66,7 @@ def run(tmp_path: Path, root: Path) -> AnalysisReport:
         classifier=CLASSIFIER,
         open_files_checked=True,
         platform="linux",
+        synced=NoSyncedFolders(),
     )
     return analyze(
         scan([root], context),

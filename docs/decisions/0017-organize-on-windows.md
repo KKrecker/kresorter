@@ -119,8 +119,9 @@ live tests run on CI's Windows job.
     field like `platform` (0012 item 39), answers the synced folders:
     `organize.synced.WindowsSyncedFolders` on Windows, reading the environment and the
     registry each time organize plans a folder and at no other time; `NoSyncedFolders`, which
-    names none, on Linux and macOS. A key that exists but cannot be read refuses every folder,
-    `cloud_sync` with the detail `synced folders unknown: <message>`.
+    names none, on Linux and macOS, and in a context made for another system than the one
+    running, as its open-file check (0016 item 5). A key that exists but cannot be read refuses
+    every folder, `cloud_sync` with the detail `synced folders unknown: <message>`.
 
 ## Junctions and the folder's name
 

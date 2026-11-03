@@ -11,6 +11,7 @@ from kresorter.core.heuristics import JunkCategory, JunkClassifier, load_rules
 from kresorter.core.models import FileEntry, Skipped, SkipReason
 from kresorter.core.policy import BlockReason
 from kresorter.core.scanner import DuplicateGroup, ScanContext, scan
+from kresorter.organize.synced import NoSyncedFolders
 from support.files import write
 
 RULES = """
@@ -29,6 +30,7 @@ def context(tmp_path: Path, *blocked: Path) -> ScanContext:
         classifier=JunkClassifier(load_rules(RULES), platform="linux"),
         open_files_checked=True,
         platform="linux",
+        synced=NoSyncedFolders(),
     )
 
 

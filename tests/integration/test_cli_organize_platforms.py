@@ -204,6 +204,17 @@ def test_a_scan_context_cannot_be_made_without_its_platform(scan: ScanContext) -
         ScanContext(**fields)
 
 
+def test_a_scan_context_cannot_be_made_without_its_synced_folders(scan: ScanContext) -> None:
+    # [0017.10] a required field like platform: no context forgets to ask
+    fields: dict[str, Any] = {
+        field.name: getattr(scan, field.name)
+        for field in dataclasses.fields(scan)
+        if field.name != "synced"
+    }
+    with pytest.raises(TypeError, match="synced"):
+        ScanContext(**fields)
+
+
 # --- list and recover run everywhere -------------------------------------------------------------
 
 
