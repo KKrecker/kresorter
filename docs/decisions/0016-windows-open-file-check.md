@@ -60,7 +60,8 @@ checks the same code through fakes.
    `windows` (the system a scan context is made for) or `win32` (`sys.platform`); macOS and
    every system other than Linux still get `NoOpenFileCheck`. A scan on Windows reports
    `"open_file_check": true`, and Overview's note about an unreliable check is not shown
-   there.
+   there. The check is the running system's: a scan context made for another system (as the
+   tests make) has `NoOpenFileCheck`.
 6. **Testable everywhere.** The checker takes the calls it needs (`CreateFileW`,
    `CloseHandle`, the last error and its message) as a protocol, `Kernel`; the default,
    `Kernel32`, is `ctypes.WinDLL("kernel32", use_last_error=True)` with the functions' types

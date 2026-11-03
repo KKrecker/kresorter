@@ -15,7 +15,7 @@ import pytest
 from fakes import FakeOpenFiles, journal_held
 from kresorter import cli_quarantine, environment
 from kresorter.core.heuristics import Platform
-from kresorter.core.open_files import NoOpenFileCheck, ProcFdChecker
+from kresorter.core.open_files import NoOpenFileCheck, ProcFdChecker, checker_for_platform
 from kresorter.core.scanner import ScanContext
 from kresorter.quarantine.service import QuarantineService
 from kresorter.storage.lock import InstanceLock
@@ -355,19 +355,33 @@ def test_bad_usage_exits_with_2(context: ScanContext, args: list[str]) -> None:
 
 
 def test_scan_context_on_linux_checks_open_files(tmp_path: Path) -> None:
+    # [0016.5] on Linux: elsewhere a context for Linux is one for another system
+    if environment.detect_platform() != "linux":
+        pytest.skip("Linux only")
     context = environment.default_context(platform="linux", env={}, home=tmp_path)
     assert isinstance(context.open_files, ProcFdChecker)
     assert context.open_files_checked is True
 
 
-@pytest.mark.parametrize("platform", ["darwin", "windows"])
-def test_scan_context_elsewhere_discloses_the_missing_check(
+def test_the_running_system_s_context_has_the_check_of_its_system() -> None:
+    # [0016.5] the Linux one, and on Windows the share-mode one: both reliable
+    context = environment.default_context()
+    expected = checker_for_platform(environment.detect_platform())
+    assert type(context.open_files) is type(expected)
+    assert context.open_files_checked is expected.reliable
+
+
+@pytest.mark.parametrize("platform", ["linux", "darwin", "windows"])
+def test_a_context_for_another_system_discloses_the_missing_check(
     tmp_path: Path, platform: Platform
 ) -> None:
+    # [0016.5] the check is the running system's: a context made for another has none
+    if platform == environment.detect_platform():
+        pytest.skip("the running system")
     env = {"USERPROFILE": r"C:\Users\Alice"}
     context = environment.default_context(platform=platform, env=env, home=tmp_path)
+    assert isinstance(context.open_files, NoOpenFileCheck)
     assert context.open_files_checked is False
-    assert context.open_files.reliable is False
 
 
 def test_a_loosened_data_directory_is_made_private_again(

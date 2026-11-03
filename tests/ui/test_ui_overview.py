@@ -12,10 +12,12 @@ from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
 from kresorter.analysis.score import Level
+from kresorter.core.open_files.windows import ShareModeChecker
 from kresorter.ui.overview import FolderChip
 from kresorter.ui.shown import shown_path
 from kresorter.ui.window import Window
 from support.files import write
+from support.kernel import FakeKernel
 from support.moves import three_files
 from support.window import FakeDialogs, environment, junk_tree, make_window, scanned, wait_idle
 
@@ -192,6 +194,18 @@ def test_without_a_reliable_open_file_check_the_page_says_so(
         "Files in use cannot be recognized on this system, so nothing can be moved to the"
         " quarantine."
     )
+
+
+def test_with_the_windows_check_the_page_says_nothing_of_it(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
+) -> None:
+    # [0016.5] the note about an unreliable check is not shown on Windows
+    checked = ShareModeChecker(FakeKernel())
+    window = make_window(
+        qtbot, environment(tmp_path, zone, data_dir, platform="windows", open_files=checked)
+    )
+    scanned(qtbot, window)
+    assert window.overview.unreliable.isHidden()
 
 
 # --- a card per level [0014.48] ------------------------------------------------------------------

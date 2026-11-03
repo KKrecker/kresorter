@@ -17,6 +17,8 @@ from kresorter.core.open_files import (
     ProcFdChecker,
     checker_for_platform,
 )
+from kresorter.core.open_files.windows import ShareModeChecker
+from support.kernel import FakeCtypes
 
 # --- fake /proc helpers ------------------------------------------------------------------------
 
@@ -162,7 +164,17 @@ def test_linux_gets_the_proc_backend() -> None:
     assert checker.reliable is True
 
 
-@pytest.mark.parametrize("platform", ["win32", "darwin", "freebsd14"])
+@pytest.mark.parametrize("platform", ["windows", "win32"])
+def test_windows_gets_the_share_mode_check(kernel32: FakeCtypes, platform: str) -> None:
+    # [0016.5] by the name a scan context is made for, or by sys.platform's; kernel32 loaded
+    checker = checker_for_platform(platform)
+    assert isinstance(checker, ShareModeChecker)
+    assert checker.reliable is True
+    assert kernel32.loaded == [("kernel32", True)]
+
+
+@pytest.mark.parametrize("platform", ["darwin", "freebsd14", "cygwin"])
 def test_other_platforms_get_an_unreliable_checker(platform: str) -> None:
-    # Quarantine refuses to start without reliable=True: a polite refusal (decision 0004, item 9).
-    assert checker_for_platform(platform).reliable is False
+    # [0016.5] Quarantine refuses to start without reliable=True: a polite refusal (decision
+    # 0004, item 9). macOS and every system other than Linux and Windows.
+    assert isinstance(checker_for_platform(platform), NoOpenFileCheck)

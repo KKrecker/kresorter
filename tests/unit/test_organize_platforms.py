@@ -12,7 +12,9 @@ import pytest
 from fakes import FakeOpenFiles
 from kresorter.core.heuristics import Platform
 from kresorter.core.open_files import NoOpenFileCheck, checker_for_platform
+from kresorter.core.open_files.windows import ShareModeChecker
 from kresorter.organize.platforms import Blocker, blockers, refusal
+from support.kernel import FakeKernel
 
 # The columns of item 38: what each system blocks whatever its open-file check.
 SYSTEM: dict[Platform, tuple[Blocker, ...]] = {
@@ -53,14 +55,27 @@ def test_an_unreliable_checker_blocks_linux_too() -> None:
     [
         ("linux", ()),
         ("darwin", (Blocker.NO_OPEN_FILE_CHECK, Blocker.CLOUD_SYNC)),
-        ("windows", tuple(Blocker)),
+        ("windows", (Blocker.SHARING_VIOLATIONS, Blocker.PATH_LENGTH_LIMIT, Blocker.CLOUD_SYNC)),
     ],
 )
+@pytest.mark.usefixtures("kernel32")
 def test_today_macos_and_windows_have_every_blocker_of_their_column(
     platform: Platform, expected: tuple[Blocker, ...]
 ) -> None:
-    # [0012.37] [0012.39] with the checkers kresorter gives them (0005; 0004 item 9)
+    # [0012.37] [0012.39] [0016.10] with the checkers kresorter gives them (0005; 0016): on
+    # Windows the share-mode check lifts the open-file blocker, and only that one
     assert blockers(platform, checker_for_platform(platform)) == expected
+
+
+def test_windows_refuses_without_the_open_file_line() -> None:
+    # [0016.10] the other lines are 0017's to take out
+    assert refusal("windows", ShareModeChecker(FakeKernel())) == (
+        "kresorter: organize does not move files on Windows; nothing was changed\n"
+        "  - a file another program holds open can refuse to move halfway through a batch,"
+        " and so can the move back\n"
+        "  - one directory deeper, a path can pass the 260-character limit\n"
+        "  - Desktop and Documents can be synced to the cloud: a move would reach every device\n"
+    )
 
 
 def test_nothing_to_refuse_where_nothing_blocks() -> None:

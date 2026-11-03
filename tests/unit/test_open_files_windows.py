@@ -5,8 +5,6 @@ error; ``Kernel32``, the default, is checked against a fake ``ctypes``. What onl
 show is in the live tests (item 7).
 """
 
-import sys
-from dataclasses import dataclass, field
 from pathlib import PureWindowsPath
 
 import pytest
@@ -14,52 +12,13 @@ import pytest
 from kresorter.core.open_files import OpenFileCheckError
 from kresorter.core.open_files.windows import Kernel, Kernel32, ShareModeChecker
 from kresorter.core.policy import BlockReason, PathPolicy, Verdict
+from support.kernel import FakeCtypes, FakeKernel
 
 GENERIC_READ = 0x80000000
 OPEN_EXISTING = 3
 FLAGS = 0x00200000 | 0x00100000  # FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_OPEN_NO_RECALL
-INVALID_HANDLE_VALUE = -1
 SHARING_VIOLATION = 32
 FILE = PureWindowsPath(r"C:\Users\Alice\Downloads\a.txt")
-
-
-@dataclass
-class FakeKernel:
-    """``CreateFileW`` answers ``handle``, or -1 and ``error`` as the last error; ``CloseHandle``
-    fails with ``close_error`` when it is not 0."""
-
-    handle: int = 7
-    error: int = 0
-    close_error: int = 0
-    calls: list[tuple[object, ...]] = field(default_factory=list)
-    _last: int = 0
-
-    def CreateFileW(
-        self,
-        name: str,
-        access: int,
-        share: int,
-        security: None,
-        disposition: int,
-        flags: int,
-        template: None,
-        /,
-    ) -> int:
-        call = ("CreateFileW", name, access, share, security, disposition, flags, template)
-        self.calls.append(call)
-        self._last = self.error
-        return INVALID_HANDLE_VALUE if self.error else self.handle
-
-    def CloseHandle(self, handle: int, /) -> int:
-        self.calls.append(("CloseHandle", handle))
-        self._last = self.close_error
-        return 0 if self.close_error else 1
-
-    def last_error(self) -> int:
-        return self._last
-
-    def message(self, code: int) -> str:
-        return f"the message of {code}"
 
 
 def opened(name: str) -> tuple[object, ...]:
@@ -135,48 +94,6 @@ def test_the_path_is_given_whole_with_its_prefix(path: str, name: str) -> None:
 # --- Kernel32: kernel32 through ctypes ----------------------------------------------------------
 
 
-@dataclass
-class FakeFunction:
-    answer: int
-    calls: list[tuple[object, ...]] = field(default_factory=list)
-    argtypes: tuple[object, ...] = ()
-    restype: object = None
-
-    def __call__(self, *args: object) -> int:
-        self.calls.append(args)
-        return self.answer
-
-
-class FakeLibrary:
-    def __init__(self) -> None:
-        self.CreateFileW = FakeFunction(11)
-        self.CloseHandle = FakeFunction(1)
-
-
-class FakeCtypes:
-    """What ``Kernel32`` takes from ``ctypes``: the library, the types, the last error."""
-
-    c_wchar_p = "c_wchar_p"
-    c_uint32 = "c_uint32"
-    c_void_p = "c_void_p"
-    c_ssize_t = "c_ssize_t"
-    c_int = "c_int"
-
-    def __init__(self) -> None:
-        self.library = FakeLibrary()
-        self.loaded: list[tuple[str, bool]] = []
-
-    def WinDLL(self, name: str, *, use_last_error: bool) -> FakeLibrary:
-        self.loaded.append((name, use_last_error))
-        return self.library
-
-    def get_last_error(self) -> int:
-        return 32
-
-    def FormatError(self, code: int) -> str:
-        return f"formatted {code}"
-
-
 def test_kernel32_is_loaded_with_its_last_error_and_typed() -> None:
     # [0016.6] a handle as a signed integer: INVALID_HANDLE_VALUE is -1
     module = FakeCtypes()
@@ -208,13 +125,9 @@ def test_kernel32_passes_each_call_on() -> None:
     assert module.library.CloseHandle.calls == [(11,)]
 
 
-def test_the_default_kernel_is_loaded_when_the_checker_is_made(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_the_default_kernel_is_loaded_when_the_checker_is_made(kernel32: FakeCtypes) -> None:
     # [0016.6]
-    module = FakeCtypes()
-    monkeypatch.setitem(sys.modules, "ctypes", module)
     checker = ShareModeChecker()
-    assert module.loaded == [("kernel32", True)]
+    assert kernel32.loaded == [("kernel32", True)]
     assert checker.is_open(FILE) is False
-    assert module.library.CloseHandle.calls == [(11,)]
+    assert kernel32.library.CloseHandle.calls == [(11,)]

@@ -22,6 +22,7 @@ import pytest
 from kresorter.core.scanner import ScanContext
 from support.artifacts import Built, Installed, build, install, lend_qt
 from support.cli import scan_context
+from support.kernel import FakeCtypes
 from support.live import guard
 
 # The window's tests run on Qt's offscreen platform, set before any application is made
@@ -122,6 +123,15 @@ def installed_with_qt(built: Built, tmp_path_factory: pytest.TempPathFactory) ->
     installed = install(built.wheel, tmp_path_factory.mktemp("installed-with-qt"))
     lend_qt(installed.venv)
     return installed
+
+
+@pytest.fixture
+def kernel32(monkeypatch: pytest.MonkeyPatch) -> FakeCtypes:
+    """``ctypes`` made a fake for the test, so that ``Kernel32`` loads on any system: its
+    ``CreateFileW`` answers a handle, its ``CloseHandle`` succeeds (decision 0016, item 6)."""
+    module = FakeCtypes()
+    monkeypatch.setitem(sys.modules, "ctypes", module)
+    return module
 
 
 @pytest.fixture

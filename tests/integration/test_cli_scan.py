@@ -1,5 +1,6 @@
 """`kresorter scan`: end-to-end on a real temporary tree. The disk must not change."""
 
+import dataclasses
 import io
 import json
 import runpy
@@ -12,10 +13,12 @@ import kresorter
 from fakes import FakeOpenFiles, make_policy
 from kresorter import cli, environment
 from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
+from kresorter.core.open_files.windows import ShareModeChecker
 from kresorter.core.policy import BlockReason, Verdict
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from support.files import snapshot, write
+from support.kernel import FakeKernel
 
 
 @pytest.fixture
@@ -87,6 +90,16 @@ def test_json_report(tmp_path: Path, tree: Path) -> None:
     assert data["skipped"] == [
         {"path": str(tree / "blocked"), "reason": "blocked", "block_reason": "system", "detail": ""}
     ]
+
+
+def test_a_scan_with_the_windows_check_says_files_were_checked(tmp_path: Path, tree: Path) -> None:
+    # [0016.5] each file is asked of the kernel; the report says the check ran
+    kernel = FakeKernel()
+    context = dataclasses.replace(ctx(tmp_path, tree), open_files=ShareModeChecker(kernel))
+    code, out = run(["scan", "--json", str(tree)], context)
+    assert (code, json.loads(out)["open_file_check"]) == (0, True)
+    asked = [str(call[1]) for call in kernel.calls if call[0] == "CreateFileW"]
+    assert any(name.endswith("m.cpython-313.pyc") for name in asked)
 
 
 def test_no_hash_flag(tmp_path: Path, tree: Path) -> None:
