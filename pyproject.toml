@@ -75,7 +75,7 @@ only-include = ["src", "tests", "docs", "README.md", "CHANGELOG.md", "LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "tests"]
+pythonpath = ["src", "tests", "packaging/windows"]
 addopts = "-ra --strict-markers --cov=kresorter --cov-branch --cov-report=term-missing --cov-fail-under=100"
 qt_api = "pyside6"
 # A deprecation fails the tests when it is announced (pre-step-8 audit, A3).
@@ -91,8 +91,8 @@ exclude_also = ["^\\s*\\.\\.\\.$", "if TYPE_CHECKING:"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["src", "tests"]
-mypy_path = "src:tests"
+files = ["src", "tests", "packaging"]
+mypy_path = "src:tests:packaging/windows"
 
 [tool.ruff]
 line-length = 100

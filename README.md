@@ -245,6 +245,21 @@ opens. It keeps one file, `settings.json` in the data directory (see
 written only when you change a setting, and a broken file is not used, as the Settings page
 says. No finding, path, plan or explanation is kept.
 
+## Uninstalling
+
+Uninstalling removes Kresorter's program and never its data. The data directory
+(`%LOCALAPPDATA%\kresorter` on Windows, `~/.local/share/kresorter` on Linux) keeps the journal,
+the vault with the quarantined files, the autostart store and `settings.json`. Files still in
+the quarantine stay there too: list them with `kresorter quarantine list` or on the Quarantine
+page, and restore or purge them first. Removing the data directory afterwards is your own step.
+
+- **Windows, installed**: Settings → Apps → Kresorter → Uninstall. It removes what the installer
+  put in `%LOCALAPPDATA%\Programs\Kresorter`, and the shortcuts.
+- **Windows, portable**: delete the `Kresorter` folder you unzipped; it wrote nothing beside
+  itself.
+- **pipx or pip**: `pipx uninstall kresorter`, or `pip uninstall kresorter` in the environment
+  you installed it in.
+
 ## Development
 
 ```bash

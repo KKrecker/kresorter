@@ -1,0 +1,38 @@
+Kresorter $kresorter for Windows: third-party notices
+
+Kresorter is free software under the MIT License, copyright (c) 2026 KKrecker: LICENSE, beside
+this file. Its folder also carries the software below, each part under its own licence; the
+licence texts are in the folder licenses, beside this file.
+
+Python $python
+  The interpreter and its standard library, copyright the Python Software Foundation, under
+  the PSF License Agreement, with the licences of the libraries Python includes:
+  licenses\Python\LICENSE.txt.
+  Source: https://www.python.org/downloads/source/
+
+PySide6 $pyside6 and shiboken6 $shiboken6 (Qt for Python)
+  Copyright The Qt Company Ltd., used under the GNU Lesser General Public License version 3:
+  licenses\LGPL-3.0.txt, with the GNU General Public License version 3 it adds to:
+  licenses\GPL-3.0.txt. The licence files their wheels ship, if any, are in
+  licenses\PySide6_Essentials and licenses\shiboken6.
+  Source: https://code.qt.io/cgit/pyside/pyside-setup.git/tag/?h=v$pyside6
+  and https://download.qt.io/official_releases/QtForPython/
+
+Qt $qt
+  Qt's libraries, copyright The Qt Company Ltd. and other contributors, used under the GNU
+  Lesser General Public License version 3 (licenses\LGPL-3.0.txt and licenses\GPL-3.0.txt).
+  They are files of their own in _internal\PySide6 (Qt6Core.dll, Qt6Gui.dll, Qt6Widgets.dll,
+  Qt6Svg.dll and Qt's plugins), not built into Kresorter.exe: you may replace them with your
+  own build of Qt $qt, or of a compatible version, and Kresorter.exe loads yours.
+  Source: https://download.qt.io/official_releases/qt/ and https://code.qt.io/
+
+Lucide
+  The window's icons, copyright Lucide Contributors and, for those from Feather, Cole Bemis,
+  under the ISC License: _internal\kresorter\ui\icons\LICENSE.
+  Source: https://github.com/lucide-icons/lucide
+
+PyInstaller $pyinstaller
+  Kresorter.exe is PyInstaller's bootloader, copyright the PyInstaller Development Team, under
+  the GNU General Public License version 2 or later, with an exception that allows it to start
+  programs under any licence: licenses\pyinstaller\COPYING.txt.
+  Source: https://github.com/pyinstaller/pyinstaller/tree/v$pyinstaller
