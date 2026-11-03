@@ -533,6 +533,7 @@ CATALOG: dict[str, dict[str, str]] = {
         " настройка не изменена.",
     },
     "settings.data_dir": {"en": "Data folder", "ru": "Папка данных"},
+    "settings.version": {"en": "Kresorter {version}", "ru": "Kresorter {version}"},
     "settings.address": {
         "en": "Address: {url} · Model: {model}",
         "ru": "Адрес: {url} · Модель: {model}",

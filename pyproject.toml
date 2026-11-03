@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kresorter"
-version = "0.0.1"
+dynamic = ["version"]
 description = "Safe, local-first file cleanup analyzer: report first, quarantine, delete only after confirmation."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,6 +32,10 @@ kresorter = "kresorter.cli:main"
 
 [project.gui-scripts]
 kresorter-ui = "kresorter.ui.launch:main"
+
+[tool.hatch.version]
+# The version is written once, in the package (decision 0015, item 2).
+path = "src/kresorter/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kresorter"]

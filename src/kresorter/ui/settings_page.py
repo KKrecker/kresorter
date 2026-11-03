@@ -9,7 +9,8 @@ setting. The page says when the settings file was not used. The local AI: its ad
 as the environment gives them, and Check, which runs the checks of ``kresorter llm status`` off
 the window's thread and shows each, in the window's words, Ollama and the model each with a dot
 in the safe or the review colour, then how to set up what is missing; nothing else asks the
-local AI. The data directory's path (from the home folder as ``~``) is shown, read only.
+local AI. The data directory's path (from the home folder as ``~``) is shown, read only, and
+under it the version (decision 0015, item 4).
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QLayout, QScrollArea, QWidget
 
+from kresorter import __version__
 from kresorter.llm.client import Status, status
 from kresorter.llm.failure import ExplanationUnavailable, SettingRefused, Unavailable
 from kresorter.llm.settings import (
@@ -174,6 +176,7 @@ class SettingsPage(QWidget):
         data_dir = environment.scan_context().policy.app_data_dir
         self.data_dir = Note(self, shown_path(Path(data_dir), Path.home()), role="secondary")
         self.data_dir.setToolTip(str(data_dir))
+        self.version = Note(self, text("settings.version", version=__version__), role="secondary")
         self.result = Note(self.controls)
         self._show()
         self.language.currentIndexChanged.connect(self._language)
@@ -189,6 +192,7 @@ class SettingsPage(QWidget):
         ai_inside.addWidget(self.check)
         data_inside.addWidget(_title(text("settings.data_dir")))
         data_inside.addWidget(self.data_dir)
+        data_inside.addWidget(self.version)
         inside = vbox(self.controls, margins=(32, 16, 32, 32), spacing=16)
         for part in (
             self.unused,

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from kresorter import (
+    __version__,
     cli_analyze,
     cli_autostart,
     cli_llm,
@@ -34,6 +35,8 @@ __all__ = [
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kresorter", description="Safe, local file cleanup.")
+    # Printed and exited by argparse, before any context is made (decision 0015, item 3).
+    parser.add_argument("--version", action="version", version=f"kresorter {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
     scan_cmd = commands.add_parser("scan", help="analyze directories; report only")
     scan_cmd.add_argument("paths", nargs="*", help="directories to scan (default: safe zones)")
