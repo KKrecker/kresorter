@@ -108,7 +108,8 @@ def request(
         headers["Content-Type"] = "application/json"
     try:
         connection.request(method, path, body=body, headers=headers)
-        return _read(connection.getresponse(), limits)
+        with connection.getresponse() as response:  # its socket closed on every way out
+            return _read(response, limits)
     except (OSError, http.client.HTTPException) as error:
         raise _failure(error, deadline, clock) from error
     finally:

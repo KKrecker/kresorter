@@ -89,6 +89,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Fixed
+- `llm.transport.request` closes the answer on every way out: a redirect, a `Content-Length` over the limit or an answer going on past it left its socket open until the garbage collector found it (pre-step-8 audit, A7).
 - `autostart.changes.XdgChanges.disable`: a file that appears where the stub over a system entry goes, between the check and `O_EXCL`, rolls the change back instead of leaving it `failed` (exit 3); `recover()` no longer takes such a file, if empty or a beginning of a stub, for a partial stub and moves it to the store (decision 0011, item 117).
 - `autostart.changes.XdgChanges.disable`: when the stub over a system entry cannot be written, the slot it is moved to is journaled (`vault_path`) before the move, as `recover()` does; a crash in between left the partial stub in the store with no row naming it (decision 0011, item 116).
 - `autostart.changes.XdgChanges` no longer makes the autostart store when it is created: a preview (`autostart disable|enable` without `--yes`), a refusal or a `recover` with nothing to close leaves no `<data_dir>/autostart`; the store is made by the first change, before it is journaled (decision 0011, item 115).
