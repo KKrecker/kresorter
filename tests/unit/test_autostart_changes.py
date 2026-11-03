@@ -36,6 +36,7 @@ from kresorter.autostart.xdg import read_xdg
 from kresorter.autostart.xdg_changes import STUB, hidden_copy
 from kresorter.storage.db import connect
 from support.files import write_desktop
+from support.host import record_opens
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 COLUMNS = (
@@ -225,6 +226,20 @@ def test_the_journal_row_exists_before_the_entry_is_touched(
     tree.changes.disable(tree.item())
 
     assert seen == [[("pending",)]]
+
+
+def test_the_stub_and_the_staged_copy_are_written_as_bytes(
+    tree: Tree, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0015.20] on Windows too: no \n becomes \r\n
+    write_desktop(tree.system, "system", APP)
+    write_desktop(tree.user, "own", APP)
+    opens = record_opens(monkeypatch)
+    for item in tree.listed():
+        assert tree.changes.disable(item).state is ChangeState.DONE
+    assert opens.in_binary("system.desktop")  # the stub
+    assert opens.in_binary("1.new")  # the copy, staged
+    assert (tree.user / "system.desktop").read_bytes() == STUB
 
 
 # --- a system entry ----------------------------------------------------------------------------

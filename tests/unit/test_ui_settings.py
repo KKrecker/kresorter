@@ -28,6 +28,7 @@ from kresorter.ui.settings import (
     save,
 )
 from support.cli import scan_context
+from support.host import record_opens
 
 
 @pytest.fixture
@@ -108,6 +109,16 @@ def test_the_file_is_replaced_by_a_renamed_temporary_file(
         kept.close()
     assert load(context) == Loaded(Settings(language="ru"))
     assert sorted(path.name for path in data_dir.iterdir()) == [SETTINGS_NAME]
+
+
+def test_the_file_is_written_as_bytes(
+    context: ScanContext, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0015.20] on Windows too: the file is the JSON written, its \n not made \r\n
+    opens = record_opens(monkeypatch)
+    assert save(context, Settings(language="ru")) is None
+    assert opens.in_binary(TEMP_NAME)
+    assert (data_dir / SETTINGS_NAME).read_bytes().count(b"\r") == 0
 
 
 def test_a_temporary_file_left_behind_is_overwritten(context: ScanContext, data_dir: Path) -> None:
