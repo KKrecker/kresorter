@@ -1,6 +1,6 @@
 """Quarantine service and vault (decision 0004, items 1, 3, 4; vault location section).
 
-Moves go through an injectable ``move`` (default ``Path.replace``) so failures and crashes can be
+Moves go through an injectable ``move`` (default ``Path.rename``) so failures and crashes can be
 simulated without touching real devices. ``recover()`` cases build journal and disk states
 directly, as a crash would leave them.
 """
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from fakes import FakeOpenFiles, make_policy
+from fakes import FakeOpenFiles, make_policy, windows_rename
 from kresorter.core.hashing import hash_file
 from kresorter.core.heuristics import JunkClassifier, load_rules
 from kresorter.core.models import FileEntry
@@ -48,7 +48,7 @@ Move = Callable[[Path, Path], object]
 
 
 def failing_on(call: int, error: BaseException, before: Callable[[], None] = lambda: None) -> Move:
-    """``Path.replace`` that raises ``error`` on the ``call``-th call (1-based)."""
+    """``Path.rename`` that raises ``error`` on the ``call``-th call (1-based)."""
     calls = 0
 
     def move(source: Path, target: Path) -> object:
@@ -57,7 +57,7 @@ def failing_on(call: int, error: BaseException, before: Callable[[], None] = lam
         if calls == call:
             before()
             raise error
-        return source.replace(target)
+        return source.rename(target)
 
     return move
 
@@ -79,7 +79,7 @@ def make_service(
     conn: sqlite3.Connection,
     policy: PathPolicy,
     *,
-    move: Move = Path.replace,
+    move: Move = Path.rename,
     vault: Vault | None = None,
 ) -> QuarantineService:
     return QuarantineService(
@@ -479,6 +479,38 @@ def test_failed_move_back_keeps_the_item_quarantined(
     )
 
     assert result.state is OperationState.FAILED
+    assert rows(conn, "SELECT state FROM items ORDER BY id") == [
+        ("quarantined",),
+        ("rolled_back",),
+    ]
+
+
+def test_rollback_where_the_rename_refuses_a_newcomer_keeps_the_item_quarantined(
+    conn: sqlite3.Connection, policy: PathPolicy, zone: Path
+) -> None:
+    # [0016.8] on Windows the move back itself refuses a file that arrived after the check
+    a = scanned(write(zone / "a.bin", b"ours"))
+    b = scanned(write(zone / "b.bin"))
+    calls = 0
+
+    def move(source: Path, target: Path) -> object:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError(5, "I/O")
+        if calls == 3:  # moving a back: the newcomer lands between the check and the rename
+            write(target, b"newcomer")
+        windows_rename(source, target)
+        return None
+
+    result = make_service(conn, policy, move=move).quarantine(
+        [Candidate(entry=a), Candidate(entry=b)]
+    )
+
+    assert result.state is OperationState.FAILED
+    assert a.path.read_bytes() == b"newcomer"
+    assert [item.original for item in result.moved] == [a.path]
+    assert result.moved[0].vault_path.read_bytes() == b"ours"
     assert rows(conn, "SELECT state FROM items ORDER BY id") == [
         ("quarantined",),
         ("rolled_back",),

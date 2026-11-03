@@ -5,6 +5,7 @@ journaled. Disk checks (vault copy, conflict, parent chain) run per item right b
 after the restore operation is journaled, so they see the freshest state.
 """
 
+import inspect
 import os
 import sqlite3
 import stat
@@ -13,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from fakes import FakeOpenFiles, make_policy
+from fakes import FakeOpenFiles, make_policy, windows_rename
 from kresorter.core.heuristics import JunkClassifier
 from kresorter.core.models import FileEntry
 from kresorter.core.policy import PathPolicy
@@ -52,7 +53,7 @@ def conn(tmp_path: Path) -> Iterator[sqlite3.Connection]:
 def make_service(
     conn: sqlite3.Connection,
     policy: PathPolicy,
-    move: Callable[[Path, Path], object] = Path.replace,
+    move: Callable[[Path, Path], object] = Path.rename,
 ) -> QuarantineService:
     return QuarantineService(
         conn, policy=policy, open_files=FakeOpenFiles(), classifier=NO_RULES, move=move
@@ -282,6 +283,46 @@ def test_failed_move_keeps_the_item_quarantined_and_others_proceed(
     assert [r.item_id for r in result.restored] == [second]
     assert item_state(conn, first) == "quarantined"
     assert slot_of(conn, first).exists()
+
+
+def test_the_quarantine_renames_and_never_replaces() -> None:
+    # [0016.8] into the vault, back in a rollback, back in a restore: Path.rename, which on
+    # Windows fails where a file is; on Linux the same rename(2) as before
+    assert inspect.signature(QuarantineService).parameters["move"].default is Path.rename
+
+
+def test_a_newcomer_after_the_check_is_a_conflict_where_the_rename_refuses_it(
+    conn: sqlite3.Connection, policy: PathPolicy, zone: Path
+) -> None:
+    # [0016.8] on Windows: the file there is never overwritten, the copy stays restorable
+    item = quarantined(make_service(conn, policy), zone / "a.bin", b"ours")
+
+    def arriving(source: Path, target: Path) -> None:
+        write(target, b"newcomer")  # between the check and the rename
+        windows_rename(source, target)
+
+    result = make_service(conn, policy, arriving).restore([item])
+
+    assert [(r.reason, r.detail) for r in result.refused] == [
+        (RestoreRefusal.CONFLICT, str(zone / "a.bin"))
+    ]
+    assert (zone / "a.bin").read_bytes() == b"newcomer"
+    assert slot_of(conn, item).read_bytes() == b"ours"
+    assert item_state(conn, item) == "quarantined"
+
+
+def test_a_parent_that_became_a_file_is_a_failed_move_not_a_conflict(
+    service: QuarantineService, conn: sqlite3.Connection, zone: Path
+) -> None:
+    # [0016.8] only the rename's own refusal is a conflict
+    item = quarantined(service, zone / "dir" / "a.bin")
+    (zone / "dir").rename(zone / "old-dir")
+    write(zone / "dir", b"a file now")
+
+    result = service.restore([item])
+
+    assert [r.reason for r in result.refused] == [RestoreRefusal.MOVE_FAILED]
+    assert item_state(conn, item) == "quarantined"
 
 
 def test_every_restore_refusal_has_a_case() -> None:

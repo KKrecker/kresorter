@@ -201,3 +201,13 @@ def journal_held(monkeypatch: pytest.MonkeyPatch, data_dir: Path) -> Iterator[No
         yield
     finally:
         other.close()
+
+
+def windows_rename(source: Path, target: Path) -> None:
+    """``Path.rename`` as Windows does it: a file at ``target`` makes it fail with
+    ``FileExistsError`` and is never replaced (decision 0016, item 8); otherwise the rename."""
+    if os.path.lexists(target):
+        raise FileExistsError(
+            errno.EEXIST, "Cannot create a file when that file already exists", str(target)
+        )
+    source.rename(target)

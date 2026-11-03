@@ -77,10 +77,13 @@ checks the same code through fakes.
 ## The quarantine on Windows
 
 8. **A rename never replaces.** The quarantine moves with `Path.rename` instead of
-   `Path.replace`: into the vault, back in a rollback, back in a restore. On Windows a file at
-   the destination makes the rename fail with `FileExistsError`: a restore refuses it as
-   `conflict`, a quarantine rolls its batch back, and the file there is never overwritten. On
-   Linux nothing changes.
+   `Path.replace`: into the vault, back in a rollback, back in a restore. On Windows a file that
+   reaches the destination after the check makes the rename fail with `FileExistsError`, and it
+   is never overwritten: a restore refuses the item as `conflict`, a rollback keeps it in the
+   vault (`failed`, restorable later). Only the rename's own refusal is a conflict: a parent
+   that cannot be created stays `move_failed`, and a parent that became a file no longer
+   breaks the restore. On Linux `rename(2)` is what ran before, and the check right before the
+   move stays the guard (the race window of `quarantine.service`).
 9. **Live on Windows** (skipped elsewhere), in a temporary profile: `kresorter quarantine
    --from-analysis --yes` moves the safe findings of a made-up tree into the vault,
    `kresorter quarantine restore` puts them back with their `mtime_ns`, and `kresorter
