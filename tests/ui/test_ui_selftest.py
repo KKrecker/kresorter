@@ -72,8 +72,11 @@ def test_each_page_is_shown_and_has_its_line(
     assert sys.excepthook is hook
 
 
-def test_an_error_while_the_window_opens_is_its_traceback(tmp_path: Path) -> None:
-    # [0015.17]
+def test_an_error_while_the_window_opens_is_its_traceback(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    # [0015.17] with a standard error the traceback is there too, as for an error in a slot,
+    # which Qt may hand to the hook or raise where its events are processed
     def broken() -> ScanContext:
         raise RuntimeError("no context")
 
@@ -85,7 +88,23 @@ def test_an_error_while_the_window_opens_is_its_traceback(tmp_path: Path) -> Non
     text = report.read_text(encoding="utf-8")
     assert text.startswith("Traceback (most recent call last):\n")
     assert text.endswith("RuntimeError: no context\n")
+    assert capsys.readouterr().err == text
     assert sys.excepthook is hook
+
+
+def test_without_a_standard_error_the_failure_is_in_the_report_alone(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # [0015.17] Kresorter.exe has no stderr
+    def broken() -> ScanContext:
+        raise RuntimeError("no context")
+
+    monkeypatch.setattr(sys, "stderr", None)
+    report = tmp_path / "report.txt"
+
+    assert self_test(report, Environment(scan_context=broken, llm_env={})) == 1
+
+    assert report.read_text(encoding="utf-8").endswith("RuntimeError: no context\n")
 
 
 def test_an_error_in_a_slot_is_its_traceback(
@@ -104,13 +123,17 @@ def test_an_error_in_a_slot_is_its_traceback(
     text = report.read_text(encoding="utf-8")
     assert text.startswith("Traceback (most recent call last):\n")
     assert text.endswith("RuntimeError: a slot failed\n")
-    assert "RuntimeError: a slot failed" in capsys.readouterr().err
+    assert capsys.readouterr().err == text  # once, by the hook or by the self-test
     assert visible() == []
     assert sys.excepthook is hook
 
 
 def test_a_page_whose_task_fails_is_a_failure(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, zone: Path, data_dir: Path
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
 ) -> None:
     # [0015.17] the window shows the task's error as a message; the self-test stops on it
     def broken(context: AutostartContext, *, include_machine: bool) -> AutostartListing:
@@ -121,9 +144,11 @@ def test_a_page_whose_task_fails_is_a_failure(
 
     assert self_test(report, made(tmp_path, zone, data_dir)) == 1
 
-    last = report.read_text(encoding="utf-8").splitlines()[-1]
+    text = report.read_text(encoding="utf-8")
+    last = text.splitlines()[-1]
     assert last.startswith("kresorter.ui.selftest.PageFailed: autostart: ")
     assert last.endswith("no autostart")
+    assert capsys.readouterr().err == text
     assert visible() == []
 
 
