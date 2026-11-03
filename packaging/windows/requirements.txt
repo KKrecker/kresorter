@@ -1,0 +1,4 @@
+# The Windows build's tools (decision 0015, items 12 and 19): one version each, changed in a
+# commit of its own.
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.9

@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  # Pinned here, used by the Windows build (decision 0015, item 19).
+  INNO_SETUP_VERSION: "6.7.1"
+
 jobs:
   check:
     # Linux only until the repository is on GitHub; then Windows and macOS
