@@ -534,7 +534,11 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "Файл настроек не использован: {reason}. Действуют значения по умолчанию, пока"
         " настройка не изменена.",
     },
-    "settings.data_dir": {"en": "Data folder: {path}", "ru": "Папка данных: {path}"},
+    "settings.data_dir": {"en": "Data folder", "ru": "Папка данных"},
+    "settings.address": {
+        "en": "Address: {url} · Model: {model}",
+        "ru": "Адрес: {url} · Модель: {model}",
+    },
     "settings.ai": {"en": "Local AI (Ollama)", "ru": "Локальный ИИ (Ollama)"},
     "settings.check": {"en": "Check", "ru": "Проверить"},
     "task.check": {"en": "Checking the local AI", "ru": "Проверка локального ИИ"},

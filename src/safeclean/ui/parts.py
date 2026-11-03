@@ -94,6 +94,7 @@ __all__ = [
     "dot",
     "hbox",
     "link",
+    "mark",
     "page",
     "paint_check",
     "rows",
@@ -247,6 +248,14 @@ def dot(kind: str) -> QFrame:
     shown.setFixedSize(8, 8)
     shown.setProperty("dot", kind)
     return shown
+
+
+def mark(shown: QFrame, kind: str) -> None:
+    """Give a dot another kind, and draw it so."""
+    shown.setProperty("dot", kind)
+    style = shown.style()
+    style.unpolish(shown)
+    style.polish(shown)
 
 
 def badge(text: str, kind: str) -> QLabel:

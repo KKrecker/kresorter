@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 
 from safeclean.ui import icons
 from safeclean.ui.i18n import Translator
-from safeclean.ui.parts import Icon, Note, divider, dot, hbox, vbox
+from safeclean.ui.parts import Icon, Note, divider, dot, hbox, mark, vbox
 from safeclean.ui.theme import Look, Palette
 
 __all__ = ["ICONS", "NAV_ROW", "WIDTH", "NavDelegate", "Sidebar", "nav_style"]
@@ -235,19 +235,12 @@ class Sidebar(QFrame):
 
     def show_open_files(self, text: str, *, reliable: bool) -> None:
         self.open_files.setText(text)
-        _mark(self.open_files_dot, "safe" if reliable else "review")
+        mark(self.open_files_dot, "safe" if reliable else "review")
 
     def show_ai(self, text: str, *, checked: bool | None) -> None:
         """``checked``: ``None`` until a Check ran, then whether every check passed."""
         self.ai.setText(text)
-        _mark(self.ai_dot, "none" if checked is None else "safe" if checked else "review")
-
-
-def _mark(shown: QFrame, kind: str) -> None:
-    shown.setProperty("dot", kind)
-    style = shown.style()
-    style.unpolish(shown)
-    style.polish(shown)
+        mark(self.ai_dot, "none" if checked is None else "safe" if checked else "review")
 
 
 def _primary_text(palette: Palette) -> str:

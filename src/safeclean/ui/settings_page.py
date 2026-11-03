@@ -1,22 +1,26 @@
-"""The Settings page (decision 0014, items 27, 36 and 37).
+"""The Settings page (decision 0014, items 27, 36, 37 and 55).
 
-The language: a change is saved and applies the next time the window opens, as the page says.
-On Windows only, the machine scope of autostart: turning it on asks first, saying what is read;
-turning it off asks nothing. Each change is saved at once (``ui.settings.save``), and a change
-that cannot be saved says why and leaves the setting as it was: the file is written only when
-the user changes a setting. The page says when the settings file was not used. Check runs the
-checks of ``safeclean llm status`` off the window's thread and shows each, in the window's
-words, with how to set up what is missing; nothing else asks the local AI. The data directory's
-path is shown, read only.
+A card each, the page scrolling under its head. The language, its choice at the right: a change
+is saved and applies the next time the window opens, as its note says. On Windows only, the
+machine scope of autostart: turning it on asks first, saying what is read; turning it off asks
+nothing. Each change is saved at once (``ui.settings.save``), and a change that cannot be saved
+says why and leaves the setting as it was: the file is written only when the user changes a
+setting. The page says when the settings file was not used. The local AI: its address and model
+as the environment gives them, and Check, which runs the checks of ``safeclean llm status`` off
+the window's thread and shows each, in the window's words, Ollama and the model each with a dot
+in the safe or the review colour, then how to set up what is missing; nothing else asks the
+local AI. The data directory's path (from the home folder as ``~``) is shown, read only.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import replace
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtWidgets import QLabel, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QLabel, QLayout, QScrollArea, QWidget
 
 from safeclean.llm.client import Status, status
 from safeclean.llm.failure import ExplanationUnavailable, SettingRefused, Unavailable
@@ -29,14 +33,15 @@ from safeclean.llm.settings import (
 )
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.i18n import Translator
-from safeclean.ui.parts import CheckBox, Choice, Head, Note, button, hbox, page
+from safeclean.ui.parts import CheckBox, Choice, Head, Note, button, card, dot, hbox, mark, vbox
 from safeclean.ui.settings import LANGUAGE_SETTINGS, Loaded, Settings, save
+from safeclean.ui.shown import shown_path
 from safeclean.ui.tasks import Task
 
 if TYPE_CHECKING:
     from safeclean.ui.window import Window
 
-__all__ = ["SettingsPage", "check_lines"]
+__all__ = ["Found", "SettingsPage", "check_lines"]
 
 _NOT_REACHED = frozenset({Unavailable.UNREACHABLE, Unavailable.TIMEOUT})
 
@@ -99,6 +104,30 @@ def _refused(translator: Translator, refused: SettingRefused) -> str:
     return translator.text("check.refused", name=refused.name, value=value, why=refused.why)
 
 
+class Found(QWidget):
+    """A line of what a check found, with a dot: safe when it passed, review when it did not."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.dot = dot("none")
+        self.line = Note(self)
+        beside = vbox(margins=(0, 8, 0, 0))  # the dot at the middle of the first line
+        beside.addWidget(self.dot)
+        beside.addStretch(1)
+        layout = hbox(self, spacing=8)
+        layout.addLayout(beside)
+        layout.addWidget(self.line, 1)
+        self.hide()  # until a check ran
+
+    def text(self) -> str:
+        return self.line.text()
+
+    def show_found(self, line: str, *, passed: bool) -> None:
+        self.line.setText(line)
+        mark(self.dot, "safe" if passed else "review")
+        self.show()
+
+
 class SettingsPage(QWidget):
     def __init__(self, window: Window, loaded: Loaded) -> None:
         """``loaded``: the settings the window opened with, and whether the file was used."""
@@ -110,51 +139,81 @@ class SettingsPage(QWidget):
         environment = window.environment
 
         look = window.look
+        self.controls = QWidget()
         why = loaded.unused
         self.unused = Note(
-            self,
+            self.controls,
             ""
             if why is None
             else text("settings.unused", reason=translator.reason(why, loaded.detail)),
         )
-        language = QLabel(text("settings.language"))
+        self.language_card, language_inside = card()
+        language = _title(text("settings.language"))
         self.language = Choice(look)
         self.language.setAccessibleName(text("settings.language"))
         for setting in LANGUAGE_SETTINGS:
             self.language.addItem(text(f"settings.{setting}"))
         language.setBuddy(self.language)
         self.language_note = Note(self, text("settings.language_note"), role="secondary")
+        self.machine_card, machine_inside = card()
+        self.machine_card.setHidden(environment.autostart_context().platform != "windows")
         self.machine = CheckBox(look, text("settings.machine"))
-        self.machine.setHidden(environment.autostart_context().platform != "windows")
+        self.machine.setHidden(self.machine_card.isHidden())
         self.machine.clicked.connect(self._machine)
-        data_dir = environment.scan_context().policy.app_data_dir
-        self.data_dir = Note(self, text("settings.data_dir", path=data_dir))
-        ai = QLabel(text("settings.ai"))
+        self.ai_card, ai_inside = card()
+        env = environment.llm_env
+        address = env.get(URL_VARIABLE, DEFAULT_ADDRESS.url)
+        model = env.get(MODEL_VARIABLE, DEFAULT_MODEL)
+        shown = text("settings.address", url=address, model=model)
+        self.address = Note(self, shown, role="secondary")
         self.check_button = button(look, text("settings.check"))
         self.check_button.clicked.connect(self._check)
+        self.found = (Found(), Found())  # Ollama, then the model
         self.check = Note(self)
-        self.result = Note(self)
+        self.data_card, data_inside = card()
+        data_dir = environment.scan_context().policy.app_data_dir
+        self.data_dir = Note(self, shown_path(Path(data_dir), Path.home()), role="secondary")
+        self.data_dir.setToolTip(str(data_dir))
+        self.result = Note(self.controls)
         self._show()
         self.language.currentIndexChanged.connect(self._language)
 
-        choose = hbox(spacing=12)
-        choose.addWidget(language)
-        choose.addWidget(self.language)
-        choose.addStretch(1)
-        check = hbox(spacing=12)
-        check.addWidget(ai)
-        check.addStretch(1)
-        check.addWidget(self.check_button)
-        layout = page(self, Head(text("page.settings"), text("head.settings")))
-        layout.addWidget(self.unused)
-        layout.addLayout(choose)
-        layout.addWidget(self.language_note)
-        layout.addWidget(self.machine)
-        layout.addLayout(check)
-        layout.addWidget(self.check)
-        layout.addWidget(self.data_dir)
-        layout.addWidget(self.result)
-        layout.addStretch(1)
+        language_inside.addLayout(_titled(language, self.language))
+        language_inside.addWidget(self.language_note)
+        machine_inside.addWidget(_title(text("page.autostart")))
+        machine_inside.addWidget(self.machine)
+        ai_inside.addLayout(_titled(_title(text("settings.ai")), self.check_button))
+        ai_inside.addWidget(self.address)
+        for found in self.found:
+            ai_inside.addWidget(found)
+        ai_inside.addWidget(self.check)
+        data_inside.addWidget(_title(text("settings.data_dir")))
+        data_inside.addWidget(self.data_dir)
+        inside = vbox(self.controls, margins=(32, 16, 32, 32), spacing=16)
+        for part in (
+            self.unused,
+            self.language_card,
+            self.machine_card,
+            self.ai_card,
+            self.data_card,
+            self.result,
+        ):
+            inside.addWidget(part)
+        inside.addStretch(1)
+        self.area = QScrollArea()
+        self.area.setFrameShape(QFrame.Shape.NoFrame)
+        self.area.setWidgetResizable(True)
+        self.area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.area.setWidget(self.controls)
+        self.controls.setAutoFillBackground(False)  # setWidget fills it: the page shows through
+        self.area.viewport().setAutoFillBackground(False)
+
+        self.head = Head(text("page.settings"), text("head.settings"))
+        top = vbox(margins=(32, 32, 32, 0), spacing=0)
+        top.addWidget(self.head)
+        layout = vbox(self, spacing=0)
+        layout.addLayout(top)
+        layout.addWidget(self.area, 1)
         window.add_starter(self.check_button)
 
     @property
@@ -205,8 +264,26 @@ class SettingsPage(QWidget):
             return status(environment.llm_env, limits=environment.llm_limits)
 
         def done(found: Status) -> None:
-            lines = check_lines(window.translator, found, environment.llm_env)
-            self.check.setText("\n".join(lines))
+            ollama, model, *rest = check_lines(window.translator, found, environment.llm_env)
+            self.found[0].show_found(ollama, passed=found.version is not None)
+            self.found[1].show_found(model, passed=found.installed is True)
+            self.check.setText("\n".join(rest))
             window.show_ai(found.failure is None)
 
         window.run(Task(window.translator.text("task.check"), work, done))
+
+
+def _title(text: str) -> QLabel:
+    """A card's title, in semibold."""
+    title = QLabel(text)
+    title.setProperty("role", "card-title")
+    return title
+
+
+def _titled(title: QLabel, control: QWidget) -> QLayout:
+    """A card's title, and its control at the right."""
+    row = hbox(spacing=12)
+    row.addWidget(title)
+    row.addStretch(1)
+    row.addWidget(control)
+    return row
