@@ -163,6 +163,47 @@ def test_msvcrt_backend_reports_a_busy_lock(lock_path: Path) -> None:
     assert [mode for _, mode, _ in fake.calls] == [2]
 
 
+class FakeFcntl:
+    """Records ``fcntl.flock`` calls; refuses the lock when ``busy``, as a held one would."""
+
+    LOCK_EX = 2
+    LOCK_NB = 4
+    LOCK_UN = 8
+
+    def __init__(self, busy: bool = False) -> None:
+        self.busy = busy
+        self.calls: list[tuple[int, int]] = []
+
+    def flock(self, fd: int, operation: int) -> None:
+        self.calls.append((fd, operation))
+        if self.busy and operation & self.LOCK_EX:
+            raise BlockingIOError(11, "Resource temporarily unavailable")
+
+
+def test_flock_backend_locks_without_waiting_and_unlocks(lock_path: Path) -> None:
+    # [0015.20] fcntl is a module given, as msvcrt is: the backend is checked on Windows too
+    fake = FakeFcntl()
+    with InstanceLock(lock_path, backend=FlockBackend(module=fake)):
+        pass
+    assert [operation for _, operation in fake.calls] == [2 | 4, 8]
+
+
+def test_flock_backend_reports_a_busy_lock(lock_path: Path) -> None:
+    # [0015.20]
+    fake = FakeFcntl(busy=True)
+    with pytest.raises(LockedError):
+        InstanceLock(lock_path, backend=FlockBackend(module=fake)).__enter__()
+    assert [operation for _, operation in fake.calls] == [2 | 4]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="fcntl exists elsewhere")
+def test_flock_backend_imports_fcntl_lazily(lock_path: Path) -> None:
+    # [0015.20]
+    backend = backend_for_platform("linux")  # constructing it imports nothing
+    with pytest.raises(ModuleNotFoundError, match="fcntl"):
+        InstanceLock(lock_path, backend=backend).__enter__()
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="msvcrt exists there")
 def test_msvcrt_backend_imports_msvcrt_lazily(lock_path: Path) -> None:
     backend = backend_for_platform("win32")  # constructing it imports nothing
