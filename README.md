@@ -7,6 +7,8 @@ Open source, local-only, no telemetry.
 > journal; analysis; autostart; file organizer; optional local AI explanations); step 7, the
 > desktop UI, is next ([roadmap](docs/roadmap.md)).
 
+![The Overview after a scan: the folders scanned, a card per safety level with its size and reasons, and a card each for Quarantine, Organize and Autostart](docs/screenshots/overview.png)
+
 ## Safety principles
 
 - **Report first.** Nothing is deleted automatically: full report → quarantine → delete only after confirmation.
@@ -225,10 +227,20 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
 - **Settings**: a card each for the language, on Windows the machine-wide autostart entries
   (off until you turn them on), the local AI with its Check, and the data folder.
 
+![Findings: the Safe files chosen, grouped by their strongest reason, and the detail of one at the right with why it was found](docs/screenshots/findings.png)
+
+![The confirmation of Move to quarantine: how many files and their size, each path, and Cancel as the default button](docs/screenshots/confirmation.png)
+
+![Organize: the plan for ~/Downloads as a card per category, the files that stay in place with their reasons, and Sort](docs/screenshots/organize.png)
+
+![Autostart: the programs that start at sign-in, each with its location, its scope and its switch](docs/screenshots/autostart.png)
+
 The window follows the system's light or dark scheme; its icons are
 [Lucide](https://lucide.dev)'s, shipped with it under their ISC licence. It needs a screen at
 least 1056 px wide in English and 1183 px in Russian, for Findings' bar and the detail beside
 it (a 1366 x 768 screen at 125 % is 1093 px wide).
+
+![Findings in the dark scheme](docs/screenshots/findings-dark.png)
 
 Nothing changes until you confirm: every action (quarantine, restore, delete permanently,
 organize, undo, disable, enable, recover) first opens a dialog that shows what it will do, with
@@ -269,6 +281,9 @@ ruff check . && ruff format --check . && mypy && pytest
 ```
 
 Python 3.11 to 3.14. `pytest` fails below 100 % line and branch coverage, and on any warning.
+The screenshots in [`docs/screenshots/`](docs/screenshots/) are made, not drawn: the window
+offscreen on a made-up home, in English, by `PYTHONPATH=tests python -m support.screenshots`
+(one screen, or all six when none is named).
 
 Decisions are logged in [`docs/decisions/`](docs/decisions/); the plan is in [`docs/roadmap.md`](docs/roadmap.md).
 
