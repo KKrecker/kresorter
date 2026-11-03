@@ -128,11 +128,11 @@ def test_a_page_has_margins_of_32_px_at_its_sides_and_its_top(window: Window) ->
 
 
 def test_the_page_s_own_controls_sit_at_the_right_of_its_title(window: Window) -> None:
-    # [0014.46] [0014.49] Autostart's search comes with its page (item 53).
+    # [0014.46] [0014.49] [0014.53] The last of them at the head's right edge.
     for name, controls in (
         ("findings", (window.findings.rescan_button,)),
         ("quarantine", (window.quarantine.refresh_button,)),
-        ("autostart", (window.autostart.refresh_button,)),
+        ("autostart", (window.autostart.search, window.autostart.refresh_button)),
         ("overview", ()),
         ("settings", ()),
     ):
@@ -144,6 +144,7 @@ def test_the_page_s_own_controls_sit_at_the_right_of_its_title(window: Window) -
             assert control.parentWidget() is head
             assert control.geometry().left() > head.title.geometry().right()
             assert control.geometry().top() == head.title.geometry().top()
+        for control in controls[-1:]:
             assert control.geometry().right() == head.width() - 1
 
 

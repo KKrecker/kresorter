@@ -1,5 +1,5 @@
 """The parts the pages are made of: heads, notes, cards, chips, links, badges, check boxes and
-the lists' rows (decision 0014, items 46 and 47)."""
+the lists' rows, switches (decision 0014, items 46, 47 and 53)."""
 
 import pytest
 from PySide6.QtCore import QPoint, QRect, QSize, Qt
@@ -31,9 +31,12 @@ from safeclean.ui.parts import (
     CHECK,
     EMPHASIS,
     GRID,
+    INITIAL,
     QUIET,
     ROW_HEIGHT,
     SECONDARY,
+    SWITCH_SIZE,
+    TILE,
     CheckBox,
     Choice,
     Field,
@@ -41,6 +44,7 @@ from safeclean.ui.parts import (
     Icon,
     Note,
     RowDelegate,
+    Switch,
     badge,
     badge_colours,
     bar,
@@ -55,12 +59,13 @@ from safeclean.ui.parts import (
     link,
     page,
     rows,
+    secondary_ink,
     shares,
     surface2_tile,
     text_ink,
     vbox,
 )
-from safeclean.ui.theme import DARK, LIGHT, Look, Palette
+from safeclean.ui.theme import DARK, LIGHT, Badge, Look, Palette
 from support.drawn import drawn_in, inked_in
 
 CHECKED, PARTLY, UNCHECKED = (
@@ -214,9 +219,10 @@ def test_cards_dividers_dots_and_badges_carry_the_properties_of_their_rules() ->
 
 
 @pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
-def test_a_badge_is_a_level_s_or_the_danger_one(palette: Palette) -> None:
-    # [0014.47]
+def test_a_badge_is_a_level_s_the_danger_one_or_the_advisory_one(palette: Palette) -> None:
+    # [0014.47] [0014.53] The advisory one is the text on surface 2.
     assert badge_colours("danger", palette) == palette.danger_badge
+    assert badge_colours("advisory", palette) == Badge(palette.text, palette.surface2)
     assert [badge_colours(level.value, palette) for level in Level] == [
         palette.badges[level] for level in Level
     ]
@@ -325,7 +331,7 @@ def test_an_icon_on_its_tile_in_the_palette_s_colours(
     mark = Icon(
         look, "shield-check", lambda p: p.primary_text, size=16, tile=lambda p: p.accent, side=28
     )
-    bare = Icon(look, "folder", lambda p: p.secondary)
+    bare = Icon(look, "folder", secondary_ink)
     layout = hbox(holder, spacing=8)
     layout.addWidget(mark)
     layout.addWidget(bare)
@@ -394,6 +400,80 @@ def test_a_choice_draws_its_chevron(qtbot: QtBot, holder: QWidget, look: Look) -
     chevron = drawn.copy(QRect(choice.width() - 24, (choice.height() - 16) // 2, 16, 16))
     assert drawn_in(chevron, LIGHT.secondary, LIGHT.canvas)
     assert choice.height() >= 36
+
+
+# --- switches [0014.53] --------------------------------------------------------------------------
+
+
+def test_a_switch_is_on_the_accent_with_its_knob_at_the_right_and_off_on_the_border(
+    qtbot: QtBot, qapp: QApplication, holder: QWidget, look: Look
+) -> None:
+    # [0014.53] Its track 20 px high inside its focus ring, the knob 16 px.
+    made = Switch(look, "Dropbox")
+    layout = hbox(holder, margins=(8, 8, 8, 8))
+    layout.addWidget(made)
+    _shown(qtbot, holder)
+    assert (made.accessibleName(), made.size(), SWITCH_SIZE) == (
+        "Dropbox",
+        QSize(40, 24),
+        QSize(40, 24),
+    )
+    assert (made.isCheckable(), made.focusPolicy()) == (True, Qt.FocusPolicy.StrongFocus)
+    assert made.colours() == (LIGHT.border, LIGHT.canvas)
+    off = made.grab().toImage()
+    assert (_colour(off, 12, 12), _colour(off, 30, 12)) == (LIGHT.canvas, LIGHT.border)
+    made.setChecked(True)
+    assert made.colours() == (LIGHT.accent, LIGHT.primary_text)
+    on = made.grab().toImage()
+    assert (_colour(on, 28, 12), _colour(on, 10, 12)) == (LIGHT.primary_text, LIGHT.accent)
+    _dark(qapp)
+    assert made.colours() == (DARK.accent, DARK.primary_text)
+    assert _colour(made.grab().toImage(), 10, 12) == DARK.accent
+    _light(qapp)
+
+
+def test_a_click_or_space_asks_to_turn_a_switch_and_only_setting_it_turns_it(
+    qtbot: QtBot, holder: QWidget, look: Look
+) -> None:
+    # [0014.53]
+    made = Switch(look, "Dropbox")
+    layout = hbox(holder, margins=(8, 8, 8, 8))
+    layout.addWidget(made)
+    _shown(qtbot, holder)
+    asked: list[bool] = []
+    made.clicked.connect(lambda: asked.append(made.isChecked()))
+    QTest.mouseClick(made, Qt.MouseButton.LeftButton)
+    assert (asked, made.isChecked()) == ([False], False)
+    with qtbot.waitActive(holder):
+        holder.activateWindow()
+    made.setFocus()
+    QTest.keyClick(made, Qt.Key.Key_Space)
+    assert (asked, made.isChecked()) == ([False, False], False)
+    made.setEnabled(False)
+    QTest.mouseClick(made, Qt.MouseButton.LeftButton)
+    assert asked == [False, False]
+
+
+def test_a_switch_is_at_half_strength_when_disabled_and_in_a_ring_of_the_accent_when_focused(
+    qtbot: QtBot, holder: QWidget, look: Look
+) -> None:
+    # [0014.53]
+    made, other = Switch(look, "Dropbox"), Switch(look, "Slack")
+    layout = hbox(holder, margins=(8, 8, 8, 8), spacing=8)
+    layout.addWidget(made)
+    layout.addWidget(other)
+    _shown(qtbot, holder)
+    made.setChecked(True)
+    assert _colour(made.grab().toImage(), 20, 0) != LIGHT.accent
+    with qtbot.waitActive(holder):
+        holder.activateWindow()
+    made.setFocus()
+    assert made.hasFocus()
+    assert _colour(made.grab().toImage(), 20, 0) == LIGHT.accent
+    other.setChecked(True)
+    other.setEnabled(False)
+    track = other.grab().toImage().pixelColor(10, 12)
+    assert track.name().upper() not in (LIGHT.accent, LIGHT.canvas)
 
 
 # --- lists [0014.47] -----------------------------------------------------------------------------
@@ -538,6 +618,33 @@ def test_a_cell_as_wide_as_its_size_hint_shows_its_text_whole(look: Look) -> Non
     for row in range(2):
         hint = delegate.sizeHint(QStyleOptionViewItem(), model.index(row, 0)).width()
         assert drawn(row, hint, hint) == drawn(row, hint + 40, hint)
+
+
+def test_a_cell_s_tile_has_its_initial_in_the_text_s_colour_on_surface_2(look: Look) -> None:
+    # [0014.53] At the cell's left, 32 px, its text after it.
+    model = QStandardItemModel()
+    plain = QStandardItem("dropbox")
+    plain.setData("~/.config/autostart/dropbox.desktop", SECONDARY)
+    tiled = plain.clone()
+    tiled.setData("D", INITIAL)
+    model.appendRow(plain)
+    model.appendRow(tiled)
+    delegate = RowDelegate(look, rows(QTreeView(), look))
+    hints = [delegate.sizeHint(QStyleOptionViewItem(), model.index(row, 0)) for row in range(2)]
+    assert hints[1].width() == hints[0].width() + TILE + 12
+    assert hints[1].height() == hints[0].height() >= TILE
+    option = QStyleOptionViewItem()
+    option.rect = QRect(0, 0, 400, ROW_HEIGHT)
+    image = QImage(400, ROW_HEIGHT, QImage.Format.Format_RGB32)
+    image.fill(QColor(LIGHT.canvas))
+    painter = QPainter(image)
+    delegate.paint(painter, option, model.index(1, 0))
+    painter.end()
+    top = ROW_HEIGHT // 2 - TILE // 2
+    assert _colour(image, 12 + 3, top + TILE // 2) == LIGHT.surface2
+    assert drawn_in(image.copy(12 + 8, top + 4, TILE - 16, TILE - 8), LIGHT.text, LIGHT.surface2)
+    gap = image.copy(12 + TILE, 0, 12, ROW_HEIGHT - 1)
+    assert not drawn_in(gap, LIGHT.text, LIGHT.canvas, within=200)
 
 
 def test_check_boxes_in_a_list_are_on_the_accent_when_checked(listed: QTreeView) -> None:

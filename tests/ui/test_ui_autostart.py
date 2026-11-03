@@ -1,11 +1,15 @@
-"""The Autostart page: the entries grouped by source, Disable and Enable after a confirmation
-that says what is written, and every end of a change (decision 0014, items 3, 13 and 24)."""
+"""The Autostart page: the entries grouped by source, each turned by its switch after a
+confirmation that says what is written, every end of a change, the search and the rows' look
+(decision 0014, items 3, 13, 24 and 53)."""
 
 import json
 import plistlib
+import threading
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QTreeWidgetItem
 from pytestqt.qtbot import QtBot
 
@@ -21,7 +25,9 @@ from safeclean.core.scanner import ScanContext
 from safeclean.storage.pending import Domain
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.i18n import Language
+from safeclean.ui.parts import BADGE, EMPHASIS, INITIAL, QUIET, SECONDARY, Icon, Switch
 from safeclean.ui.sessions import Changed, change_entry
+from safeclean.ui.tasks import Task
 from safeclean.ui.window import Window
 from support.cli import autostart_context, run
 from support.files import write
@@ -74,18 +80,47 @@ def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
     return child
 
 
-def _tree(window: Window) -> list[tuple[str, list[tuple[str, ...]]]]:
-    """Each group, with the cells of its entries."""
+def _groups(window: Window) -> list[QTreeWidgetItem]:
     root = window.autostart.entries.invisibleRootItem()
-    groups = [_child(root, index) for index in range(root.childCount())]
+    return [_child(root, index) for index in range(root.childCount())]
+
+
+def _tree(window: Window) -> list[tuple[str, list[tuple[str, ...]]]]:
+    """Each group, with what its entries show."""
     return [
-        (group.text(0), [_cells(_child(group, index)) for index in range(group.childCount())])
-        for group in groups
+        (
+            group.text(0),
+            [_cells(window, _child(group, index)) for index in range(group.childCount())],
+        )
+        for group in _groups(window)
     ]
 
 
-def _cells(row: QTreeWidgetItem) -> tuple[str, ...]:
-    return tuple(row.text(column) for column in range(4))
+def _switch(window: Window, row: QTreeWidgetItem) -> Switch:
+    holder = window.autostart.entries.itemWidget(row, 2)
+    assert holder is not None
+    made = holder.findChild(Switch)
+    assert made is not None
+    return made
+
+
+def _lock(window: Window, row: QTreeWidgetItem) -> Icon | None:
+    holder = window.autostart.entries.itemWidget(row, 2)
+    assert holder is not None
+    return holder.findChild(Icon)
+
+
+def _cells(window: Window, row: QTreeWidgetItem) -> tuple[str, ...]:
+    """The entry's name, its state (its switch's tooltip), its scope and its location (the
+    name's tooltip)."""
+    return row.text(0), _switch(window, row).toolTip(), row.text(1), row.toolTip(0)
+
+
+def _shown(window: Window) -> tuple[list[str], list[str]]:
+    """The groups and the entries the search keeps."""
+    groups = [group for group in _groups(window) if not group.isHidden()]
+    rows = [_child(group, index) for group in groups for index in range(group.childCount())]
+    return [group.text(0) for group in groups], [row.text(0) for row in rows if not row.isHidden()]
 
 
 def _select(window: Window, name: str) -> None:
@@ -94,15 +129,19 @@ def _select(window: Window, name: str) -> None:
 
 
 def _change(qtbot: QtBot, window: Window, name: str, action: str) -> str:
-    _select(window, name)
+    """A click on the switch of the entry ``name``, on to disable it, off to enable it."""
     page = window.autostart
-    (page.disable_button if action == "disable" else page.enable_button).click()
+    switch = page.switch(name)
+    assert switch.isChecked() == (action == "disable")
+    switch.click()
     wait_idle(qtbot, window)
     return page.result.text()
 
 
-def _buttons(window: Window) -> tuple[bool, bool]:
-    return window.autostart.disable_button.isEnabled(), window.autostart.enable_button.isEnabled()
+def _turns(window: Window, name: str) -> tuple[bool, bool]:
+    """Whether the entry's switch can be clicked, and whether it is on."""
+    switch = window.autostart.switch(name)
+    return switch.isEnabled(), switch.isChecked()
 
 
 def _cli(scan: ScanContext, tmp_path: Path, action: str) -> None:
@@ -129,7 +168,7 @@ def test_the_entries_are_grouped_by_source_with_state_scope_and_location(
     user: Path,
     system: Path,
 ) -> None:
-    # [0014.24] [0014.2] As `autostart list` reads them: no journal is opened.
+    # [0014.24] [0014.2] [0014.53] As `autostart list` reads them: no journal is opened.
     write(user / "app.desktop", APP)
     write(user / "hidden.desktop", hidden_copy(OTHER))
     write(system / "other.desktop", OTHER)
@@ -140,12 +179,11 @@ def test_the_entries_are_grouped_by_source_with_state_scope_and_location(
     (units / "default.target.wants" / "sync.service").symlink_to(units / "sync.service")
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
     page = window.autostart
-    header = page.entries.headerItem()
-    assert [header.text(column) for column in range(4)] == ["Name", "State", "Scope", "Location"]
+    assert page.entries.isHeaderHidden()
     assert page.entries.accessibleName() == "Autostart entries"
     assert _tree(window) == [
         (
-            "Desktop autostart: 3",
+            "Desktop autostart · 3 entries",
             [
                 ("app", "Enabled", "This user", str(user / "app.desktop")),
                 ("hidden", "Disabled", "This user", str(user / "hidden.desktop")),
@@ -153,7 +191,7 @@ def test_the_entries_are_grouped_by_source_with_state_scope_and_location(
             ],
         ),
         (
-            "systemd user service: 1",
+            "systemd user service · 1 entry",
             [
                 (
                     "sync.service",
@@ -175,21 +213,14 @@ def test_the_entries_are_grouped_by_source_with_state_scope_and_location(
 def test_the_page_in_russian(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs, user: Path
 ) -> None:
-    # [0014.24]
+    # [0014.24] [0014.53]
     write(user / "app.desktop", APP)
     write(user / "hidden.desktop", hidden_copy(OTHER))
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs, language="ru")
     page = window.autostart
-    header = page.entries.headerItem()
-    assert [header.text(column) for column in range(4)] == [
-        "Название",
-        "Состояние",
-        "Область",
-        "Расположение",
-    ]
     assert [(group, [row[:3] for row in rows]) for group, rows in _tree(window)] == [
         (
-            "Автозапуск рабочего стола: 2",
+            "Автозапуск рабочего стола · 2 записи",
             [
                 ("app", "Включена", "Этот пользователь"),
                 ("hidden", "Отключена", "Этот пользователь"),
@@ -198,21 +229,26 @@ def test_the_page_in_russian(
     ]
     assert page.total.text() == "2 записи, отключено: 1"
     assert page.skipped.text() == "Пропущено: 0"
-    assert (page.refresh_button.text(), page.disable_button.text()) == ("Обновить", "Отключить…")
-    assert page.enable_button.text() == "Включить…"
+    assert (page.refresh_button.text(), page.search.placeholderText()) == (
+        "Обновить",
+        "Поиск записей",
+    )
     assert _change(qtbot, window, "app", "disable") == "Отключено: app (изменение 1)."
 
 
 def test_windows_entries_are_grouped_by_their_keys(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs
 ) -> None:
-    # [0014.24]
+    # [0014.24] [0014.53]
     once = RegValue("Setup", ValueKind.REG_SZ, r"C:\setup.exe")
     registry = FakeRegistry({(Hive.HKCU, RUN): [SYNC], (Hive.HKCU, RUN_ONCE): [once]})
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs, registry=registry)
     assert _tree(window) == [
-        ("Registry Run: 1", [("Sync", "Enabled", "This user", f"HKCU\\{RUN}\\Sync")]),
-        ("Registry RunOnce: 1", [("Setup", "Enabled", "This user", f"HKCU\\{RUN_ONCE}\\Setup")]),
+        ("Registry Run · 1 entry", [("Sync", "Enabled", "This user", f"HKCU\\{RUN}\\Sync")]),
+        (
+            "Registry RunOnce · 1 entry",
+            [("Setup", "Enabled", "This user", f"HKCU\\{RUN_ONCE}\\Setup")],
+        ),
     ]
 
 
@@ -237,7 +273,7 @@ def test_refresh_reads_what_changed_since(
 # --- what can change [0014.24] -------------------------------------------------------------------
 
 
-def test_disable_and_enable_are_offered_for_an_entry_that_can_change(
+def test_the_switch_of_an_entry_that_can_change_is_on_while_it_starts(
     qtbot: QtBot,
     tmp_path: Path,
     zone: Path,
@@ -246,31 +282,34 @@ def test_disable_and_enable_are_offered_for_an_entry_that_can_change(
     user: Path,
     system: Path,
 ) -> None:
-    # [0014.24] A group is no entry and cannot be selected.
+    # [0014.24] [0014.53] A group is no entry and cannot be selected.
     write(user / "app.desktop", APP)
     write(user / "hidden.desktop", hidden_copy(OTHER))
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
     page = window.autostart
-    assert _buttons(window) == (False, False)
-    _child(page.entries.invisibleRootItem(), 0).setSelected(True)
-    assert (page.entries.selectedItems(), _buttons(window)) == ([], (False, False))
-    _select(window, "app")
-    assert _buttons(window) == (True, False)
-    _select(window, "hidden")
-    assert _buttons(window) == (False, True)
-    page.entries.clearSelection()
-    assert _buttons(window) == (False, False)
+    assert (_turns(window, "app"), _turns(window, "hidden")) == ((True, True), (True, False))
+    assert [page.switch(name).accessibleName() for name in ("app", "hidden")] == ["app", "hidden"]
+    _groups(window)[0].setSelected(True)
+    assert page.entries.selectedItems() == []
 
 
-def test_an_entry_that_cannot_change_offers_neither(
+def test_an_entry_that_cannot_change_has_a_lock_and_a_switch_that_cannot_turn(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs
 ) -> None:
-    # [0014.24] RunOnce values are read only (0011).
+    # [0014.24] [0014.53] RunOnce values are read only (0011).
     once = RegValue("Setup", ValueKind.REG_SZ, r"C:\setup.exe")
-    registry = FakeRegistry({(Hive.HKCU, RUN_ONCE): [once]})
+    registry = FakeRegistry({(Hive.HKCU, RUN): [SYNC], (Hive.HKCU, RUN_ONCE): [once]})
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs, registry=registry)
-    _select(window, "Setup")
-    assert _buttons(window) == (False, False)
+    page = window.autostart
+    assert (_turns(window, "Setup"), _turns(window, "Sync")) == ((False, True), (True, True))
+    locks = [_lock(window, page.row(name)) for name in ("Setup", "Sync")]
+    assert [(lock.name, lock.toolTip()) for lock in locks if lock is not None] == [
+        ("lock", "Listed only: safeclean does not change this entry")
+    ]
+    assert locks[1] is None
+    QTest.mouseClick(page.switch("Setup"), Qt.MouseButton.LeftButton)
+    wait_idle(qtbot, window)
+    assert (dialogs.asked, _turns(window, "Setup")) == ([], (False, True))
 
 
 # --- the confirmation [0014.3] [0014.24] ---------------------------------------------------------
@@ -292,6 +331,7 @@ def test_a_disable_asks_first_saying_what_is_written_and_a_cancel_changes_nothin
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
     assert _change(qtbot, window, "app", "disable") == ""
     assert _change(qtbot, window, "other", "disable") == ""
+    assert _turns(window, "app") == (True, True)  # [0014.53] it turns once the entry has
     assert dialogs.asked == [
         Confirmation(
             title="Disable app",
@@ -383,17 +423,19 @@ def test_a_run_value_s_confirmation_says_its_flag_is_written(
 def test_disable_then_enable_an_entry(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs, user: Path
 ) -> None:
-    # [0014.24] The entry stays selected: Enable puts it back.
+    # [0014.24] [0014.53] A click on its switch selects the entry, and it stays selected.
     entry = write(user / "app.desktop", APP)
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
     assert _change(qtbot, window, "app", "disable") == "Disabled app (change 1)."
     assert entry.read_bytes() == hidden_copy(APP)
     assert _tree(window)[0][1][0][:2] == ("app", "Disabled")
     assert window.autostart.total.text() == "1 entry, 1 disabled"
-    assert _buttons(window) == (False, True)
-    window.autostart.enable_button.click()
-    wait_idle(qtbot, window)
-    assert window.autostart.result.text() == "Enabled app (change 2)."
+    assert _turns(window, "app") == (True, False)
+    item = window.autostart.selected()
+    assert item is not None
+    assert item.name == "app"
+    assert _change(qtbot, window, "app", "enable") == "Enabled app (change 2)."
+    assert _turns(window, "app") == (True, True)
     assert entry.read_bytes() == APP
     assert _changes(data_dir) == [(1, "disable", "done"), (2, "enable", "done")]
     assert window.recovery.isHidden()
@@ -451,7 +493,7 @@ def test_an_entry_gone_since_it_was_listed_leaves_nothing_selected(
     assert _change(qtbot, window, "app", "disable") == "Refused: Changed since it was listed."
     assert [row[0] for row in _tree(window)[0][1]] == ["renamed"]
     assert window.autostart.selected() is None
-    assert _buttons(window) == (False, False)
+    assert window.autostart.explain.isHidden()
 
 
 def test_a_rolled_back_change_says_so(
@@ -527,9 +569,8 @@ def test_a_check_before_the_change_that_fails_changes_nothing(
     write(system / "app.desktop", APP)
     user.mkdir(parents=True)
     window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
-    _select(window, "app")
     deny_stat(monkeypatch, user)
-    window.autostart.disable_button.click()
+    window.autostart.switch("app").click()
     wait_idle(qtbot, window)
     monkeypatch.undo()
     assert window.autostart.result.text() == (
@@ -542,14 +583,14 @@ def test_a_check_before_the_change_that_fails_changes_nothing(
 def test_nothing_is_changed_on_macos(
     tmp_path: Path, scan: ScanContext, data_dir: Path, qtbot: QtBot, zone: Path
 ) -> None:
-    # [0014.24] No entry there can change: the page offers neither, and a change is refused.
+    # [0014.24] [0014.53] No entry there can change: no switch turns, and a change is refused.
     agent = {"Label": "com.example.agent", "ProgramArguments": ["/usr/bin/agent"]}
     write(tmp_path / "Library" / "LaunchAgents" / "agent.plist", plistlib.dumps(agent))
     window = make_window(qtbot, environment(tmp_path, zone, data_dir, platform="darwin"))
     window.show_page("autostart")
     wait_idle(qtbot, window)
     _select(window, "com.example.agent")
-    assert _buttons(window) == (False, False)
+    assert _turns(window, "com.example.agent") == (False, True)
     auto = autostart_context("darwin", tmp_path)
     item = window.autostart.selected()
     assert item is not None
@@ -628,3 +669,114 @@ def test_unfinished_work_of_another_domain_comes_first(
     assert _changes(data_dir) == []
     assert window.recovery.offered == {Domain.QUARANTINE}
     assert window.recovery.text.text() == "Unfinished work: Quarantine."
+
+
+# --- the page [0014.53] --------------------------------------------------------------------------
+
+
+def test_a_row_has_a_tile_with_its_initial_its_location_under_its_name_and_its_scope_as_a_badge(
+    qtbot: QtBot,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    dialogs: FakeDialogs,
+    user: Path,
+    system: Path,
+    home: Path,
+) -> None:
+    # [0014.53] The location from the home folder as ~, the whole in its tooltip; a section's
+    # name and count in semibold secondary text.
+    write(user / "app.desktop", APP)
+    write(system / "other.desktop", OTHER)
+    window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
+    page = window.autostart
+    row = page.row("app")
+    assert [row.data(0, role) for role in (INITIAL, EMPHASIS, SECONDARY)] == [
+        "A",
+        True,
+        "~/config/autostart/app.desktop",
+    ]
+    assert row.toolTip(0) == str(user / "app.desktop")
+    assert [page.row(name).data(1, BADGE) for name in ("app", "other")] == ["advisory"] * 2
+    assert page.row("other").text(1) == "All users"
+    (group,) = _groups(window)
+    assert (group.data(0, EMPHASIS), group.data(0, QUIET)) == (True, True)
+    assert group.flags() == Qt.ItemFlag.ItemIsEnabled
+    assert (page.entries.rootIsDecorated(), page.entries.itemsExpandable()) == (False, False)
+
+
+def test_the_search_keeps_the_entries_whose_name_or_location_contains_its_text(
+    qtbot: QtBot,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    dialogs: FakeDialogs,
+    user: Path,
+    system: Path,
+) -> None:
+    # [0014.53] Ignoring case, with the sections that keep one; an entry put away is no longer
+    # selected, and a refresh keeps the search.
+    write(user / "app.desktop", APP)
+    write(system / "other.desktop", OTHER)
+    units = tmp_path / "config" / "systemd" / "user"
+    write(units / "sync.service", b"[Service]\nExecStart=/usr/bin/sync-daemon\n")
+    (units / "default.target.wants").mkdir()
+    (units / "default.target.wants" / "sync.service").symlink_to(units / "sync.service")
+    window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
+    page = window.autostart
+    desktop, systemd = "Desktop autostart · 2 entries", "systemd user service · 1 entry"
+    assert page.search.placeholderText() == "Search entries"
+    assert _shown(window) == ([desktop, systemd], ["app", "other", "sync.service"])
+    page.search.setText("APP")
+    assert _shown(window) == ([desktop], ["app"])
+    page.search.setText("ETC/xdg")
+    assert _shown(window) == ([desktop], ["other"])
+    page.search.setText("Sync")
+    assert _shown(window) == ([systemd], ["sync.service"])
+    _select(window, "sync.service")
+    page.search.setText("nothing like it")
+    assert _shown(window) == ([], [])
+    assert (page.selected(), page.detail.text(), page.explain.isHidden()) == (None, "", True)
+    page.search.setText("other")
+    page.refresh_button.click()
+    wait_idle(qtbot, window)
+    assert _shown(window) == ([desktop], ["other"])
+    page.search.clear()
+    assert _shown(window) == ([desktop, systemd], ["app", "other", "sync.service"])
+
+
+def test_no_switch_turns_while_a_task_runs(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs
+) -> None:
+    # [0014.53] [0014.16] And when it ends, a locked one still does not.
+    once = RegValue("Setup", ValueKind.REG_SZ, r"C:\setup.exe")
+    registry = FakeRegistry({(Hive.HKCU, RUN): [SYNC], (Hive.HKCU, RUN_ONCE): [once]})
+    window = _opened(qtbot, tmp_path, zone, data_dir, dialogs, registry=registry)
+    release = threading.Event()
+    assert window.run(Task("Scanning", lambda: release.wait(timeout=10), lambda _: None))
+    assert (_turns(window, "Sync"), _turns(window, "Setup")) == ((False, True), (False, True))
+    release.set()
+    qtbot.waitUntil(lambda: window.autostart.switch("Sync").isEnabled())
+    assert _turns(window, "Setup") == (False, True)
+
+
+def test_the_detail_and_explain_are_under_the_list_once_an_entry_is_selected(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, dialogs: FakeDialogs, user: Path
+) -> None:
+    # [0014.53] [0014.26] The total and the skips in secondary text.
+    write(user / "app.desktop", APP)
+    window = _opened(qtbot, tmp_path, zone, data_dir, dialogs)
+    page = window.autostart
+    layout = page.layout()
+    assert layout is not None
+    order = [page.entries, page.detail, page.explain, page.result, page.total, page.skipped]
+    places = [layout.indexOf(part) for part in order]
+    assert places == sorted(places)
+    assert places[0] >= 0
+    assert page.explain.isHidden()
+    _select(window, "app")
+    assert not page.explain.isHidden()
+    assert page.detail.text() == "Command: /usr/bin/app --tray"
+    page.entries.clearSelection()
+    assert page.explain.isHidden()
+    assert [page.total.property("role"), page.skipped.property("role")] == ["secondary"] * 2

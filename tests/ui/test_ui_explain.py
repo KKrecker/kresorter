@@ -352,7 +352,7 @@ def test_an_autostart_entry_s_detail_and_its_explanation(
     assert _asked(ollama) == [_facts(item)]
     assert _said(page) == (ANSWER, MODEL)
     assert page.selected() == item
-    assert page.disable_button.isEnabled()
+    assert page.switch("app").isEnabled()
     assert _listing(tmp_path) == files
     assert not data_dir.exists()
 

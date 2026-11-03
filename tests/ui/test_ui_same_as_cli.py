@@ -17,6 +17,7 @@ from safeclean.autostart.registry import Hive, RegValue, ValueKind
 from safeclean.autostart.run_keys import RUN
 from safeclean.organize.planner import StayReason
 from safeclean.ui.i18n import Translator
+from safeclean.ui.window import Window
 from support.cli import autostart_context, run, scan_context
 from support.files import write
 from support.interrupted import APP
@@ -171,20 +172,38 @@ def test_what_the_russian_window_sorted_organize_undo_moves_back(
     assert files(folder) == {A: b"a.jpg", B: b"b.pdf", C: b"c.mp3"}
 
 
-def _expected(items: list[dict[str, object]]) -> list[tuple[str, list[list[str]]]]:
+Entry = tuple[str, bool, str, str]
+
+
+def _entries(window: Window) -> list[tuple[str, list[Entry]]]:
+    """Each section of the Autostart page, with each entry's name, its switch (on when it
+    starts), its scope and its location (the name's tooltip)."""
+    page = window.autostart
+    return [
+        (
+            title,
+            [
+                (row[0], page.switch(row[0]).isChecked(), row[1], page.row(row[0]).toolTip(0))
+                for row in rows
+            ],
+        )
+        for title, rows in _groups(page.entries)
+    ]
+
+
+def _expected(items: list[dict[str, object]]) -> list[tuple[str, list[Entry]]]:
     """``autostart list --json``'s items as the Autostart page groups and shows them."""
-    groups: dict[str, list[list[str]]] = {}
+    groups: dict[str, list[Entry]] = {}
     for item in items:
         source = EN.label(Source(str(item["source"])))
-        state = "Enabled" if item["enabled"] else "Disabled"
-        cells = [
+        cells = (
             str(item["name"]),
-            state,
+            bool(item["enabled"]),
             EN.label(Scope(str(item["scope"]))),
             str(item["location"]),
-        ]
+        )
         groups.setdefault(source, []).append(cells)
-    return [(f"{source}: {len(rows)}", rows) for source, rows in groups.items()]
+    return [(f"{source} · {EN.count('entry', len(rows))}", rows) for source, rows in groups.items()]
 
 
 def test_the_autostart_entries_are_those_of_autostart_list_json(
@@ -209,7 +228,7 @@ def test_the_autostart_entries_are_those_of_autostart_list_json(
 
     items = json.loads(out)["items"]
     assert len(items) == 3
-    assert _groups(window.autostart.entries) == _expected(items)
+    assert _entries(window) == _expected(items)
 
 
 @pytest.mark.parametrize("include_machine", [False, True])
@@ -238,4 +257,4 @@ def test_on_windows_the_entries_are_those_of_the_same_scope(
 
     items = json.loads(out)["items"]
     assert len(items) == 1 + include_machine
-    assert _groups(window.autostart.entries) == _expected(items)
+    assert _entries(window) == _expected(items)
