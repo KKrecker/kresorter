@@ -25,6 +25,7 @@ from kresorter.core.scanner import ScanContext
 from kresorter.organize.platforms import refusal
 from support.cli import autostart_context, run, scan_context
 from support.files import snapshot, write
+from support.host import alias
 from support.journal import query
 from support.moves import B, crash, planned, three_files, tree
 
@@ -188,10 +189,10 @@ def test_windows_with_a_reliable_check_moves_and_undoes(
 def test_on_windows_a_folder_given_in_another_case_is_sorted_as_the_system_spells_it(
     tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
-    # [0017.12] the plan, the batch and the journal take the system's spelling; here a link
-    # from the other case stands for it, as this system tells case apart
-    (zone / "ann").symlink_to(zone / "Ann")
+    # [0017.12] the plan, the batch and the journal take the system's spelling; where the
+    # system tells case apart a link from the other case stands for it
     real = three_files(zone / "Ann")
+    alias(zone / "ann", zone / "Ann")
     given = zone / "ann" / "Downloads"
     windows = scan_context(tmp_path, zone, data_dir, platform="windows")
     code, out, _ = run(["organize", "move", str(given)], windows)

@@ -79,14 +79,14 @@ def test_a_file_is_not_a_folder(zone: Path, scan: ScanContext) -> None:
 def test_a_link_is_refused_even_to_a_directory(zone: Path, scan: ScanContext) -> None:
     # [0012.7] the detail is where the link leads
     (zone / "real").mkdir()
-    (zone / "Downloads").symlink_to(zone / "real")
+    (zone / "Downloads").symlink_to(zone / "real", target_is_directory=True)
     assert refusal(zone / "Downloads", scan) == (FolderReason.LINK, str(zone / "real"))
 
 
 def test_a_folder_below_a_link_is_refused(zone: Path, scan: ScanContext) -> None:
     # [0012.7] a link anywhere above: the folder is not where its path says
     (zone / "real" / "Downloads").mkdir(parents=True)
-    (zone / "via").symlink_to(zone / "real")
+    (zone / "via").symlink_to(zone / "real", target_is_directory=True)
     folder = zone / "via" / "Downloads"
     assert refusal(folder, scan) == (FolderReason.LINK, str(zone / "real" / "Downloads"))
 
@@ -399,7 +399,7 @@ def test_what_comes_before_not_a_directory_comes_first(zone: Path, scan: ScanCon
     context = syncing(scan, root)
     (zone / "real").mkdir()
     root.mkdir()
-    (root / "link").symlink_to(zone / "real")
+    (root / "link").symlink_to(zone / "real", target_is_directory=True)
     assert refusal(root / "missing", context) == (FolderReason.NOT_FOUND, "")
     assert refusal(write(root / "notes.txt"), context) == (FolderReason.NOT_A_DIRECTORY, "")
     assert refusal(root / "link", context) == (FolderReason.LINK, str(zone / "real"))

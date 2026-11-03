@@ -226,7 +226,7 @@ def test_parent_swapped_for_symlink_is_refused(
     item = quarantined(service, zone / "dir" / "a.bin")
     (zone / "dir").replace(zone / "old-dir")
     (tmp_path / "elsewhere").mkdir()
-    (zone / "dir").symlink_to(tmp_path / "elsewhere")
+    (zone / "dir").symlink_to(tmp_path / "elsewhere", target_is_directory=True)
 
     result = service.restore([item])
 

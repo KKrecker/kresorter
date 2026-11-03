@@ -187,7 +187,7 @@ def test_parent_swapped_for_symlink_is_refused(preflight: Preflight, zone: Path)
     decoy = write(zone / "elsewhere" / "a.bin")
     os.utime(decoy, ns=(entry.mtime_ns, entry.mtime_ns))
     (zone / "dir").replace(zone / "old-dir")
-    (zone / "dir").symlink_to(zone / "elsewhere")
+    (zone / "dir").symlink_to(zone / "elsewhere", target_is_directory=True)
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.PARENT_SWAPPED
 
 
@@ -196,7 +196,7 @@ def test_grandparent_swapped_for_symlink_is_refused(preflight: Preflight, zone: 
     decoy = write(zone / "elsewhere" / "dir" / "a.bin")
     os.utime(decoy, ns=(entry.mtime_ns, entry.mtime_ns))
     (zone / "top").replace(zone / "old-top")
-    (zone / "top").symlink_to(zone / "elsewhere")
+    (zone / "top").symlink_to(zone / "elsewhere", target_is_directory=True)
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.PARENT_SWAPPED
 
 

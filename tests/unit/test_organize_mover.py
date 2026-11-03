@@ -146,7 +146,7 @@ def test_a_folder_swapped_for_a_link_refuses_every_file(
     # [0012.19] a parent not swapped for a link
     moves = plan(folder, scan).moves
     folder.rename(zone / "elsewhere")
-    folder.symlink_to(zone / "elsewhere")
+    folder.symlink_to(zone / "elsewhere", target_is_directory=True)
     assert refused(folder, scan, moves) == [(name, "parent_swapped") for name in (A, C, B)]
 
 
@@ -192,7 +192,7 @@ def test_a_category_path_no_longer_a_directory_is_refused(
     # [0012.19] a link to a directory is not one
     moves = plan(folder, scan).moves
     (zone / "elsewhere").mkdir()
-    (folder / "Documents").symlink_to(zone / "elsewhere")
+    (folder / "Documents").symlink_to(zone / "elsewhere", target_is_directory=True)
     not_one = f"{folder / 'Documents'}: not a directory"
     assert explained(folder, scan, moves) == [(B, "conflict", not_one)]
 
@@ -391,7 +391,7 @@ def test_a_category_path_that_became_a_link_stops_the_batch(
 ) -> None:
     # [0012.26] [0012.27] never followed: nothing goes where the link leads
     (zone / "elsewhere").mkdir()
-    (folder / "Documents").symlink_to(zone / "elsewhere")
+    (folder / "Documents").symlink_to(zone / "elsewhere", target_is_directory=True)
     rename = FlakyRename()
     result = carry_out(conn, folder, planned(folder), rename=rename)
     assert result.state is BatchState.ROLLED_BACK

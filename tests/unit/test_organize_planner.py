@@ -146,7 +146,7 @@ def test_anything_but_a_regular_file_stays(tmp_path: Path, zone: Path, scan: Sca
     folder = downloads(zone, "report.pdf")
     (folder / "album").mkdir()
     (folder / "photo.jpg").symlink_to(folder / "report.pdf")
-    (folder / "elsewhere").symlink_to(tmp_path)
+    (folder / "elsewhere").symlink_to(tmp_path, target_is_directory=True)
     (folder / "song.mp3").symlink_to(folder / "missing.mp3")
     make_fifo(folder / "clip.mp4")
     result = plan(folder, scan)
@@ -286,7 +286,7 @@ def test_a_category_path_that_is_not_a_directory_keeps_its_category(
     # [0012.18] Images is a file, Documents a link to a directory: never followed
     (tmp_path / "elsewhere").mkdir()
     folder = downloads(zone, "Images", "a.jpg", "b.png", "c.pdf", "d.mp3")
-    (folder / "Documents").symlink_to(tmp_path / "elsewhere")
+    (folder / "Documents").symlink_to(tmp_path / "elsewhere", target_is_directory=True)
     result = plan(folder, scan)
     assert stayed(result) == {
         "Documents": StayReason.NOT_REGULAR,

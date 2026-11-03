@@ -253,7 +253,7 @@ def test_a_linked_folder_is_not_followed(root: Path, tmp_path: Path) -> None:
     elsewhere = tmp_path / "elsewhere"
     task(elsewhere, "T")
     root.mkdir(parents=True)
-    (root / "Linked").symlink_to(elsewhere)
+    (root / "Linked").symlink_to(elsewhere, target_is_directory=True)
 
     assert read(root) == skip(root / "Linked", "not a regular file")
 
