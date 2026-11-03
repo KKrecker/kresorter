@@ -11,9 +11,8 @@ env:
 
 jobs:
   check:
-    # Linux for every Python; Windows for the oldest and the newest while the repository is
-    # private, for every Python once it is public (decision 0015, item 20; pre-step-5 audit,
-    # B11).
+    # Linux and Windows for every Python, the repository being public (decision 0015, item 20;
+    # pre-step-5 audit, B11).
     runs-on: ${{ matrix.os }}
     env:
       # The window's tests need no display, on either system (decision 0014, item 10).
@@ -23,11 +22,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.11", "3.12", "3.13", "3.14"]
-        exclude:
-          - os: windows-latest
-            python-version: "3.12"
-          - os: windows-latest
-            python-version: "3.13"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

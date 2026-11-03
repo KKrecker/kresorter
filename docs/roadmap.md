@@ -275,8 +275,9 @@ Scanner core and `kresorter scan` (read-only report).
   once, and with it the quarantine on Windows; decision 0017: organize on Windows, renames tried
   again after a sharing violation, a path limit of 259 characters, and the folders a sync
   client keeps refused.
-- CI on two systems: `ubuntu-latest` for every Python, `windows-latest` for 3.11 and 3.14 (B11
-  for the checks), and what Windows does otherwise fixed, each with its test: files opened with
+- CI on two systems: `ubuntu-latest` for every Python, `windows-latest` for 3.11 and 3.14
+  while the repository was private and for every Python since it is public (B11 for the
+  checks), and what Windows does otherwise fixed, each with its test: files opened with
   `O_BINARY`, modes as Windows shows them, 100 ns steps, a name in another case.
 - The Windows application (`packaging/windows`): PyInstaller's folder `Kresorter` with
   `Kresorter.exe`, its icon and version resource, `LICENSE`, `THIRD-PARTY-NOTICES.txt` and
@@ -295,7 +296,7 @@ Scanner core and `kresorter scan` (read-only report).
   [`docs/releases/README.md`](releases/README.md).
 - 3027 tests, 100 % line and branch coverage. Left before the tag: CI's runs read on both
   systems, Python 3.14 with them (step 6 was checked on it locally only); the owner's runs on
-  clean machines and their record; then the tag, by the owner, once the repository is public.
+  clean machines and their record; then the tag, by the owner.
 
 ### Accepted limitations carried after step 8
 - Everything from steps 2 to 7 still holds. The window is now tested offscreen on Windows too,
@@ -318,8 +319,7 @@ Scanner core and `kresorter scan` (read-only report).
 
 ### Left for later
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
-- B11: CI on Windows for every Python once the repository is public, CI on macOS, and live
-  `WinRegistry` tests.
+- B11: CI on macOS, and live `WinRegistry` tests.
 - B12: a user's own stub without `Exec` that `enable` moved to the store is not given back
   (accepted limitation of step 5).
 
