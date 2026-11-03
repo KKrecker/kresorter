@@ -56,6 +56,18 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "Объяснения ИИ: значение {name} отклонено",
     },
     "button.cancel": {"en": "Cancel", "ru": "Отмена"},
+    "button.close": {"en": "Close", "ru": "Закрыть"},
+    "button.copy": {"en": "Copy", "ru": "Копировать"},
+    "error.title": {
+        "en": "Kresorter: an unexpected error",
+        "ru": "Kresorter: непредвиденная ошибка",
+    },
+    "error.text": {
+        "en": "The window stays open, and nothing was sent anywhere. The details below can be"
+        " copied into a report.",
+        "ru": "Окно остаётся открытым, и ничего никуда не отправлено. Подробности ниже можно"
+        " скопировать в отчёт.",
+    },
     "task.running": {"en": "Running: {task}", "ru": "Выполняется: {task}"},
     "task.failed": {"en": "{task} failed: {message}", "ru": "Ошибка ({task}): {message}"},
     "close.wait": {
