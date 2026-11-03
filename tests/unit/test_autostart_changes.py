@@ -36,7 +36,7 @@ from kresorter.autostart.xdg import read_xdg
 from kresorter.autostart.xdg_changes import STUB, hidden_copy
 from kresorter.storage.db import connect
 from support.files import write_desktop
-from support.host import record_opens
+from support.host import as_kept, record_opens
 
 APP = b"[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 COLUMNS = (
@@ -116,7 +116,7 @@ def test_the_store_is_apart_from_the_quarantine_and_made_private_by_the_first_ch
 
     tree.changes.disable(tree.item())
 
-    assert stat.S_IMODE(tree.store.root.stat().st_mode) == 0o700
+    assert stat.S_IMODE(tree.store.root.stat().st_mode) == as_kept(0o700, directory=True)
     assert tree.stored() == ["1"]
 
 
@@ -282,7 +282,7 @@ def test_a_missing_user_directory_is_created_private(tree: Tree) -> None:
 
     tree.changes.disable(tree.item())
 
-    assert stat.S_IMODE(tree.user.stat().st_mode) == 0o700
+    assert stat.S_IMODE(tree.user.stat().st_mode) == as_kept(0o700, directory=True)
     assert (tree.user / "app.desktop").read_bytes() == STUB
 
 
@@ -293,7 +293,7 @@ def test_an_existing_user_directory_keeps_its_mode(tree: Tree) -> None:
 
     tree.changes.disable(tree.item())
 
-    assert stat.S_IMODE(tree.user.stat().st_mode) == 0o755
+    assert stat.S_IMODE(tree.user.stat().st_mode) == as_kept(0o755, directory=True)
     assert (tree.user / "app.desktop").read_bytes() == STUB
 
 

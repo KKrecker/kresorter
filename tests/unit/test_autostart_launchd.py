@@ -8,7 +8,6 @@ keeps of its own are not read, so every item says ``state from the file``. XML a
 property lists; read-only.
 """
 
-import os
 import plistlib
 from pathlib import Path
 
@@ -23,6 +22,7 @@ from kresorter.autostart.models import (
     Source,
     entry_digest,
 )
+from support.host import make_fifo
 
 Dirs = tuple[Path, Path, Path]
 Content = dict[str, object] | list[object] | bytes  # a property list to write, or raw bytes
@@ -225,7 +225,7 @@ def test_an_oversized_file_is_skipped_unread(dirs: Dirs) -> None:
 
 def test_something_that_is_not_a_regular_file_is_skipped(dirs: Dirs) -> None:
     dirs[0].mkdir(parents=True)
-    os.mkfifo(dirs[0] / "pipe.plist")  # opening it would block: never opened
+    make_fifo(dirs[0] / "pipe.plist")  # opening it would block: never opened
 
     assert read(dirs) == skip(dirs[0] / "pipe.plist", "not a regular file")
 

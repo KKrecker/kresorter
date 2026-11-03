@@ -22,6 +22,7 @@ from kresorter.autostart.models import (
     entry_digest,
 )
 from kresorter.autostart.systemd import read_systemd_user, systemd_user_dir
+from support.host import make_fifo
 
 SYNC = "[Unit]\nDescription=Sync\n\n[Service]\nExecStart=/usr/bin/sync --serve\n"
 
@@ -238,7 +239,7 @@ def test_a_link_to_something_that_is_not_a_regular_file_is_skipped(
     units: Path, vendor: Path
 ) -> None:
     vendor.mkdir(parents=True)
-    os.mkfifo(vendor / "pipe.service")  # opening it would block: never opened
+    make_fifo(vendor / "pipe.service")  # opening it would block: never opened
     link = enable(units, "default.target", "pipe.service", vendor / "pipe.service")
 
     assert read_systemd_user(units) == skipped(link, "not a regular file")

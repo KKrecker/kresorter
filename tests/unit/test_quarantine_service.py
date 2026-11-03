@@ -28,6 +28,7 @@ from kresorter.quarantine.service import QuarantineError, QuarantineService
 from kresorter.quarantine.vault import Vault
 from kresorter.storage.db import connect
 from support.files import write
+from support.host import as_kept
 from support.journal import rows
 
 NO_RULES = JunkClassifier([], platform="linux")
@@ -133,8 +134,8 @@ def test_data_dir_matching_a_junk_rule_is_refused(
 
 
 def test_vault_is_created_private(service: QuarantineService, data_dir: Path) -> None:
-    assert mode_bits(data_dir) == 0o700
-    assert mode_bits(data_dir / "quarantine") == 0o700
+    assert mode_bits(data_dir) == as_kept(0o700, directory=True)
+    assert mode_bits(data_dir / "quarantine") == as_kept(0o700, directory=True)
 
 
 def test_existing_loose_vault_is_tightened(
@@ -144,8 +145,8 @@ def test_existing_loose_vault_is_tightened(
     data_dir.chmod(0o755)
     (data_dir / "quarantine").chmod(0o777)
     make_service(conn, policy)
-    assert mode_bits(data_dir) == 0o700
-    assert mode_bits(data_dir / "quarantine") == 0o700
+    assert mode_bits(data_dir) == as_kept(0o700, directory=True)
+    assert mode_bits(data_dir / "quarantine") == as_kept(0o700, directory=True)
 
 
 def test_vault_slot_layout(data_dir: Path) -> None:

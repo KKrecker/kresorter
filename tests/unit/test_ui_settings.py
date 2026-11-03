@@ -28,7 +28,7 @@ from kresorter.ui.settings import (
     save,
 )
 from support.cli import scan_context
-from support.host import record_opens
+from support.host import as_kept, posix_only, record_opens
 
 
 @pytest.fixture
@@ -88,11 +88,12 @@ def test_saving_makes_the_data_directory_private_and_the_file_alone_in_it(
     # [0014.35]
     assert not data_dir.exists()
     assert save(context, Settings(language="ru")) is None
-    assert _mode(data_dir) == 0o700
-    assert _mode(data_dir / SETTINGS_NAME) == 0o600
+    assert _mode(data_dir) == as_kept(0o700, directory=True)
+    assert _mode(data_dir / SETTINGS_NAME) == as_kept(0o600)
     assert sorted(path.name for path in data_dir.iterdir()) == [SETTINGS_NAME]
 
 
+@posix_only("on Windows a file open elsewhere cannot be replaced")
 def test_the_file_is_replaced_by_a_renamed_temporary_file(
     context: ScanContext, data_dir: Path
 ) -> None:
@@ -128,7 +129,7 @@ def test_a_temporary_file_left_behind_is_overwritten(context: ScanContext, data_
     (data_dir / TEMP_NAME).chmod(0o644)
     assert save(context, Settings(language="ru")) is None
     assert sorted(path.name for path in data_dir.iterdir()) == [SETTINGS_NAME]
-    assert _mode(data_dir / SETTINGS_NAME) == 0o600
+    assert _mode(data_dir / SETTINGS_NAME) == as_kept(0o600)
     assert load(context) == Loaded(Settings(language="ru"))
 
 

@@ -21,6 +21,7 @@ from kresorter.quarantine.service import QuarantineService
 from kresorter.storage.lock import InstanceLock
 from support.cli import run, scan_context
 from support.files import write
+from support.host import as_kept
 from support.journal import query
 
 # --- helpers -----------------------------------------------------------------------------------
@@ -278,7 +279,7 @@ def test_data_directory_is_created_private(context: ScanContext, data_dir: Path)
     run(["quarantine", "list"], context)
 
     assert (data_dir / "journal.db").is_file()
-    assert data_dir.stat().st_mode & 0o777 == 0o700
+    assert data_dir.stat().st_mode & 0o777 == as_kept(0o700, directory=True)
 
 
 # --- restore -----------------------------------------------------------------------------------
@@ -392,7 +393,7 @@ def test_a_loosened_data_directory_is_made_private_again(
 
     run(["quarantine", "list"], context)
 
-    assert data_dir.stat().st_mode & 0o777 == 0o700
+    assert data_dir.stat().st_mode & 0o777 == as_kept(0o700, directory=True)
 
 
 # --- bulk add from an analysis (decision 0010, item 14) ----------------------------------------

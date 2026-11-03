@@ -23,6 +23,7 @@ from kresorter.core.preflight import (
     UnreliableCheckerError,
 )
 from support.files import write
+from support.host import make_fifo
 
 # --- helpers -----------------------------------------------------------------------------------
 
@@ -136,7 +137,7 @@ def test_file_replaced_by_directory_is_refused(preflight: Preflight, zone: Path)
 def test_file_replaced_by_fifo_is_refused(preflight: Preflight, zone: Path) -> None:
     entry = scanned(write(zone / "a.bin"))
     entry.path.replace(zone / "moved.bin")
-    os.mkfifo(entry.path)
+    make_fifo(entry.path)
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.NOT_REGULAR
 
 

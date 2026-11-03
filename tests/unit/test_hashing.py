@@ -20,6 +20,7 @@ from kresorter.core.hashing import (
     hash_file,
 )
 from kresorter.core.models import FileEntry, Skipped, SkipReason
+from support.host import MTIME_STEP_NS
 
 
 def blake(data: bytes) -> str:
@@ -191,10 +192,11 @@ def test_file_changed_since_scan_is_not_hashed(
 
 
 def test_one_nanosecond_change_is_detected(tmp_path: Path) -> None:
-    # A float st_mtime (~1.7e9 s) cannot represent 1 ns; mtime_ns can.
+    # A float st_mtime (~1.7e9 s) cannot represent 1 ns; mtime_ns can. NTFS keeps 100 ns steps,
+    # which a float cannot represent either.
     a = make(tmp_path / "a", b"data-data")
     b = make(tmp_path / "b", b"data-data")
-    os.utime(b.path, ns=(b.mtime_ns + 1, b.mtime_ns + 1))
+    os.utime(b.path, ns=(b.mtime_ns + MTIME_STEP_NS, b.mtime_ns + MTIME_STEP_NS))
 
     assert candidates([a, b]) == [
         Skipped(path=b.path, reason=SkipReason.CHANGED, detail="modified since scan")

@@ -20,6 +20,7 @@ from kresorter.ui.i18n import Translator
 from kresorter.ui.window import Window
 from support.cli import autostart_context, run, scan_context
 from support.files import write
+from support.host import native
 from support.interrupted import APP
 from support.moves import A, B, C, files, three_files
 from support.window import (
@@ -160,7 +161,7 @@ def test_what_the_russian_window_sorted_organize_undo_moves_back(
         f"Audio/{C}": b"c.mp3",
     }
     assert code == 0
-    assert "Images/a.jpg -> a.jpg" in out
+    assert f"{native('Images/a.jpg')} -> a.jpg" in out
     assert files(folder) == {A: b"a.jpg", B: b"b.pdf", C: b"c.mp3"}
 
 

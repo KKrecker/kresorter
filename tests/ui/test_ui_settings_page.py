@@ -28,6 +28,7 @@ from kresorter.ui.settings_page import SettingsPage
 from kresorter.ui.theme import LIGHT
 from kresorter.ui.window import Window
 from support.cli import autostart_context, run, scan_context
+from support.host import native
 from support.ollama import TAGS, VERSION, Answer, ScriptedOllama, as_json
 from support.window import FakeDialogs, children, environment, make_window, settled, wait_idle
 
@@ -555,7 +556,10 @@ def test_the_data_folder_from_the_home_folder(
     # [0014.55] The whole path in its tooltip, in secondary text.
     window = _window(qtbot, tmp_path, zone, data_dir)
     page = window.settings
-    assert (page.data_dir.text(), page.data_dir.toolTip()) == ("~/data/kresorter", str(data_dir))
+    assert (page.data_dir.text(), page.data_dir.toolTip()) == (
+        native("~/data/kresorter"),
+        str(data_dir),
+    )
     assert page.data_dir.property("role") == "secondary"
 
 

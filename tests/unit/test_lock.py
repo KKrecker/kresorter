@@ -22,6 +22,7 @@ from kresorter.storage.lock import (
     backend_for_platform,
 )
 from kresorter.storage.transactions import StorageError
+from support.host import as_kept
 
 posix_only = pytest.mark.skipif(sys.platform == "win32", reason="flock backend")
 
@@ -60,7 +61,7 @@ def hold_in_another_process(lock_path: Path) -> subprocess.Popen[str]:
 
 def test_lock_creates_a_private_file_and_keeps_it(lock_path: Path) -> None:
     with InstanceLock(lock_path):
-        assert stat.S_IMODE(lock_path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(lock_path.stat().st_mode) == as_kept(0o600)
     assert lock_path.is_file()  # released, never deleted
 
 
@@ -68,7 +69,7 @@ def test_a_loosened_lock_file_is_made_private_again(lock_path: Path) -> None:
     lock_path.touch()
     lock_path.chmod(0o666)
     with InstanceLock(lock_path):
-        assert stat.S_IMODE(lock_path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(lock_path.stat().st_mode) == as_kept(0o600)
 
 
 def test_second_lock_in_the_same_process_is_refused(lock_path: Path) -> None:

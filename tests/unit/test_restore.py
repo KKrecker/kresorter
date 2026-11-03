@@ -23,6 +23,7 @@ from kresorter.quarantine.journal import OperationState
 from kresorter.quarantine.service import QuarantineError, QuarantineService, RestoreRefusal
 from kresorter.storage.db import connect
 from support.files import write
+from support.host import as_kept
 from support.journal import rows
 
 NO_RULES = JunkClassifier([], platform="linux")
@@ -118,7 +119,7 @@ def test_mode_atime_and_mtime_come_back_from_the_journal(
     service.restore([item])
 
     info = (zone / "a.bin").lstat()
-    assert stat.S_IMODE(info.st_mode) == 0o640
+    assert stat.S_IMODE(info.st_mode) == as_kept(0o640)
     assert info.st_atime_ns == ATIME_NS
     assert info.st_mtime_ns == MTIME_NS
 

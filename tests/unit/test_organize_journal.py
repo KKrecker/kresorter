@@ -31,6 +31,7 @@ from kresorter.organize.journal import (
 )
 from kresorter.storage.db import connect
 from support.files import write
+from support.host import MTIME_STEP_NS
 
 FILE = b"the file"
 
@@ -147,7 +148,7 @@ def test_a_copy_with_the_same_size_and_mtime_is_another_file(zone: Path) -> None
 def test_the_file_edited_since_is_another_file(zone: Path) -> None:
     # [0012.31] the same inode, another mtime_ns
     file = identity(write(zone / "a.jpg", FILE))
-    os.utime(zone / "a.jpg", ns=(file.mtime_ns, file.mtime_ns + 1))
+    os.utime(zone / "a.jpg", ns=(file.mtime_ns, file.mtime_ns + MTIME_STEP_NS))
     assert holds(zone / "a.jpg", file) is Held.ANOTHER_FILE
 
 

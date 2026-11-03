@@ -29,6 +29,7 @@ from kresorter.organize.mover import check
 from kresorter.organize.planner import plan
 from kresorter.ui.i18n import Translator
 from support.files import write
+from support.host import alias, posix_only
 from support.synced import FakeSynced
 
 DECISION = Path(__file__).resolve().parents[2] / "docs" / "decisions" / "0012-organize.md"
@@ -269,10 +270,10 @@ def test_markers_one_level_down_refuse_nothing(zone: Path, scan: ScanContext) ->
 
 
 def spelled(zone: Path, given: str, real: str) -> tuple[Path, Path]:
-    """``zone/given/Downloads`` and ``zone/real/Downloads``, a photo in it, ``given`` a link to
-    ``real``."""
-    (zone / given).symlink_to(zone / real)
+    """``zone/given/Downloads`` and ``zone/real/Downloads``, a photo in it, ``given`` standing for
+    ``real``: a link to it, or on Windows the same name in another case."""
     write(zone / real / "Downloads" / "a.jpg")
+    alias(zone / given, zone / real)
     return zone / given / "Downloads", zone / real / "Downloads"
 
 
@@ -306,12 +307,13 @@ def test_on_windows_a_short_name_or_another_drive_is_a_link(zone: Path, scan: Sc
     assert refusal(given, windows) == (FolderReason.LINK, str(real))
 
 
+@posix_only("on Windows names that differ only in case are one name")
 def test_on_windows_a_link_spelled_as_its_target_is_still_a_link(
     zone: Path, scan: ScanContext
 ) -> None:
     # [0017.12] the folder itself is a link: refused whatever it leads to
     (zone / "Downloads").mkdir()
-    (zone / "downloads").symlink_to(zone / "Downloads")
+    (zone / "downloads").symlink_to(zone / "Downloads", target_is_directory=True)
     windows = dataclasses.replace(scan, platform="windows")
     assert refusal(zone / "downloads", windows) == (FolderReason.LINK, str(zone / "Downloads"))
 
@@ -321,8 +323,8 @@ def test_on_windows_the_system_s_spelling_is_checked_as_any_folder(
 ) -> None:
     # [0017.12] the policy blocks tmp_path/system, not tmp_path/SYSTEM: the system's spelling
     # is what is refused
-    (tmp_path / "SYSTEM").symlink_to(tmp_path / "system")
     (tmp_path / "system" / "Downloads").mkdir(parents=True)
+    alias(tmp_path / "SYSTEM", tmp_path / "system")
     with pytest.raises(FolderRefused) as refused:
         plan(tmp_path / "SYSTEM" / "Downloads", dataclasses.replace(scan, platform="windows"))
     assert refused.value.folder == tmp_path / "system" / "Downloads"
@@ -334,7 +336,7 @@ def test_on_windows_the_system_s_spelling_is_taken_once(
 ) -> None:
     # [0017.12] a system that would spell it otherwise again: a link, not a loop
     for name in ("ab", "AB"):
-        (zone / name).mkdir()
+        (zone / name).mkdir(exist_ok=True)  # on Windows one directory
     other = {str(zone / "ab"): str(zone / "AB"), str(zone / "AB"): str(zone / "ab")}
     real = os.path.realpath
 

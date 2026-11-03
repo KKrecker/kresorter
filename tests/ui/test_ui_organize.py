@@ -27,6 +27,7 @@ from kresorter.ui.theme import LIGHT
 from kresorter.ui.window import Window
 from support.cli import run, scan_context
 from support.files import write
+from support.host import native
 from support.journal import pending_quarantine, query
 from support.moves import A, B, C, FlakyRename, files, renaming, three_files
 from support.window import FakeDialogs, children, environment, make_window, wait_idle
@@ -513,7 +514,11 @@ def test_undo_shows_its_plan_then_moves_back_after_confirmation(
         Confirmation(
             title="Undo batch 1",
             text=f"Move back 3 files (15 B) sorted by batch 1 in {folder}?",
-            details=("Images/a.jpg → a.jpg", "Audio/c.mp3 → c.mp3", "Documents/b.pdf → b.pdf"),
+            details=(
+                f"{native('Images/a.jpg')} → a.jpg",
+                f"{native('Audio/c.mp3')} → c.mp3",
+                f"{native('Documents/b.pdf')} → b.pdf",
+            ),
             action="Move back",
         )
     ]
@@ -550,9 +555,9 @@ def test_what_cannot_move_back_stays_and_is_shown(
     (folder / "Images" / A).rename(tmp_path / A)
     _undo(qtbot, window, 1)
     assert dialogs.asked[0].details == (
-        "Audio/c.mp3 → c.mp3",
-        "Documents/b.pdf → b.pdf",
-        "Images/a.jpg (No longer there)",
+        f"{native('Audio/c.mp3')} → c.mp3",
+        f"{native('Documents/b.pdf')} → b.pdf",
+        f"{native('Images/a.jpg')} (No longer there)",
     )
     assert files(folder) == {B: b"b.pdf", C: b"c.mp3", **STAYING}
     assert _batches(window)[1] == _batch(
@@ -571,9 +576,9 @@ def test_an_undo_with_nothing_to_move_back_says_so(
     assert dialogs.asked == []
     assert _lines(window) == [
         "Nothing to move back from batch 1.",
-        "Images/a.jpg (No longer there)",
-        "Audio/c.mp3 (No longer there)",
-        "Documents/b.pdf (No longer there)",
+        f"{native('Images/a.jpg')} (No longer there)",
+        f"{native('Audio/c.mp3')} (No longer there)",
+        f"{native('Documents/b.pdf')} (No longer there)",
     ]
 
 
@@ -727,9 +732,9 @@ def test_the_page_in_russian(
     _undo(qtbot, window, 1)
     [asked] = dialogs.asked
     assert asked.details == (
-        "Images/a.jpg → a.jpg",
-        "Audio/c.mp3 → c.mp3",
-        "Documents/b.pdf → b.pdf",
+        f"{native('Images/a.jpg')} → a.jpg",
+        f"{native('Audio/c.mp3')} → c.mp3",
+        f"{native('Documents/b.pdf')} → b.pdf",
     )
     assert files(folder) == {**UNSORTED, **STAYING}
 
@@ -776,7 +781,10 @@ def test_a_refused_folder_is_shown_in_the_field_too(
     write(folder / "Makefile", b"all:")
     _planned(qtbot, window)
     page = window.organize
-    assert (page.folder.text(), page.choose_button.text()) == ("~/zone/Downloads", "Change…")
+    assert (page.folder.text(), page.choose_button.text()) == (
+        native("~/zone/Downloads"),
+        "Change…",
+    )
     assert page.state.text() == ""
 
 
@@ -875,7 +883,7 @@ def test_the_recent_batches_in_a_card_at_the_right_each_with_its_folder_in_its_t
     )
     assert page.batches.accessibleName() == "Recent batches"
     [row] = _rows(page.batches)
-    assert row.toolTip(0) == "~/zone/Downloads"
+    assert row.toolTip(0) == native("~/zone/Downloads")
     assert row.data(0, Qt.ItemDataRole.UserRole) == 1
     assert page.undo_button.parent() is recent
 

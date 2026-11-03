@@ -7,7 +7,6 @@ with the replaced system file in ``shadows``. ``Hidden=true`` and
 never evaluated. A file that cannot be read is skipped with a reason. Reading never writes.
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -21,6 +20,7 @@ from kresorter.autostart.models import (
     entry_digest,
 )
 from kresorter.autostart.xdg import MAX_ENTRY_BYTES, autostart_dirs, read_xdg
+from support.host import make_fifo
 
 APP = "[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 
@@ -328,7 +328,7 @@ def test_an_oversized_file_is_skipped_unread(user: Path, system: Path) -> None:
 
 def test_something_that_is_not_a_regular_file_is_skipped(user: Path, system: Path) -> None:
     (system / "dir.desktop").mkdir(parents=True)
-    os.mkfifo(system / "pipe.desktop")  # opening it would block: never opened
+    make_fifo(system / "pipe.desktop")  # opening it would block: never opened
 
     assert read(user, system).skipped == (
         AutostartSkipped(Source.XDG_AUTOSTART, str(system / "dir.desktop"), "not a regular file"),

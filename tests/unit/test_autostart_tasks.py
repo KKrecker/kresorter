@@ -7,7 +7,6 @@ not listed. The command is the first action, as written. Parsing is strict and b
 is refused, so no entity is ever expanded. Real temporary trees; read-only.
 """
 
-import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -22,6 +21,7 @@ from kresorter.autostart.models import (
     entry_digest,
 )
 from kresorter.autostart.tasks import read_tasks, tasks_dir
+from support.host import make_fifo
 
 NS = "http://schemas.microsoft.com/windows/2004/02/mit/task"
 LOGON = "<LogonTrigger><Enabled>true</Enabled></LogonTrigger>"
@@ -244,7 +244,7 @@ def test_an_oversized_definition_is_skipped_unread(root: Path) -> None:
 
 def test_something_that_is_not_a_regular_file_is_skipped(root: Path) -> None:
     root.mkdir(parents=True)
-    os.mkfifo(root / "pipe")  # opening it would block: never opened
+    make_fifo(root / "pipe")  # opening it would block: never opened
 
     assert read(root) == skip(root / "pipe", "not a regular file")
 

@@ -23,6 +23,7 @@ from kresorter.organize.mover import Rename
 from kresorter.organize.platforms import renamer
 from support.cli import run, scan_context
 from support.files import write
+from support.host import native
 from support.journal import query
 from support.moves import (
     MOVED,
@@ -520,9 +521,9 @@ def test_undo_without_yes_shows_the_plan(scan: ScanContext, zone: Path, data_dir
     assert (code, err) == (1, "")
     assert out == (
         f"Would move back 3 files, 15 B, sorted by batch 1 in {folder}:\n"
-        "  Images/a.jpg -> a.jpg\n"
-        "  Audio/c.mp3 -> c.mp3\n"
-        "  Documents/b.pdf -> b.pdf\n"
+        f"  {native('Images/a.jpg')} -> a.jpg\n"
+        f"  {native('Audio/c.mp3')} -> c.mp3\n"
+        f"  {native('Documents/b.pdf')} -> b.pdf\n"
         "Nothing was moved. Re-run with --yes to move these files back.\n"
     )
     assert tree(zone) == before
@@ -541,9 +542,9 @@ def test_undo_with_yes_moves_back_and_leaves_the_directories(
     assert (code, err) == (0, "")
     assert out == (
         f"Moved back 3 files, 15 B, in {folder} (batch 2, undoing batch 1):\n"
-        "  Images/a.jpg -> a.jpg\n"
-        "  Audio/c.mp3 -> c.mp3\n"
-        "  Documents/b.pdf -> b.pdf\n"
+        f"  {native('Images/a.jpg')} -> a.jpg\n"
+        f"  {native('Audio/c.mp3')} -> c.mp3\n"
+        f"  {native('Documents/b.pdf')} -> b.pdf\n"
     )
     assert tree(folder) == {**content(SOURCES), **CATEGORIES}
     assert query(data_dir, "SELECT kind, state FROM move_batches ORDER BY id") == [
@@ -566,11 +567,11 @@ def test_undo_says_what_stays_and_what_was_refused(
     assert (code, out) == (
         1,
         f"Moved back 1 file, 5 B, in {folder} (batch 2, undoing batch 1):\n"
-        "  Documents/b.pdf -> b.pdf\n"
+        f"  {native('Documents/b.pdf')} -> b.pdf\n"
         "Refused 1:\n"
         f"  open_file: {folder / MOVED[C]}\n"
         "Stays 1:\n"
-        "  missing: Images/a.jpg\n",
+        f"  missing: {native('Images/a.jpg')}\n",
     )
     assert tree(folder) == {**content({B: B, C: MOVED[C]}), **CATEGORIES}
 

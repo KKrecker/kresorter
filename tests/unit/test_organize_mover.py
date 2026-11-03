@@ -25,6 +25,7 @@ from kresorter.organize.mover import BatchState, carry_out, check
 from kresorter.organize.planner import Move, plan
 from kresorter.storage.db import connect
 from support.files import write
+from support.host import as_kept
 from support.kernel import HoldingKernel
 from support.moves import (
     MOVED,
@@ -348,7 +349,7 @@ def test_category_directories_are_made_after_the_journal_with_the_default_mode(
     modes = {
         stat.S_IMODE((folder / name).lstat().st_mode) for name in ("Images", "Documents", "Audio")
     }
-    assert modes == {0o777 & ~umask}
+    assert modes == {as_kept(0o777 & ~umask, directory=True)}
 
 
 def test_an_existing_category_directory_is_used_as_it_is(
@@ -359,7 +360,7 @@ def test_an_existing_category_directory_is_used_as_it_is(
     (folder / "Images").chmod(0o700)
     result = carry_out(conn, folder, planned(folder))
     assert result.state is BatchState.DONE
-    assert stat.S_IMODE((folder / "Images").lstat().st_mode) == 0o700
+    assert stat.S_IMODE((folder / "Images").lstat().st_mode) == as_kept(0o700, directory=True)
     assert files(folder) == {**content(MOVED), "Images/older.jpg": b"older"}
 
 

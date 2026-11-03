@@ -31,6 +31,7 @@ from kresorter.ui.tasks import Task
 from kresorter.ui.window import Window
 from support.cli import autostart_context, run
 from support.files import write
+from support.host import native
 from support.interrupted import APP
 from support.journal import pending_quarantine, query
 from support.window import FakeDialogs, children, environment, make_window, wait_idle
@@ -688,7 +689,7 @@ def test_a_row_has_a_tile_with_its_initial_its_location_under_its_name_and_its_s
     assert [row.data(0, role) for role in (INITIAL, EMPHASIS, SECONDARY)] == [
         "A",
         True,
-        "~/config/autostart/app.desktop",
+        native("~/config/autostart/app.desktop"),
     ]
     assert row.toolTip(0) == str(user / "app.desktop")
     assert [page.row(name).data(1, BADGE) for name in ("app", "other")] == ["advisory"] * 2
@@ -723,7 +724,7 @@ def test_the_search_keeps_the_entries_whose_name_or_location_contains_its_text(
     assert _shown(window) == ([desktop, systemd], ["app", "other", "sync.service"])
     page.search.setText("APP")
     assert _shown(window) == ([desktop], ["app"])
-    page.search.setText("ETC/xdg")
+    page.search.setText(native("ETC/xdg"))
     assert _shown(window) == ([desktop], ["other"])
     page.search.setText("Sync")
     assert _shown(window) == ([systemd], ["sync.service"])

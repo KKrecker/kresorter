@@ -15,6 +15,7 @@ from fakes import FakeOpenFiles, make_policy
 from kresorter.core.models import FileEntry, Skipped, SkipReason
 from kresorter.core.policy import BlockReason
 from kresorter.core.walker import walk
+from support.host import make_fifo
 
 
 def write(path: Path, data: bytes = b"x") -> Path:
@@ -142,7 +143,7 @@ def test_special_files_are_skipped(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
     fifo = root / "pipe"
-    os.mkfifo(fifo)
+    make_fifo(fifo)
 
     assert run(tmp_path, [root]) == [Skipped(path=fifo, reason=SkipReason.SPECIAL)]
 

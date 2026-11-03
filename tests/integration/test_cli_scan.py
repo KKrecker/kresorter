@@ -19,6 +19,7 @@ from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from kresorter.organize.synced import NoSyncedFolders
 from support.files import snapshot, write
+from support.host import posix_only
 from support.kernel import FakeKernel
 
 
@@ -201,6 +202,7 @@ def test_explicit_scan_never_lists_the_app_data_dir(tmp_path: Path, tree: Path) 
     } in data["skipped"]
 
 
+@posix_only("a context for Linux or macOS takes its home as a POSIX path")
 def test_default_context_passes_environment_to_posix_policy(tmp_path: Path) -> None:
     env = {"XDG_DATA_HOME": str(tmp_path / "xdg")}
     context = environment.default_context(platform="linux", env=env, home=tmp_path)
@@ -208,6 +210,7 @@ def test_default_context_passes_environment_to_posix_policy(tmp_path: Path) -> N
     assert context.policy.app_data_dir == tmp_path / "xdg" / "kresorter"
 
 
+@posix_only("a context for Linux or macOS takes its home as a POSIX path")
 @pytest.mark.parametrize("platform", ["linux", "darwin"])
 def test_default_context_posix(tmp_path: Path, platform: Platform) -> None:
     context = environment.default_context(platform=platform, env={}, home=tmp_path)

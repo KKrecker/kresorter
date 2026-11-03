@@ -8,7 +8,6 @@ file in place, a missed one moves it away from what expects it. Linux keeps ``ca
 precomposed and decomposed as two names, so both spellings can be made side by side here.
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -17,6 +16,7 @@ from fakes import deny_stat, relist
 from kresorter.core.scanner import ScanContext
 from kresorter.organize.planner import Move, Plan, Stay, StayReason, plan
 from support.files import write
+from support.host import make_fifo
 
 NFC = "caf\u00e9"  # é as one code point
 NFD = "cafe\u0301"  # e and a combining acute accent, as a Mac writes it
@@ -148,7 +148,7 @@ def test_anything_but_a_regular_file_stays(tmp_path: Path, zone: Path, scan: Sca
     (folder / "photo.jpg").symlink_to(folder / "report.pdf")
     (folder / "elsewhere").symlink_to(tmp_path)
     (folder / "song.mp3").symlink_to(folder / "missing.mp3")
-    os.mkfifo(folder / "clip.mp4")
+    make_fifo(folder / "clip.mp4")
     result = plan(folder, scan)
     assert moved(result) == {"report.pdf": "Documents"}
     assert stayed(result) == {
