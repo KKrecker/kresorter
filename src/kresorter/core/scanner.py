@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from kresorter.core import hashing
 from kresorter.core.heuristics import JunkClassifier, JunkMatch, Platform
@@ -13,6 +14,9 @@ from kresorter.core.models import FileEntry, Skipped
 from kresorter.core.open_files import OpenFileChecker
 from kresorter.core.policy import PathPolicy
 from kresorter.core.walker import walk
+
+if TYPE_CHECKING:
+    from kresorter.organize.synced import SyncedFolders
 
 
 @dataclass(frozen=True)
@@ -22,6 +26,7 @@ class ScanContext:
     classifier: JunkClassifier
     open_files_checked: bool  # False: no real open-file backend; must be disclosed
     platform: Platform  # the system it was made for, no default (decision 0012, item 39)
+    synced: SyncedFolders  # what organize refuses as a whole, no default (0017, item 10)
 
 
 @dataclass(frozen=True)

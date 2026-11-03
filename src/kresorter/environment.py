@@ -19,6 +19,7 @@ from kresorter.core.open_files import NoOpenFileCheck, OpenFileChecker, checker_
 from kresorter.core.policy import PathPolicy
 from kresorter.core.scanner import ScanContext
 from kresorter.llm.transport import LIMITS, Limits
+from kresorter.organize.synced import NoSyncedFolders, SyncedFolders, WindowsSyncedFolders
 
 __all__ = ["Environment", "default_context", "detect_platform", "program_folders"]
 
@@ -47,8 +48,9 @@ def default_context(
     home: Path | None = None,
 ) -> ScanContext:
     """Context for the current system (arguments exist for tests). The folders kresorter runs
-    from and the open-file check are the running system's: a context made for another has no
-    folder and no check (decision 0015, item 16; 0016, item 5)."""
+    from, the open-file check and the synced folders are the running system's: a context made
+    for another has no folder, no check and no synced folder (decision 0015, item 16; 0016,
+    item 5; 0017, item 10)."""
     current = platform or detect_platform()
     running = current == detect_platform()
     program = program_folders() if running else ()
@@ -63,12 +65,15 @@ def default_context(
             program_dirs=program,
         )
     open_files: OpenFileChecker = checker_for_platform(current) if running else NoOpenFileCheck()
+    windows = running and current == "windows"
+    synced: SyncedFolders = WindowsSyncedFolders(env) if windows else NoSyncedFolders()
     return ScanContext(
         policy=policy,
         open_files=open_files,
         classifier=JunkClassifier(default_rules(), platform=current),
         open_files_checked=open_files.reliable,
         platform=current,
+        synced=synced,
     )
 
 

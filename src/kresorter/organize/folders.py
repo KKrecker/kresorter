@@ -1,7 +1,8 @@
 """The folder organize sorts, refused as a whole when it must not be (decision 0012, items 7, 8).
 
 The folder must be a real directory the policy allows, neither the home directory nor above it,
-and one that can be listed; and none whose files break when moved: a game library, a project, a
+and one that can be listed; one no sync client keeps (0017, item 8), whose moves would reach
+every device of the user; and none whose files break when moved: a game library, a project, a
 cache or temp directory. What marks the first two lives in ``folders.toml``, read and checked
 here; the third is the junk rules' (``JunkClassifier.classify_directory``). Markers are compared
 with folded names (``names.first_match``): a wrong match only refuses a folder, a missed one
@@ -20,7 +21,8 @@ from importlib.resources import files
 from pathlib import Path
 
 from kresorter.core.scanner import ScanContext
-from kresorter.organize.names import first_match
+from kresorter.organize.names import first_match, fold
+from kresorter.organize.synced import SyncedFoldersUnknown
 
 __all__ = [
     "FolderMarkers",
@@ -41,6 +43,7 @@ class FolderReason(StrEnum):
     BLOCKED = "blocked"  # by the policy; the detail is its BlockReason
     HOME = "home"  # the home directory or a directory above it
     UNREADABLE = "unreadable"  # the folder or an entry cannot be looked at; the detail says why
+    CLOUD_SYNC = "cloud_sync"  # the detail is the synced folder that holds it (0017, item 8)
     GAME_LIBRARY = "game_library"  # the detail is the marker
     PROJECT = "project"  # the detail is the marker
     CACHE_OR_TEMP = "cache_or_temp"  # the detail is the junk rule
@@ -123,6 +126,7 @@ def _check_path(folder: Path, context: ScanContext, markers: FolderMarkers) -> N
         raise FolderRefused(folder, FolderReason.LINK, real)
     if not stat.S_ISDIR(info.st_mode):
         raise FolderRefused(folder, FolderReason.NOT_A_DIRECTORY)
+    _check_synced(folder, context)
     junk = context.classifier.classify_directory(folder)
     if junk is not None:
         raise FolderRefused(folder, FolderReason.CACHE_OR_TEMP, junk.rule_id)
@@ -134,6 +138,19 @@ def _check_path(folder: Path, context: ScanContext, markers: FolderMarkers) -> N
         for name in markers.version_control:
             if os.path.lexists(directory / name):
                 raise FolderRefused(folder, FolderReason.PROJECT, name)
+
+
+def _check_synced(folder: Path, context: ScanContext) -> None:
+    """Refuse ``folder`` when a synced folder holds it, its path compared ignoring case."""
+    try:
+        roots = context.synced.folders()
+    except SyncedFoldersUnknown as error:
+        detail = f"synced folders unknown: {error}"
+        raise FolderRefused(folder, FolderReason.CLOUD_SYNC, detail) from None
+    parts = [fold(part) for part in folder.parts]
+    for root in roots:
+        if parts[: len(root.parts)] == [fold(part) for part in root.parts]:
+            raise FolderRefused(folder, FolderReason.CLOUD_SYNC, str(root))
 
 
 def _list(folder: Path) -> dict[str, os.stat_result]:

@@ -136,6 +136,7 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "blocked": _both("A protected location", "Защищённое место"),
         "home": _both("The home folder or above it", "Домашняя папка или выше"),
         "unreadable": _both("Cannot be read", "Не читается"),
+        "cloud_sync": _both("A synced folder", "Синхронизируемая папка"),
         "game_library": _both("A game library", "Библиотека игр"),
         "project": _both("A project", "Проект"),
         "cache_or_temp": _both("A cache or temporary folder", "Кэш или временная папка"),
