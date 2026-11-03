@@ -264,13 +264,15 @@ def workflow() -> str:
 
 
 def test_ci_installs_qt_s_libraries_before_the_package() -> None:
-    # [0014.10]
+    # [0014.10] in each job that installs it with the extra dev: the check and, after it, the
+    # build (decision 0015, item 21)
     lines = workflow().splitlines()
-    (apt,) = [i for i, line in enumerate(lines) if "apt-get install" in line]
-    (pip,) = [i for i, line in enumerate(lines) if "pip install" in line]
-    assert apt < pip
-    assert all(library in lines[apt].split() for library in LIBRARIES)
-    assert '".[dev]"' in lines[pip]
+    apts = [i for i, line in enumerate(lines) if "apt-get install" in line]
+    pips = [i for i, line in enumerate(lines) if "pip install" in line and '".[dev]"' in line]
+    order = sorted([(i, "apt") for i in apts] + [(i, "pip") for i in pips])
+    assert [kind for _, kind in order] == ["apt", "pip"] * 2
+    for apt in apts:
+        assert all(library in lines[apt].split() for library in LIBRARIES)
 
 
 def test_ci_runs_the_window_offscreen_on_every_python() -> None:
