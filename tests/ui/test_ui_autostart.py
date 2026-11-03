@@ -33,7 +33,7 @@ from support.cli import autostart_context, run
 from support.files import write
 from support.interrupted import APP
 from support.journal import pending_quarantine, query
-from support.window import FakeDialogs, environment, make_window, wait_idle
+from support.window import FakeDialogs, children, environment, make_window, wait_idle
 
 OTHER = b"[Desktop Entry]\nType=Application\nName=Other\nExec=/usr/bin/other\n"
 SYNC = RegValue("Sync", ValueKind.REG_SZ, r"C:\sync.exe")
@@ -74,15 +74,9 @@ def _opened(
     return window
 
 
-def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
-    child = item.child(index)
-    assert child is not None
-    return child
-
-
 def _groups(window: Window) -> list[QTreeWidgetItem]:
     root = window.autostart.entries.invisibleRootItem()
-    return [_child(root, index) for index in range(root.childCount())]
+    return children(root)
 
 
 def _tree(window: Window) -> list[tuple[str, list[tuple[str, ...]]]]:
@@ -90,7 +84,7 @@ def _tree(window: Window) -> list[tuple[str, list[tuple[str, ...]]]]:
     return [
         (
             group.text(0),
-            [_cells(window, _child(group, index)) for index in range(group.childCount())],
+            [_cells(window, row) for row in children(group)],
         )
         for group in _groups(window)
     ]
@@ -119,7 +113,7 @@ def _cells(window: Window, row: QTreeWidgetItem) -> tuple[str, ...]:
 def _shown(window: Window) -> tuple[list[str], list[str]]:
     """The groups and the entries the search keeps."""
     groups = [group for group in _groups(window) if not group.isHidden()]
-    rows = [_child(group, index) for group in groups for index in range(group.childCount())]
+    rows = [row for group in groups for row in children(group)]
     return [group.text(0) for group in groups], [row.text(0) for row in rows if not row.isHidden()]
 
 

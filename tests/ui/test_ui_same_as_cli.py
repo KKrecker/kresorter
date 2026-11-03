@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
+from PySide6.QtWidgets import QTreeWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeRegistry
@@ -24,6 +24,7 @@ from support.interrupted import APP
 from support.moves import A, B, C, files, three_files
 from support.window import (
     FakeDialogs,
+    children,
     environment,
     junk_tree,
     make_window,
@@ -37,23 +38,14 @@ _MOVE = re.compile(r"^    (?P<name>.+) -> (?P<category>[^/]+)/$")
 _STAY = re.compile(r"^  (?P<reason>[a-z_]+): (?P<path>.+?)(?: \((?P<detail>.*)\))?$")
 
 
-def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
-    child = item.child(index)
-    assert child is not None
-    return child
-
-
 def _groups(tree: QTreeWidget) -> list[tuple[str, list[list[str]]]]:
     """Each group's title, with the cells of its rows."""
     root = tree.invisibleRootItem()
-    groups = [_child(root, index) for index in range(root.childCount())]
+    groups = children(root)
     return [
         (
             group.text(0),
-            [
-                [_child(group, i).text(c) for c in range(tree.columnCount())]
-                for i in range(group.childCount())
-            ],
+            [[row.text(c) for c in range(tree.columnCount())] for row in children(group)],
         )
         for group in groups
     ]
@@ -135,7 +127,7 @@ def test_the_organize_plan_is_that_of_organize_move_without_yes(
     assert [(card.category, card.names.text()) for card in page.cards] == [
         (category, ", ".join(names)) for category, names in by_category.items()
     ]
-    shown_stays = [_child(page.stays.invisibleRootItem(), i) for i in range(len(stays))]
+    shown_stays = children(page.stays.invisibleRootItem())
     assert [(row.text(0), row.text(1)) for row in shown_stays] == stays
     assert page.stays.topLevelItemCount() == len(stays)
     assert not (folder / "Images").exists()

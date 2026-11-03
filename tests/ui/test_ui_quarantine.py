@@ -16,7 +16,15 @@ from safeclean.ui.window import Window
 from support.cli import run
 from support.files import write
 from support.journal import query
-from support.window import FakeDialogs, environment, junk_tree, make_window, scanned, wait_idle
+from support.window import (
+    FakeDialogs,
+    children,
+    environment,
+    junk_tree,
+    make_window,
+    scanned,
+    wait_idle,
+)
 
 
 @pytest.fixture
@@ -63,9 +71,7 @@ def window(
 
 
 def _listed(window: Window) -> list[QTreeWidgetItem]:
-    root = window.quarantine.items.invisibleRootItem()
-    listed = [root.child(index) for index in range(root.childCount())]
-    return [row for row in listed if row is not None]
+    return children(window.quarantine.items.invisibleRootItem())
 
 
 def _rows(window: Window) -> list[tuple[str, str, str]]:

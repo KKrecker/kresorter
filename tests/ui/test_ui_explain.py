@@ -26,7 +26,15 @@ from support.files import write
 from support.interrupted import APP
 from support.moves import three_files
 from support.ollama import TAGS, VERSION, Answer, ScriptedOllama, as_json, generated, held
-from support.window import FakeDialogs, environment, junk_tree, make_window, scanned, wait_idle
+from support.window import (
+    FakeDialogs,
+    children,
+    environment,
+    junk_tree,
+    make_window,
+    scanned,
+    wait_idle,
+)
 
 ANSWER = "Bytecode that Python makes again when it needs it."
 CHECKS = [("GET", "/api/version"), ("GET", "/api/tags")]
@@ -94,23 +102,17 @@ def _listing(root: Path) -> list[str]:
     return sorted(path.relative_to(root).as_posix() for path in root.rglob("*"))
 
 
-def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
-    child = item.child(index)
-    assert child is not None
-    return child
-
-
 def _stay_row(page: OrganizePage, name: str) -> QTreeWidgetItem:
     """The row of the file that stays named ``name``."""
     root = page.stays.invisibleRootItem()
-    rows = [_child(root, index) for index in range(root.childCount())]
+    rows = children(root)
     return next(row for row in rows if row.text(0) == name)
 
 
 def _plan(page: OrganizePage) -> list[str]:
     """The plan shown: each category's card, then each file that stays."""
     root = page.stays.invisibleRootItem()
-    stays = [_child(root, index) for index in range(root.childCount())]
+    stays = children(root)
     return [
         *(f"{card.name.text()}: {card.names.text()}" for card in page.cards),
         *(f"{row.text(0)}: {row.text(1)}" for row in stays),

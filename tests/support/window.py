@@ -8,7 +8,7 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
-from PySide6.QtWidgets import QAbstractButton, QWidget
+from PySide6.QtWidgets import QAbstractButton, QTreeWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
 from safeclean.autostart.registry import UserRegistry
@@ -129,3 +129,13 @@ def unnamed(widget: QWidget) -> list[QAbstractButton]:
         for button in widget.findChildren(QAbstractButton)
         if not (button.text().strip() or button.accessibleName().strip())
     ]
+
+
+def children(item: QTreeWidgetItem) -> list[QTreeWidgetItem]:
+    """The rows under ``item``, in order; under a tree's invisible root, its top-level rows."""
+    rows = []
+    for index in range(item.childCount()):
+        row = item.child(index)
+        assert row is not None
+        rows.append(row)
+    return rows

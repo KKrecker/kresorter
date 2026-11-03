@@ -28,7 +28,15 @@ from safeclean.ui.parts import BADGE, EMPHASIS, QUIET, SECONDARY
 from safeclean.ui.window import Window
 from support.files import write
 from support.journal import pending_move_batch, query
-from support.window import FakeDialogs, environment, junk_tree, make_window, scanned, wait_idle
+from support.window import (
+    FakeDialogs,
+    children,
+    environment,
+    junk_tree,
+    make_window,
+    scanned,
+    wait_idle,
+)
 
 
 @pytest.fixture
@@ -57,16 +65,7 @@ def window(
 
 
 def _groups(window: Window) -> list[QTreeWidgetItem]:
-    return _children(window.findings.tree.invisibleRootItem())
-
-
-def _children(group: QTreeWidgetItem) -> list[QTreeWidgetItem]:
-    children = []
-    for index in range(group.childCount()):
-        child = group.child(index)
-        assert child is not None
-        children.append(child)
-    return children
+    return children(window.findings.tree.invisibleRootItem())
 
 
 def _shown(window: Window) -> list[str]:
@@ -75,7 +74,7 @@ def _shown(window: Window) -> list[str]:
         child.data(0, PATH)
         for group in _groups(window)
         if not group.isHidden()
-        for child in _children(group)
+        for child in children(group)
         if not child.isHidden()
     ]
 
@@ -118,15 +117,15 @@ def test_findings_are_grouped_by_their_strongest_reason_with_files_rules_and_siz
         "review",
     ]
     assert all(group.data(0, EMPHASIS) and group.data(1, EMPHASIS) for group in _groups(window))
-    assert [_row(child) for child in _children(cache)] == [
+    assert [_row(child) for child in children(cache)] == [
         (tree[name].name, str(Path("~", tree[name].parent.relative_to(tmp_path))), size, "")
         for name, size in (("n", "15 B"), ("m", "8 B"), ("kept", "4 B"), ("copy", "4 B"))
     ]
-    assert [child.data(0, PATH) for child in _children(cache)] == [
+    assert [child.data(0, PATH) for child in children(cache)] == [
         str(tree[name]) for name in ("n", "m", "kept", "copy")
     ]
-    assert all(child.data(1, QUIET) for child in _children(cache))
-    assert [_row(child) for child in _children(copies)] == [
+    assert all(child.data(1, QUIET) for child in children(cache))
+    assert [_row(child) for child in children(copies)] == [
         ("img.jpg", str(Path("~", "zone", "backup")), "10 B", "")
     ]
     header = window.findings.tree.headerItem()
@@ -134,7 +133,7 @@ def test_findings_are_grouped_by_their_strongest_reason_with_files_rules_and_siz
     right = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
     assert header.textAlignment(1) == right
     assert cache.textAlignment(1) == right
-    assert _children(cache)[0].textAlignment(1) == right
+    assert children(cache)[0].textAlignment(1) == right
 
 
 def test_a_folder_elsewhere_is_shown_as_it_is(
@@ -143,7 +142,7 @@ def test_a_folder_elsewhere_is_shown_as_it_is(
     # [0014.49]
     window = make_window(qtbot, environment(tmp_path, zone, data_dir))
     scanned(qtbot, window)
-    [old] = _children(_groups(window)[2])
+    [old] = children(_groups(window)[2])
     assert old.data(0, SECONDARY) == str(tree["old"].parent)
 
 

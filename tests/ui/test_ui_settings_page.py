@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QFrame, QLabel, QTreeWidgetItem, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeRegistry
@@ -29,7 +29,7 @@ from safeclean.ui.theme import LIGHT
 from safeclean.ui.window import Window
 from support.cli import autostart_context, run, scan_context
 from support.ollama import TAGS, VERSION, Answer, ScriptedOllama, as_json
-from support.window import FakeDialogs, environment, make_window, settled, wait_idle
+from support.window import FakeDialogs, children, environment, make_window, settled, wait_idle
 
 MACHINE = (
     "Machine-wide entries (HKLM, services, scheduled tasks, the common startup folder) were not"
@@ -96,12 +96,6 @@ def _saved(data_dir: Path) -> object:
     return json.loads((data_dir / "settings.json").read_bytes())
 
 
-def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
-    child = item.child(index)
-    assert child is not None
-    return child
-
-
 def _lines(page: SettingsPage) -> list[str]:
     """What the check found: Ollama, the model, then the rest."""
     return [*(found.text() for found in page.found), *page.check.text().splitlines()]
@@ -129,8 +123,8 @@ def _listed(qtbot: QtBot, window: Window) -> list[str]:
     window.show_page("autostart")
     wait_idle(qtbot, window)
     root = window.autostart.entries.invisibleRootItem()
-    groups = [_child(root, index) for index in range(root.childCount())]
-    return [_child(group, i).text(0) for group in groups for i in range(group.childCount())]
+    groups = children(root)
+    return [row.text(0) for group in groups for row in children(group)]
 
 
 # --- the page ------------------------------------------------------------------------------------

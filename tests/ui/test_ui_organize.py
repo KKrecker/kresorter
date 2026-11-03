@@ -28,7 +28,7 @@ from support.cli import run, scan_context
 from support.files import write
 from support.journal import pending_quarantine, query
 from support.moves import A, B, C, FlakyRename, files, three_files
-from support.window import FakeDialogs, environment, make_window, wait_idle
+from support.window import FakeDialogs, children, environment, make_window, wait_idle
 
 UNSORTED = {A: b"a.jpg", B: b"b.pdf", C: b"c.mp3"}
 SORTED = {f"Images/{A}": b"a.jpg", f"Documents/{B}": b"b.pdf", f"Audio/{C}": b"c.mp3"}
@@ -110,15 +110,9 @@ def _undo(qtbot: QtBot, window: Window, batch_id: int) -> None:
     wait_idle(qtbot, window)
 
 
-def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
-    child = item.child(index)
-    assert child is not None
-    return child
-
-
 def _rows(tree: QTreeWidget) -> list[QTreeWidgetItem]:
     root = tree.invisibleRootItem()
-    return [_child(root, index) for index in range(root.childCount())]
+    return children(root)
 
 
 def _at(grid: QGridLayout, row: int, column: int) -> QWidget | None:
