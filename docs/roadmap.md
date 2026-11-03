@@ -289,10 +289,13 @@ Scanner core and `kresorter scan` (read-only report).
   publishing and a GitHub release gets them with the installer, the zip and `SHA256SUMS.txt`.
 - The screenshots, made by `tests/support/screenshots.py` on a made-up home; the changelog of
   0.1.0, for its users; the README's Install, Windows first.
-- 3002 tests, 100 % line and branch coverage. Left before the tag: CI's runs read on both
-  systems, Python 3.14 with them (step 6 was checked on it locally only); the release record of
-  the owner's runs on clean machines (0015 item 28); then the tag, by the owner, once the
-  repository is public.
+- The release record (0015 item 28): `packaging/release.py check` refuses the tag without
+  `docs/releases/<version>.md`, the owner's runs on Windows 10, Windows 11 and an Ubuntu LTS,
+  each saying what was done and seen, and names every gap; the form is in
+  [`docs/releases/README.md`](releases/README.md).
+- 3027 tests, 100 % line and branch coverage. Left before the tag: CI's runs read on both
+  systems, Python 3.14 with them (step 6 was checked on it locally only); the owner's runs on
+  clean machines and their record; then the tag, by the owner, once the repository is public.
 
 ### Accepted limitations carried after step 8
 - Everything from steps 2 to 7 still holds. The window is now tested offscreen on Windows too,

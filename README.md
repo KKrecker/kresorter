@@ -347,6 +347,10 @@ offscreen on a made-up home, in English, by `PYTHONPATH=tests python -m support.
 
 Decisions are logged in [`docs/decisions/`](docs/decisions/); the plan is in [`docs/roadmap.md`](docs/roadmap.md).
 
+A release is a tag `vX.Y.Z` pushed by the owner, after the runs on clean machines are recorded
+in `docs/releases/X.Y.Z.md` ([the form](docs/releases/README.md)): the release job checks the
+tag, the changelog and that record before it publishes anything.
+
 ## License
 
 Kresorter is under the MIT licence, held by KKrecker: [`LICENSE`](LICENSE). The window's icons
