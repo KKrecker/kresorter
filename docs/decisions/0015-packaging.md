@@ -125,13 +125,19 @@ Windows can build is checked by CI there (items 21, 22).
     there (`kresorter quarantine list`, or the Quarantine page: restore or purge them first)
     and that removing the folder is the user's own step.
 16. **Its own files are never findings**: the policy blocks the folder Kresorter runs from,
-    like the data directory: the package's folder, and when frozen the folder of the
-    executable, so a scan of `%LOCALAPPDATA%` or of a virtual environment never proposes
-    Kresorter itself.
+    like the data directory and with a reason of its own, `app_program`: the package's folder,
+    and when frozen the folder of the executable, so a scan of `%LOCALAPPDATA%` or of a
+    virtual environment never proposes Kresorter itself. Those folders are the running
+    system's: a policy made for another system (as the tests make) has none.
 17. **A self-test**: `kresorter-ui --self-test REPORT` opens the window, shows each page,
-    closes it and writes one line per page to `REPORT`, then exits with 0, changing nothing;
-    a failure is its traceback in `REPORT` and exit 1. CI runs it on the installed wheel and
-    on the Windows application, offscreen; the owner can run it on a clean machine.
+    closes it and writes one line per page to `REPORT` (`overview: shown`, in the sidebar's
+    order), then exits with 0, changing nothing: the pages only read, as when they are opened
+    (Organize and Quarantine make the data directory and its empty journal when there are
+    none, as every session does), and no setting is saved. A failure is its traceback in
+    `REPORT` and exit 1: an error raised while the window opens or reaching the event loop, a
+    page whose task ends with an error, or one still working after 60 seconds. CI runs it on
+    the installed wheel and on the Windows application, offscreen; the owner can run it on a
+    clean machine.
 
 ## The changelog
 

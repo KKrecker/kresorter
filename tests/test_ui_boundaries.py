@@ -5,8 +5,9 @@ and the CLI runs every command with Qt made unimportable [0014.1]. From PySide6 
 imports only QtCore, QtGui and QtWidgets, never names ``QProcess`` or ``QDesktopServices``, and
 imports no module of the CLI [0014.7]. Only ``kresorter.ui.settings`` opens, reads or writes a
 file, besides ``kresorter.ui.icons``, which reads the icons shipped in the package [0014.47],
-and no module of the window names Qt's own ways to store [0014.35]. The guards read the AST of
-``src`` (``support.imports``).
+and ``kresorter.ui.selftest``, which writes the report it is given [0015.17]; no module of the
+window names Qt's own ways to store [0014.35]. The guards read the AST of ``src``
+(``support.imports``).
 """
 
 import argparse
@@ -34,6 +35,8 @@ QT_STORAGE_NAMES = frozenset({"QSettings", "QFile", "QSaveFile", "QTemporaryFile
 SETTINGS = "kresorter.ui.settings"  # the one module of the window that touches a file
 ICONS = "kresorter.ui.icons"  # reads its icons, shipped in the package, and writes nothing
 SHIPPED_ICON = 'files("kresorter.ui").joinpath("icons", f"{name}.svg").read_text('
+SELF_TEST = "kresorter.ui.selftest"  # writes the report of --self-test, and nothing else
+REPORT = 'report.write_text(text, encoding="utf-8")'
 REFUSED_URL = {"KRESORTER_OLLAMA_URL": "http://192.0.2.1:11434"}  # not loopback: no connection
 
 
@@ -229,14 +232,20 @@ def _reads_a_shipped_icon(module: str, source: str, line: int) -> bool:
     return module == ICONS and SHIPPED_ICON in source.splitlines()[line - 1]
 
 
+def _writes_the_report(module: str, source: str, line: int) -> bool:
+    return module == SELF_TEST and REPORT in source.splitlines()[line - 1]
+
+
 def test_the_window_stores_nothing_but_its_settings() -> None:
-    # [0014.35] [0014.47] No finding, path, plan or explanation is stored: only the settings
-    # module touches a file, besides the icons read from the package, and nothing in the
-    # window uses Qt's settings or files.
+    # [0014.35] [0014.47] [0015.17] No finding, path, plan or explanation is stored: only the
+    # settings module touches a file, besides the icons read from the package and the report
+    # of the self-test, and nothing in the window uses Qt's settings or files.
     modules = dict(ui_sources())
-    assert {SETTINGS, ICONS} <= set(modules)
+    assert {SETTINGS, ICONS, SELF_TEST} <= set(modules)
     icons = modules[ICONS].read_text(encoding="utf-8")
     assert [_reads_a_shipped_icon(ICONS, icons, line) for line in file_uses(icons)] == [True]
+    test = modules[SELF_TEST].read_text(encoding="utf-8")
+    assert [_writes_the_report(SELF_TEST, test, line) for line in file_uses(test)] == [True]
     read = {module: path.read_text(encoding="utf-8") for module, path in modules.items()}
     files = [
         f"{module}:{line}"
@@ -244,6 +253,7 @@ def test_the_window_stores_nothing_but_its_settings() -> None:
         if module != SETTINGS
         for line in file_uses(source)
         if not _reads_a_shipped_icon(module, source, line)
+        and not _writes_the_report(module, source, line)
     ]
     stores = [
         f"{module}:{line} {name}"

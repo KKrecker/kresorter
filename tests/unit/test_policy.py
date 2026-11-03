@@ -357,3 +357,44 @@ def test_the_home_directory_and_every_directory_above_it_hold_home(
 def test_holds_home_rejects_a_relative_path(linux: PathPolicy) -> None:
     with pytest.raises(ValueError, match="absolute"):
         linux.holds_home(PurePosixPath("alice"))
+
+
+SITE = PurePosixPath("/home/alice/venv/lib/python3.13/site-packages")
+
+
+def test_kresorter_s_own_folder_is_blocked_with_a_reason_of_its_own() -> None:
+    # [0015.16] a scan of a virtual environment never proposes Kresorter's own bytecode
+    package = SITE / "kresorter"
+    policy = PathPolicy.for_posix(
+        home=PurePosixPath("/home/alice"), platform="linux", program_dirs=[package]
+    )
+    for path in (package, package / "__pycache__" / "cli.cpython-313.pyc"):
+        assert policy.check_path(path) == blocked(BlockReason.APP_PROGRAM)
+    assert policy.check_path(SITE / "pip" / "__pycache__" / "a.cpython-313.pyc") == ALLOWED
+    assert policy.check_path(SITE / "kresorter_extra" / "a.py") == ALLOWED
+
+
+def test_kresorter_s_own_folder_says_so_inside_a_system_path() -> None:
+    # [0015.16] like the data directory, before the system's rules
+    package = PurePosixPath("/usr/lib/python3/dist-packages/kresorter")
+    policy = PathPolicy.for_posix(
+        home=PurePosixPath("/home/alice"), platform="linux", program_dirs=[package]
+    )
+    assert policy.check_path(package / "cli.py") == blocked(BlockReason.APP_PROGRAM)
+    assert policy.check_path(package.parent / "other" / "a.py") == blocked(BlockReason.SYSTEM)
+
+
+def test_the_executable_s_folder_is_blocked_case_insensitively_on_windows() -> None:
+    # [0015.16] a scan of %LOCALAPPDATA% never proposes the installed Kresorter.exe's folder
+    folder = PureWindowsPath(r"C:\Users\Alice\AppData\Local\Programs\Kresorter")
+    policy = PathPolicy.for_windows(WIN_ENV, program_dirs=[folder])
+    inside = PureWindowsPath(r"c:\users\alice\appdata\local\PROGRAMS\kresorter\_internal\a.pyd")
+    assert policy.check_path(inside) == blocked(BlockReason.APP_PROGRAM)
+    assert policy.check_path(folder.parent / "Other" / "a.log") == ALLOWED
+
+
+def test_without_program_folders_only_the_data_directory_is_kresorter_s(
+    linux: PathPolicy,
+) -> None:
+    # [0015.16] a policy made for another system has none
+    assert linux.check_path(SITE / "kresorter" / "cli.py") == ALLOWED

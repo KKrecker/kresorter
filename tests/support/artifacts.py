@@ -4,7 +4,8 @@
 sdist, with the ``hatchling`` of the running Python: nothing is downloaded. ``wheel_from_tree``
 makes a second wheel straight from the repository, to compare with the first. ``install`` puts a
 wheel in a new virtual environment, offline, and ``run`` runs a command there in a profile of its
-own, without the variables that would point it at the source tree.
+own, without the variables that would point it at the source tree. ``lend_qt`` makes the running
+environment's PySide6 importable in another, which an offline install cannot fetch.
 """
 
 import email.message
@@ -114,6 +115,25 @@ def install(wheel: Path, root: Path) -> Installed:
     return Installed(venv, before, distributions(venv))
 
 
+def lend_qt(venv: Venv) -> None:
+    """The running environment's PySide6 importable in ``venv``, after its own packages: a
+    ``.pth`` file there names the folder PySide6 and shiboken6 are in. Its other ``.pth`` files
+    are not read, so the wheel's Kresorter is the one imported."""
+    import PySide6
+    import shiboken6
+
+    folder = Path(PySide6.__file__).parents[1]
+    assert Path(shiboken6.__file__).parents[1] == folder
+    found = subprocess.run(
+        [str(venv.python), "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=clean_env(),
+    )
+    (Path(found.stdout.strip()) / "qt-of-the-tests.pth").write_text(f"{folder}\n", "utf-8")
+
+
 def clean_env(home: Path | None = None) -> dict[str, str]:
     """The environment without Python's or Kresorter's variables; with ``home``, a profile there:
     the home folder, and the data and configuration folders inside it."""
@@ -142,6 +162,9 @@ def data_dir(home: Path) -> Path:
 def run(
     command: list[str], home: Path, extra: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
-    """A command in the profile of ``home``; its exit code is the caller's to check."""
+    """A command in the profile of ``home``; its exit code is the caller's to check. One that
+    still runs after two minutes (a window left open) is stopped, and the test fails."""
     env = clean_env(home) | (extra or {})
-    return subprocess.run(command, capture_output=True, text=True, env=env, check=False)
+    return subprocess.run(
+        command, capture_output=True, text=True, env=env, check=False, timeout=120
+    )

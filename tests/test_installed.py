@@ -1,13 +1,15 @@
 """The wheel installed offline in a new virtual environment, then uninstalled (decision 0015,
-items 10 and 11).
+items 10, 11, 16 and 17).
 
 The installed commands behave as the source tree's: the version, a scan of a made-up tree, and
-the window's one line without PySide6. Uninstalling removes every file the wheel installed and
-nothing of the data directory.
+the window's one line without PySide6. A scan of the environment never proposes Kresorter's own
+files; with PySide6 lent to another environment, the window's self-test passes there.
+Uninstalling removes every file the wheel installed and nothing of the data directory.
 """
 
 import json
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 from support.artifacts import ROOT, Built, Installed, data_dir, install, pip, run
@@ -63,6 +65,48 @@ def test_the_window_without_pyside6_is_one_line_and_exit_3(
     # [0015.10]
     done = run([str(installed.venv.script("kresorter-ui"))], tmp_path)
     assert (done.returncode, done.stdout, done.stderr) == (3, "", NO_QT)
+
+
+def paths(report: object) -> Iterator[str]:
+    """Every ``path`` of a JSON report, at any depth."""
+    if isinstance(report, dict):
+        for key, value in report.items():
+            if key == "path" and isinstance(value, str):
+                yield value
+            else:
+                yield from paths(value)
+    elif isinstance(report, list):
+        for value in report:
+            yield from paths(value)
+
+
+def test_a_scan_of_the_environment_never_proposes_kresorter(installed: Installed) -> None:
+    # [0015.16] pip compiled its bytecode, which is junk anywhere else
+    package = site_packages(installed.venv.root).resolve() / "kresorter"
+    assert list(package.rglob("*.pyc"))
+    scan = [str(installed.venv.script("kresorter")), "scan", "--json", str(installed.venv.root)]
+    done = run(scan, installed.venv.root)  # the home: beside it, it is another user's profile
+    assert (done.returncode, done.stderr) == (0, "")
+    report = json.loads(done.stdout)
+    assert [p for p in paths(report) if Path(p).is_relative_to(package)] == [str(package)]
+    skipped = {"path": str(package), "reason": "blocked", "block_reason": "app_program"}
+    assert skipped | {"detail": ""} in report["skipped"]
+    assert any(Path(p).name.endswith(".pyc") for p in paths(report["junk"]))  # pip's own
+
+
+PAGES = ["overview", "findings", "organize", "autostart", "quarantine", "settings"]
+
+
+def test_the_self_test_of_the_installed_window(
+    installed_with_qt: Installed, tmp_path: Path
+) -> None:
+    # [0015.17] as CI runs it: offscreen, in a profile of its own; no setting is saved
+    report = tmp_path / "report.txt"
+    command = [str(installed_with_qt.venv.script("kresorter-ui")), "--self-test", str(report)]
+    done = run(command, tmp_path, {"QT_QPA_PLATFORM": "offscreen"})
+    assert done.returncode == 0, done.stderr
+    assert report.read_text(encoding="utf-8").splitlines() == [f"{p}: shown" for p in PAGES]
+    assert not (data_dir(tmp_path) / "settings.json").exists()
 
 
 def test_uninstalling_keeps_the_user_s_data(built: Built, tmp_path: Path) -> None:

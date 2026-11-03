@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 from kresorter.core.scanner import ScanContext
-from support.artifacts import Built, Installed, build, install
+from support.artifacts import Built, Installed, build, install, lend_qt
 from support.cli import scan_context
 from support.live import guard
 
@@ -113,6 +113,15 @@ def built(tmp_path_factory: pytest.TempPathFactory) -> Built:
 def installed(built: Built, tmp_path_factory: pytest.TempPathFactory) -> Installed:
     """That wheel in a new virtual environment, offline: once per run (decision 0015)."""
     return install(built.wheel, tmp_path_factory.mktemp("installed"))
+
+
+@pytest.fixture(scope="session")
+def installed_with_qt(built: Built, tmp_path_factory: pytest.TempPathFactory) -> Installed:
+    """The wheel in another environment, with the running one's PySide6 lent to it (decision
+    0015, item 17): once per run."""
+    installed = install(built.wheel, tmp_path_factory.mktemp("installed-with-qt"))
+    lend_qt(installed.venv)
+    return installed
 
 
 @pytest.fixture

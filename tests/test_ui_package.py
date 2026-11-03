@@ -101,8 +101,9 @@ def test_without_pyside6_one_line_and_exit_3(
 def test_without_pyside6_the_default_environment_is_not_made(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # [0014.9]
+    # [0014.9] the arguments are the command line's, after the program's name
     monkeypatch.setattr(launch, "Environment", no_environment)
+    monkeypatch.setattr(sys, "argv", ["kresorter-ui"])
 
     assert launch.main() == 3
     assert capsys.readouterr().err.count("\n") == 1
@@ -222,6 +223,35 @@ def test_another_import_error_is_not_hidden(monkeypatch: pytest.MonkeyPatch) -> 
 
     with pytest.raises(ImportError, match=r"kresorter\.ui\.app"):
         launch.main([], environment=UNTOUCHED)
+
+
+# --- the self-test's option ----------------------------------------------------------------------
+
+
+def test_the_window_takes_one_option_the_self_test() -> None:
+    # [0015.17] read before Qt is imported
+    assert launch.options([]) == launch.Options(self_test=None)
+    assert launch.options(["--self-test", "report.txt"]) == launch.Options(Path("report.txt"))
+
+
+def test_the_window_s_help_names_the_self_test(capsys: pytest.CaptureFixture[str]) -> None:
+    # [0015.17]
+    with pytest.raises(SystemExit) as exited:
+        launch.options(["--help"])
+    assert exited.value.code == 0
+    out = capsys.readouterr().out
+    assert out.startswith("usage: kresorter-ui [-h] [--self-test REPORT]\n")
+
+
+@pytest.mark.usefixtures("without_qt")
+def test_without_pyside6_the_self_test_is_the_one_line_and_exit_3(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    # [0015.17] [0014.9] no window to test: nothing is written
+    report = tmp_path / "report.txt"
+    assert launch.main(["--self-test", str(report)], environment=UNTOUCHED) == 3
+    assert capsys.readouterr().err.startswith("kresorter-ui: the desktop window needs PySide6")
+    assert not report.exists()
 
 
 # --- CI ------------------------------------------------------------------------------------------

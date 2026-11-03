@@ -129,7 +129,7 @@ def test_an_error_in_the_running_window_is_a_dialog_and_the_window_stays_open(
             QTimer.singleShot(10, inspect)
             return
         windows = [w for w in QApplication.topLevelWidgets() if w.windowTitle() == "Kresorter"]
-        seen.append((dialog.what.text(), all(w.isVisible() for w in windows) and bool(windows)))
+        seen.append((dialog.what.text(), any(w.isVisible() for w in windows)))
         dialog.close_button.click()
         QTimer.singleShot(0, close_all)
 

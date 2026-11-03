@@ -8,9 +8,11 @@ from pathlib import Path
 
 import pytest
 
+import kresorter
 from fakes import FakeOpenFiles, make_policy
 from kresorter import cli, environment
 from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
+from kresorter.core.policy import BlockReason, Verdict
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from support.files import snapshot, write
@@ -212,6 +214,28 @@ def test_default_context_uses_current_system() -> None:
     context = environment.default_context()
 
     assert context.policy.default_roots()[0].name == ".cache"
+
+
+PACKAGE = Path(kresorter.__file__).resolve().parent
+
+
+def test_the_folders_kresorter_runs_from(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # [0015.16] the package's folder; frozen (Kresorter.exe), the executable's too
+    assert environment.program_folders() == (PACKAGE,)
+    executable = tmp_path / "Kresorter" / "Kresorter.exe"
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(executable))
+    assert environment.program_folders() == (PACKAGE, executable.parent.resolve())
+
+
+def test_the_running_system_s_context_blocks_kresorter_s_own_folder(tmp_path: Path) -> None:
+    # [0015.16] whatever the profile
+    for context in (
+        environment.default_context(),
+        environment.default_context(environment.detect_platform(), {}, tmp_path),
+    ):
+        verdict = context.policy.check_path(PACKAGE / "__pycache__" / "cli.cpython-313.pyc")
+        assert verdict == Verdict(allowed=False, reason=BlockReason.APP_PROGRAM)
 
 
 def test_python_dash_m_entry_point(

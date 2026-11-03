@@ -199,6 +199,12 @@ def test_every_value_shown_has_a_label_in_both_languages() -> None:
     assert Translator("ru").label(Level.REVIEW) == "Проверить"
 
 
+def test_kresorter_s_own_program_has_a_label_of_its_own() -> None:
+    # [0015.16] not its data: the folder it runs from
+    labels = [Translator(language).label(BlockReason.APP_PROGRAM) for language in LANGUAGES]
+    assert labels == ["kresorter's own program", "Программа kresorter"]
+
+
 def test_an_unknown_key_is_an_error() -> None:
     # [0014.28] a key the catalog lacks is a mistake of the window, never shown as a key
     with pytest.raises(KeyError):
