@@ -15,7 +15,8 @@ carries everything it needs. The audit found three confirmed defects (A1-A3), th
 configuration and documentation (A4-A6) and six weak spots (B1-B6). A1 breaks item 9 on a
 common system, A2 makes the window freeze for seconds to a minute on a large cache folder,
 and A3 hides a deprecation that a later PySide6 would turn into a crash. They are fixed first,
-as step 8.0; what belongs to a release goes to decision 0015.
+as step 8.0; what belongs to a release goes to decision 0015. A3's fix, warnings as errors,
+found a fourth defect (A7).
 
 ## 2. Verified
 
@@ -81,6 +82,19 @@ allows, would fail when the window opens.
 
 Fix: an alignment flag, and warnings are errors in the tests (`filterwarnings = ["error"]`).
 
+### A7. A refused answer's socket is left to the garbage collector (found by A3's fix)
+
+With warnings as errors, a few tests of `llm` fail at random, each run others, on a
+`ResourceWarning: unclosed <_DeadlineSocket [closed]>`. `transport.request` closes the
+connection in every case, but with `Connection: close` the connection hands its socket to the
+response, and the response is closed only when it is read to its end. A redirect, a
+`Content-Length` over the limit and an answer that goes on past the limit are refused without
+that, so the socket stays open as long as the failure is kept, then until the garbage collector
+finds it. Nothing is read from it or sent on it any more; it is a file descriptor held for no
+use.
+
+Fix: the response is closed on every way out of `request`.
+
 ## 4. Configuration and documentation drift
 
 - **A4.** `pyproject.toml` says `license = { text = "MIT" }` and the README's last section
@@ -123,8 +137,8 @@ Fix: an alignment flag, and warnings are errors in the tests (`filterwarnings = 
 
 In this order; each line is one commit or one test/fix pair (red, then green):
 
-1. A3: warnings are errors; the columns' alignment a flag. First, because it pins the gate
-   every later fix passes through.
+1. A7, then A3: a request closes its response; warnings are errors, the columns' alignment a
+   flag. First, because it pins the gate every later fix passes through.
 2. A1: `launch.main` imports Qt first; a library Qt cannot load is one line and exit 3; no line
    without a standard error.
 3. A2: the confirmation's details in a plain-text box; then Findings: rows made apart and

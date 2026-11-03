@@ -284,3 +284,49 @@ def test_a_request_body_over_the_limit_is_refused_before_connecting() -> None:
 def test_the_default_limits_are_pinned() -> None:
     # [0013.12]
     assert Limits(3.0, 60.0, 64 * 1024, 4 * 1024) == LIMITS
+
+
+# --- every socket closed -------------------------------------------------------------------------
+
+
+@pytest.fixture
+def sockets(monkeypatch: pytest.MonkeyPatch) -> list[socket.socket]:
+    """Every socket a request connects."""
+    made: list[socket.socket] = []
+    connect = socket.socket.connect
+
+    def recorded(self: socket.socket, address: Any) -> None:
+        made.append(self)
+        connect(self, address)
+
+    monkeypatch.setattr(socket.socket, "connect", recorded)
+    return made
+
+
+def answered(address: Address) -> Answer | ExplanationUnavailable:
+    """The answer or the failure, kept: whatever it still holds stays alive while it is."""
+    try:
+        return get(address, limits=SMALL)
+    except ExplanationUnavailable as error:
+        return error
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        body(b"{}"),
+        redirect("http://192.0.2.1/api/version"),
+        body(b"x" * 1025),
+        until_closed(b"x" * 1025),
+        chunked(b"x" * 1025),
+        endless(),
+    ],
+    ids=["whole", "redirect", "too-long", "over-until-closed", "over-chunked", "endless"],
+)
+def test_the_socket_is_closed_whatever_the_answer(
+    answer: Callable[..., None], sockets: list[socket.socket]
+) -> None:
+    # [0013.12] by the request itself, not by the garbage collector (pre-step-8 audit, A7)
+    with ScriptedOllama(answer) as ollama:
+        outcome = answered(ollama.address)
+    assert [sock.fileno() for sock in sockets] == [-1], outcome
