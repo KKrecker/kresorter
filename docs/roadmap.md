@@ -9,10 +9,10 @@ its checks.
 | 2 | `quarantine`, `storage` | Quarantine with metadata, SQLite journal (WAL, FK, rollback), restore. "File changed between scan and action". Vault outside default scan zones and blacklisted (decision 0004). | MVP (iteration 1) |
 | 3 | `analysis` | Duplicates by hash, large/old files, cache patterns, "safe to delete" score. **MVP.** | MVP (iteration 1) |
 | 4 | `autostart` | Startup folders, Run/RunOnce (HKCU/HKLM, opt-in setting), task scheduler, auto services. Disable = keep record, never delete. Fake hive in tests. | Iteration 2 |
-| 5 | `organize` | File organizer: proposed category structure for a folder; "breaks when moved" detection (Steam libraries, system files, caches, relative dependencies); moves journaled before they happen, in a table of their own, with rollback and recovery; refused on macOS and Windows at first (pre-step-5 audit, decisions 3-4; decision 0012). | Iteration 2 |
+| 5 | `organize` | File organizer: proposed category structure for a folder; "breaks when moved" detection (Steam libraries, system files, caches, relative dependencies); moves journaled before they happen, in a table of their own, with rollback and recovery; refused on macOS, which has no open-file check yet (pre-step-5 audit, decisions 3-4; decision 0012; on Windows since decision 0017). | Iteration 2 |
 | 6 | `llm` | Ollama: local explanations for findings, autostart items and organizer proposals. | Iteration 2 |
 | 7 | `ui` | Scan, findings with filters, cleanup plan, organizer, autostart, quarantine/restore, settings (incl. registry opt-in). | Iteration 3 |
-| 8 | packaging | Installer, VM tests, README with screenshots. | Iteration 3 |
+| 8 | packaging | Kresorter 0.1.0: the Windows installer and portable zip, the wheel on PyPI, CI on Windows, a release from a tag, runs on clean machines, README with screenshots. | Iteration 3 |
 
 ## Status
 
@@ -263,10 +263,60 @@ Scanner core and `kresorter scan` (read-only report).
   as with `--include-machine`; the window is tested offscreen on Linux only (B11), with no
   screen reader; there are no screenshots yet (step 8).
 
+### Step 8: done (packaging)
+- Decision 0015: the project is Kresorter; one version, `kresorter.__version__`, which
+  `kresorter --version` and the Settings page show; the MIT licence in the repository and in
+  every artifact, and the metadata; one wheel for every system and the sdist that makes it,
+  installed offline and uninstalled by the tests, with nothing of Qt; the tools of the extra
+  `dev` pinned. On Windows a GUI program has no console: the line of exit 3 is a message box
+  and an uncaught error a dialog (B1). `kresorter-ui --self-test REPORT` shows each page and
+  changes nothing, and Kresorter's own folders are never findings (`app_program`).
+- Then decision 0016, by its own plan: the Windows open-file check, an exclusive open closed at
+  once, and with it the quarantine on Windows; decision 0017: organize on Windows, renames tried
+  again after a sharing violation, a path limit of 259 characters, and the folders a sync
+  client keeps refused.
+- CI on two systems: `ubuntu-latest` for every Python, `windows-latest` for 3.11 and 3.14 (B11
+  for the checks), and what Windows does otherwise fixed, each with its test: files opened with
+  `O_BINARY`, modes as Windows shows them, 100 ns steps, a name in another case.
+- The Windows application (`packaging/windows`): PyInstaller's folder `Kresorter` with
+  `Kresorter.exe`, its icon and version resource, `LICENSE`, `THIRD-PARTY-NOTICES.txt` and
+  Qt's libraries as files of their own; the portable zip, and the Inno Setup installer for the
+  current user.
+- The artifacts built once, after the checks, and run: `packaging/trial.py` installs the wheel
+  in a new environment, runs the installer silently, unzips the portable zip, runs each
+  self-test and uninstalls. Only a tag publishes: `packaging/release.py` checks it against
+  `__version__` and the changelog, then the wheel and the sdist go to PyPI by trusted
+  publishing and a GitHub release gets them with the installer, the zip and `SHA256SUMS.txt`.
+- The screenshots, made by `tests/support/screenshots.py` on a made-up home; the changelog of
+  0.1.0, for its users; the README's Install, Windows first.
+- 3002 tests, 100 % line and branch coverage. Left before the tag: CI's runs read on both
+  systems, Python 3.14 with them (step 6 was checked on it locally only); the release record of
+  the owner's runs on clean machines (0015 item 28); then the tag, by the owner, once the
+  repository is public.
+
+### Accepted limitations carried after step 8
+- Everything from steps 2 to 7 still holds. The window is now tested offscreen on Windows too,
+  and the README has its screenshots.
+- **Unsigned** (0015): SmartScreen warns before the installer and `Kresorter.exe` run; signing
+  is a later decision.
+- **The Windows application is the window**: the commands come with `pipx install kresorter`.
+- **No macOS build**, no CI on macOS, and macOS is not claimed by the metadata; the quarantine
+  and organize refuse there.
+- **No Flatpak, no Snap.**
+- **The Windows open-file check** (0016): a handle for attributes only and a file mapped into
+  memory after its handle was closed are not seen; a file on another drive than the data
+  directory is refused (`cross_device`).
+- **Organize on Windows** (0017): Desktop and Documents moved into OneDrive are not sorted; a
+  folder synced by a client that registers no Cloud Files root and is not OneDrive is sorted,
+  and the client syncs the moves; a file whose new path would pass 259 characters stays, with
+  `LongPathsEnabled` too; a file held for more than three seconds stops the batch. The
+  quarantine does not ask the synced folders: a junk file in one goes to the vault, which the
+  client syncs as a deletion until it is restored.
+
 ### Left for later
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
-- B11: CI on Windows and macOS and live `WinRegistry` tests, once the repository is published.
-- Before the first release: CI confirms Python 3.14 (step 6 was checked on it locally only).
+- B11: CI on Windows for every Python once the repository is public, CI on macOS, and live
+  `WinRegistry` tests.
 - B12: a user's own stub without `Exec` that `enable` moved to the store is not given back
   (accepted limitation of step 5).
 

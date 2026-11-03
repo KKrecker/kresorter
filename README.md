@@ -3,9 +3,8 @@
 Cross-platform desktop app for **safe** cleanup and triage of files on your PC.
 Open source, local-only, no telemetry.
 
-> Status: early development, console mode only. Steps 1-6 are done (scanner; quarantine and
-> journal; analysis; autostart; file organizer; optional local AI explanations); step 7, the
-> desktop UI, is next ([roadmap](docs/roadmap.md)).
+> Status: alpha, on Windows and Linux: the window and the console commands. See
+> [what each system can do](#what-each-system-can-do) and the [roadmap](docs/roadmap.md).
 
 ![The Overview after a scan: the folders scanned, a card per safety level with its size and reasons, and a card each for Quarantine, Organize and Autostart](docs/screenshots/overview.png)
 
@@ -18,6 +17,65 @@ Open source, local-only, no telemetry.
 - **Safe zones by default.** Program Files, user profiles and open files are blacklisted.
 - **Local only.** No telemetry; the optional AI explanations come from Ollama on your own
   machine, over loopback only, and are only ever shown.
+
+## Install
+
+### Windows
+
+From the [releases](https://github.com/KKrecker/kresorter/releases), download one of:
+
+- `Kresorter-<version>-setup.exe`, the installer: for you only, with no administrator rights,
+  into `%LOCALAPPDATA%\Programs\Kresorter`, with a Start menu shortcut (a desktop one if you
+  ask) and an entry in Settings → Apps;
+- `Kresorter-<version>-portable.zip`, the same program as a folder: unzip it anywhere and run
+  `Kresorter.exe` in it.
+
+Both are the window, and both keep their data in `%LOCALAPPDATA%\kresorter`. The console
+commands come with pipx, as on Linux: `pipx install kresorter`, with Python 3.11 or newer.
+
+The installer and `Kresorter.exe` are not signed yet, so SmartScreen stops them the first time
+("Windows protected your PC"): choose **More info**, then **Run anyway**. Before that, check
+what you downloaded against `SHA256SUMS.txt` of the same release, a line per file: the hash
+PowerShell prints, in capitals, is the one on your file's line.
+
+```powershell
+Get-FileHash .\Kresorter-<version>-setup.exe -Algorithm SHA256
+```
+
+### Linux
+
+With [pipx](https://pipx.pypa.io) and Python 3.11 or newer:
+
+```bash
+pipx install "kresorter[ui]"   # the window, kresorter-ui, and the commands
+pipx install kresorter         # or the commands only
+```
+
+The window needs a few of Qt's system libraries; [Desktop app](#desktop-app-optional) names
+them.
+
+### What each system can do
+
+| | Windows | Linux | macOS |
+| --- | --- | --- | --- |
+| Scan and analyze | yes | yes | yes |
+| Quarantine | yes | yes | no: refused |
+| Organize | yes | yes | no: refused |
+| Autostart: list | yes | yes | yes |
+| Autostart: disable, enable | `HKCU` Run values | XDG entries | no: listed only |
+| Recover | yes | yes | yes |
+| AI explanations | yes | yes | yes |
+| The window | installer, zip or pipx | with pipx | with pipx, untested |
+
+macOS has no build and no CI: its column is what the code does there, untried on a Mac. The
+quarantine and organize refuse there (exit code 3) because macOS has no open-file check yet.
+
+An installation is checked with the self-test CI runs on every build:
+`Kresorter.exe --self-test report.txt` in the program's folder on Windows, or
+`kresorter-ui --self-test report.txt` with pipx. It opens the window, shows each page and
+closes it, changing nothing, then writes a line per page to `report.txt` (`overview: shown`
+and so on) and exits with 0; when something fails, the report has the error and the exit code
+is 1. How to remove Kresorter is under [Uninstalling](#uninstalling).
 
 ## Usage (console)
 
@@ -187,7 +245,9 @@ plan are not refusals.
 
 ## Desktop app (optional)
 
-The window is an extra: the console commands need none of it.
+The window is an extra: the console commands need none of it. On Windows it is the
+installer or the portable zip (see [Install](#install)); with pip or pipx it is the extra
+`ui`:
 
 ```bash
 pip install "kresorter[ui]"   # adds PySide6-Essentials
