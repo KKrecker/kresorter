@@ -47,7 +47,7 @@ __all__ = ["QuarantinePage"]
 T = TypeVar("T")
 _CHECKED, _UNCHECKED = Qt.CheckState.Checked, Qt.CheckState.Unchecked
 _NAME, _SIZE, _ID = range(3)  # the columns
-_RIGHT = int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+_RIGHT = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
 
 
 class QuarantinePage(QWidget):

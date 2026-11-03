@@ -89,6 +89,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `safeclean scan` (and `python -m safeclean`): text/JSON report of junk candidates, duplicate groups and skips; read-only.
 
 ### Fixed
+- The window's columns are aligned with an alignment flag instead of a number (`QTreeWidgetItem.setTextAlignment(int, int)`, deprecated in PySide6 6.12, 1398 warnings per test run), and a warning now fails the tests (`filterwarnings = ["error"]`; pre-step-8 audit, A3).
 - `llm.transport.request` closes the answer on every way out: a redirect, a `Content-Length` over the limit or an answer going on past it left its socket open until the garbage collector found it (pre-step-8 audit, A7).
 - `autostart.changes.XdgChanges.disable`: a file that appears where the stub over a system entry goes, between the check and `O_EXCL`, rolls the change back instead of leaving it `failed` (exit 3); `recover()` no longer takes such a file, if empty or a beginning of a stub, for a partial stub and moves it to the store (decision 0011, item 117).
 - `autostart.changes.XdgChanges.disable`: when the stub over a system entry cannot be written, the slot it is moved to is journaled (`vault_path`) before the move, as `recover()` does; a crash in between left the partial stub in the store with no row naming it (decision 0011, item 116).

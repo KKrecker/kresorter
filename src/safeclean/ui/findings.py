@@ -63,7 +63,7 @@ _EVIDENCE = Qt.ItemDataRole.UserRole + 1  # a group's item keeps its reason
 _CHECKED, _UNCHECKED = Qt.CheckState.Checked, Qt.CheckState.Unchecked
 _SELECTABLE = (Level.SAFE, Level.LIKELY_SAFE)  # never a whole Review level
 _NAME, _SIZE, _LEVEL = range(3)  # the columns
-_RIGHT = int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+_RIGHT = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
 _FACTS = ("size", "modified", "found")
 _JUNK = frozenset(
     {
