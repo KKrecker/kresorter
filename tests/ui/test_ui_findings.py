@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QModelIndex, Qt
 from PySide6.QtWidgets import QTreeWidgetItem
 from pytestqt.qtbot import QtBot
 
@@ -606,3 +606,70 @@ def test_a_session_that_cannot_run_says_why(
         f"The data folder cannot be used here: data directory {inside} is inside scan zone {zone}"
     )
     assert all(path.exists() for path in tree.values())
+
+
+# --- tens of thousands of findings: a group at a time (pre-step-8 audit, A2) ---------------------
+
+
+class Announced:
+    """What the findings' tree model announces: each insertion and removal as the parent's row
+    (-1 for none), the first row and the last; each change as its parent's row."""
+
+    def __init__(self, window: Window) -> None:
+        self.inserted: list[tuple[int, int, int]] = []
+        self.removed: list[tuple[int, int, int]] = []
+        self.changed: list[int] = []
+        model = window.findings.tree.model()
+        model.rowsInserted.connect(self._inserted)
+        model.rowsRemoved.connect(self._removed)
+        model.dataChanged.connect(self._changed)
+
+    def _inserted(self, parent: QModelIndex, first: int, last: int) -> None:
+        self.inserted.append((parent.row(), first, last))
+
+    def _removed(self, parent: QModelIndex, first: int, last: int) -> None:
+        self.removed.append((parent.row(), first, last))
+
+    def _changed(self, top: QModelIndex, bottom: QModelIndex, roles: list[int]) -> None:
+        self.changed.append(top.parent().row())
+
+
+def test_a_group_s_files_go_in_with_it(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path, tree: dict[str, Path]
+) -> None:
+    # [0014.20] not row by row
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    announced = Announced(window)
+    scanned(qtbot, window)
+    assert announced.inserted == [(-1, 0, 0), (-1, 1, 1), (-1, 2, 2)]
+    assert [group.childCount() for group in _groups(window)] == [4, 1, 1]
+
+
+def test_many_check_states_change_without_announcing_each_file(
+    window: Window, tree: dict[str, Path]
+) -> None:
+    # [0014.20] Clear, a level's link and a group's check box: only the groups' rows change
+    page = window.findings
+    announced = Announced(window)
+    page.clear_button.click()
+    page.select_buttons[Level.SAFE].click()
+    assert _checked(window) == {tree[name] for name in ("n", "m", "copy")}
+    _check_group(_groups(window)[0], on=False)
+    assert _checked(window) == set()
+    assert set(announced.changed) == {-1}
+
+
+def test_what_moved_leaves_its_group_in_one_go(
+    qtbot: QtBot, window: Window, tree: dict[str, Path]
+) -> None:
+    # [0014.21] and the current finding, which stays, stays current
+    page = window.findings
+    page.tree.setCurrentItem(page.item(tree["kept"]))
+    announced = Announced(window)
+    page.move_button.click()
+    wait_idle(qtbot, window)
+    assert announced.removed == [(0, 0, 3)]
+    assert announced.inserted == [(0, 0, 0)]
+    assert page.tree.currentItem() is page.item(tree["kept"])
+    assert page.detail.name.text() == "x.pyc"
+    assert _groups(window)[0].isExpanded()

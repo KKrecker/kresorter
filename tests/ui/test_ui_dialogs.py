@@ -9,7 +9,7 @@ import pytest
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QPlainTextEdit, QWidget
 from pytestqt.qtbot import QtBot
 
 from safeclean.ui.dialogs import Confirmation, ConfirmDialog, FolderDialog, choose_folder, confirm
@@ -76,13 +76,13 @@ def test_the_dialog_names_the_action_and_shows_what_it_will_do(parent: QWidget) 
     seen: dict[str, object] = {}
 
     def look(dialog: ConfirmDialog) -> None:
+        dialog.reject()  # first: if a look below fails, the dialog does not wait for ever
         seen["title"] = dialog.windowTitle()
         seen["question"] = dialog.question.text()
         seen["text"] = dialog.text.text()
-        seen["details"] = dialog.listed.text()
+        seen["details"] = dialog.details.toPlainText()
         seen["buttons"] = [dialog.cancel.text(), dialog.action.text()]
         seen["role"] = dialog.action.property("role")
-        dialog.reject()
 
     _once_asked(look)
     assert not confirm(parent, Translator("en"), MOVE)
@@ -184,8 +184,17 @@ def test_a_long_path_wraps_instead_of_widening_the_dialog(qtbot: QtBot, parent: 
     long = "/" + "/".join(["folder"] * 30) + "/file.txt"
     dialog = _shown(qtbot, parent, Confirmation("Restore", "Restore?", (long,), "Restore"))
     assert dialog.width() == 520
-    assert dialog.listed.text() == long
+    assert dialog.details.toPlainText() == long
     assert dialog.details.height() > _shown(qtbot, parent, _paths(1)).details.height()
+
+
+def test_the_details_are_plain_text_in_a_box_of_their_own(qtbot: QtBot, parent: QWidget) -> None:
+    # [0014.50] not one label of every line: the box lays out only what it shows (pre-step-8
+    # audit, A2)
+    dialog = _shown(qtbot, parent, _paths(2000))
+    assert isinstance(dialog.details, QPlainTextEdit)
+    assert dialog.details.isReadOnly()
+    assert dialog.details.toPlainText() == "\n".join(f"/q/{n}" for n in range(2000))
 
 
 def test_without_details_the_box_takes_no_room(qtbot: QtBot, parent: QWidget) -> None:

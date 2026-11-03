@@ -287,7 +287,7 @@ def test_a_confirmation_s_title_is_18_px_semibold_and_its_details_on_surface(
     # [0014.50]
     rules = dict(_rules(style_sheet(palette)))
     assert rules['QLabel[role="question"]'] == {"font-size": "18px", "font-weight": "600"}
-    assert rules['QScrollArea[role="details"]'] == {
+    assert rules['QPlainTextEdit[role="details"]'] == {
         "background-color": palette.surface,
         "border": "none",
         "border-radius": "8px",
