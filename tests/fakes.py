@@ -4,9 +4,11 @@ import errno
 import functools
 import os
 import sqlite3
+import stat
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path, PurePath
+from typing import cast
 
 import pytest
 
@@ -160,6 +162,34 @@ def _elsewhere(
         return info
     rest = {name: getattr(info, name) for name in _NOT_IN_SEQUENCE}
     return os.stat_result((*info[:2], info.st_dev + 1, *info[3:10]), rest)
+
+
+def reparse_point(monkeypatch: pytest.MonkeyPatch, directory: Path) -> None:
+    """``os.stat`` and ``os.lstat`` of ``directory`` say what Windows's ``lstat`` says of a
+    junction or a mount point: a directory with ``FILE_ATTRIBUTE_REPARSE_POINT``, which this
+    system's never says. Everything else they say is the directory's (decision 0017, item 11)."""
+    for name in ("stat", "lstat"):
+        reparse = functools.partial(_reparse, getattr(os, name), str(directory))
+        monkeypatch.setattr(os, name, reparse)
+
+
+class _ReparseStat:
+    st_file_attributes = stat.FILE_ATTRIBUTE_DIRECTORY | stat.FILE_ATTRIBUTE_REPARSE_POINT
+
+    def __init__(self, info: os.stat_result) -> None:
+        self._info = info
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._info, name)
+
+
+def _reparse(
+    real: Callable[..., os.stat_result], faked: str, path: object, *args: object, **kwargs: object
+) -> os.stat_result:
+    info = real(path, *args, **kwargs)
+    if str(path) != faked:
+        return info
+    return cast("os.stat_result", _ReparseStat(info))
 
 
 def relist(

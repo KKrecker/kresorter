@@ -8,12 +8,14 @@ a wrong match only refuses a folder, a missed one breaks what is in it.
 """
 
 import dataclasses
+import os
 import re
 from pathlib import Path, PurePath, PurePosixPath
 
 import pytest
 
 from fakes import deny_listing, deny_stat
+from kresorter.core.heuristics import Platform
 from kresorter.core.scanner import ScanContext
 from kresorter.core.scanner import scan as scan_of
 from kresorter.organize.folders import (
@@ -259,6 +261,91 @@ def test_markers_one_level_down_refuse_nothing(zone: Path, scan: ScanContext) ->
     for relative in ("app/.git/HEAD", "app/Makefile", "game/libraryfolders.vdf", "a.jpg"):
         write(folder / relative)
     assert [move.source.name for move in plan(folder, scan).moves] == ["a.jpg"]
+
+
+# --- the folder as the system spells it (decision 0017, item 12) -------------------------------
+# This system tells case apart: a link from one spelling to the other stands for a folder given
+# in another case than the system's, which a Windows context takes for the same folder.
+
+
+def spelled(zone: Path, given: str, real: str) -> tuple[Path, Path]:
+    """``zone/given/Downloads`` and ``zone/real/Downloads``, a photo in it, ``given`` a link to
+    ``real``."""
+    (zone / given).symlink_to(zone / real)
+    write(zone / real / "Downloads" / "a.jpg")
+    return zone / given / "Downloads", zone / real / "Downloads"
+
+
+def test_on_windows_a_folder_given_in_another_case_is_sorted_as_the_system_spells_it(
+    zone: Path, scan: ScanContext
+) -> None:
+    # [0017.12] the plan, its moves and their destinations take the system's spelling
+    given, real = spelled(zone, "ann", "Ann")
+    found = plan(given, dataclasses.replace(scan, platform="windows"))
+    assert found.folder == real
+    assert [(m.source, m.destination) for m in found.moves] == [
+        (real / "a.jpg", real / "Images" / "a.jpg")
+    ]
+
+
+@pytest.mark.parametrize("platform", ["linux", "darwin"])
+def test_elsewhere_a_folder_in_another_case_is_another_folder(
+    zone: Path, scan: ScanContext, platform: Platform
+) -> None:
+    # [0017.12] a link, as before (0012.7)
+    given, real = spelled(zone, "ann", "Ann")
+    context = dataclasses.replace(scan, platform=platform)
+    assert refusal(given, context) == (FolderReason.LINK, str(real))
+
+
+def test_on_windows_a_short_name_or_another_drive_is_a_link(zone: Path, scan: ScanContext) -> None:
+    # [0017.12] ANN~1, a subst drive, a mapped drive: the path it stands for is not only spelled
+    # otherwise
+    given, real = spelled(zone, "ANN~1", "Ann")
+    windows = dataclasses.replace(scan, platform="windows")
+    assert refusal(given, windows) == (FolderReason.LINK, str(real))
+
+
+def test_on_windows_a_link_spelled_as_its_target_is_still_a_link(
+    zone: Path, scan: ScanContext
+) -> None:
+    # [0017.12] the folder itself is a link: refused whatever it leads to
+    (zone / "Downloads").mkdir()
+    (zone / "downloads").symlink_to(zone / "Downloads")
+    windows = dataclasses.replace(scan, platform="windows")
+    assert refusal(zone / "downloads", windows) == (FolderReason.LINK, str(zone / "Downloads"))
+
+
+def test_on_windows_the_system_s_spelling_is_checked_as_any_folder(
+    tmp_path: Path, scan: ScanContext
+) -> None:
+    # [0017.12] the policy blocks tmp_path/system, not tmp_path/SYSTEM: the system's spelling
+    # is what is refused
+    (tmp_path / "SYSTEM").symlink_to(tmp_path / "system")
+    (tmp_path / "system" / "Downloads").mkdir(parents=True)
+    with pytest.raises(FolderRefused) as refused:
+        plan(tmp_path / "SYSTEM" / "Downloads", dataclasses.replace(scan, platform="windows"))
+    assert refused.value.folder == tmp_path / "system" / "Downloads"
+    assert (refused.value.reason, refused.value.detail) == (FolderReason.BLOCKED, "system")
+
+
+def test_on_windows_the_system_s_spelling_is_taken_once(
+    zone: Path, scan: ScanContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0017.12] a system that would spell it otherwise again: a link, not a loop
+    for name in ("ab", "AB"):
+        (zone / name).mkdir()
+    other = {str(zone / "ab"): str(zone / "AB"), str(zone / "AB"): str(zone / "ab")}
+    real = os.path.realpath
+
+    def flipping(path: str | os.PathLike[str]) -> str:
+        return other.get(os.fspath(path)) or real(path)
+
+    monkeypatch.setattr(os.path, "realpath", flipping)
+    with pytest.raises(FolderRefused) as refused:
+        plan(zone / "ab", dataclasses.replace(scan, platform="windows"))
+    assert refused.value.folder == zone / "AB"
+    assert (refused.value.reason, refused.value.detail) == (FolderReason.LINK, str(zone / "ab"))
 
 
 # --- a folder a sync client keeps (decision 0017, item 8) ---------------------------------------
