@@ -235,8 +235,25 @@ Scanner core and `safeclean scan` (read-only report).
   path and a moment are shown (`ui.shown`). Light and dark, English and Russian, every margin on
   the grid. 2673 tests, 100 % line and branch coverage.
 
+### Step 8.0: done (pre-step-8 audit)
+- The audit ([`docs/reviews/pre-step8-audit.md`](reviews/pre-step8-audit.md)) and its plan, in
+  order, each red test before its fix.
+- Fixes: a library Qt cannot load (`libGL.so.1`) is one line and exit 3 instead of a traceback,
+  and a GUI script without a standard error writes nothing (A1, decision 0014 item 9); Findings
+  adds a group's rows with it, changes many check states at once and takes what moved out in
+  one go, and the confirmation's details are plain text (A2; with 20 000 cache files,
+  offscreen: listing 2.0 s to 1.0 s, a group's check box 3.5 s to 0.3 s, removing what moved
+  65 s to 0.1 s, the confirmation 6.4 s to 0.1 s); the columns' alignment is a flag, and a
+  warning fails the tests (A3); a request to Ollama closes its answer on every way out (A7).
+- Refactors without behaviour change: three texts nothing shows leave the catalog (A5); the
+  meta-tests of decisions 0012 to 0014 share `tests/support/decisions.py`, and the window's
+  tests `support.window.children` (B4).
+- Step 7 closed: decision 0014 accepted. 2676 tests, 100 % line and branch coverage.
+
 ### Accepted limitations carried into step 8
 - Everything from steps 2 to 6 still holds.
+- **The window's width** (pre-step-8 audit, B2): at least 1056 px in English and 1183 px in
+  Russian, for Findings' bar and the detail beside it.
 - **Window** (decision 0014): a task cannot be cancelled, and a scan that only reads is left
   behind when the window closes; the folders added on Overview are not remembered; a new
   language applies the next time the window opens; organize's category directories keep their

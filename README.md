@@ -221,7 +221,9 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
   (off until you turn them on), the local AI with its Check, and the data folder.
 
 The window follows the system's light or dark scheme; its icons are
-[Lucide](https://lucide.dev)'s, shipped with it under their ISC licence.
+[Lucide](https://lucide.dev)'s, shipped with it under their ISC licence. It needs a screen at
+least 1056 px wide in English and 1183 px in Russian, for Findings' bar and the detail beside
+it (a 1366 x 768 screen at 125 % is 1093 px wide).
 
 Nothing changes until you confirm: every action (quarantine, restore, delete permanently,
 organize, undo, disable, enable, recover) first opens a dialog that shows what it will do, with
@@ -246,7 +248,7 @@ pip install -e ".[dev]"
 ruff check . && ruff format --check . && mypy && pytest
 ```
 
-Python 3.11 to 3.14. `pytest` fails below 100 % line and branch coverage.
+Python 3.11 to 3.14. `pytest` fails below 100 % line and branch coverage, and on any warning.
 
 Decisions are logged in [`docs/decisions/`](docs/decisions/); the plan is in [`docs/roadmap.md`](docs/roadmap.md).
 
