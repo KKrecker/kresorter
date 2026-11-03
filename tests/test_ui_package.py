@@ -128,14 +128,90 @@ def test_a_library_qt_cannot_load_is_one_line_and_exit_3(
     assert list(tmp_path.iterdir()) == []
 
 
+class Boxes:
+    """The message boxes ``launch.message_box`` would show."""
+
+    def __init__(self) -> None:
+        self.shown: list[str] = []
+
+    def __call__(self, text: str) -> None:
+        self.shown.append(text)
+
+
 @pytest.mark.usefixtures("without_qt")
 def test_without_a_standard_error_nothing_is_written_and_exit_3(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # [0014.9] a GUI script on Windows runs without one (pre-step-8 audit, A1)
+    # [0014.9] a GUI script runs without one (pre-step-8 audit, A1); outside Windows nothing is
+    # shown either [0015.24]
+    boxes = Boxes()
+    monkeypatch.setattr(launch, "message_box", boxes)
+    monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setattr(sys, "stderr", None)
 
     assert launch.main([], environment=UNTOUCHED) == 3
+    assert boxes.shown == []
+
+
+@pytest.mark.usefixtures("without_qt")
+def test_on_windows_without_a_standard_error_the_line_is_a_message_box(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # [0015.24] kresorter-ui and Kresorter.exe have no console there
+    boxes = Boxes()
+    monkeypatch.setattr(launch, "message_box", boxes)
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "stderr", None)
+
+    assert launch.main([], environment=UNTOUCHED) == 3
+    (shown,) = boxes.shown
+    assert shown.startswith(
+        'kresorter-ui: the desktop window needs PySide6 (pip install "kresorter[ui]"): '
+    )
+    assert not shown.endswith("\n")
+
+
+@pytest.mark.usefixtures("qt_without_its_library")
+def test_on_windows_with_a_standard_error_the_line_is_written_there(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # [0015.24] a box only without one
+    boxes = Boxes()
+    monkeypatch.setattr(launch, "message_box", boxes)
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    assert launch.main([], environment=UNTOUCHED) == 3
+    assert capsys.readouterr().err.startswith("kresorter-ui: Qt cannot load a library it needs")
+    assert boxes.shown == []
+
+
+class FakeUser32:
+    def __init__(self) -> None:
+        self.calls: list[tuple[object, str, str, int]] = []
+
+    def MessageBoxW(self, window: None, text: str, caption: str, kind: int, /) -> int:
+        self.calls.append((window, text, caption, kind))
+        return 1
+
+
+class FakeCtypes:
+    def __init__(self) -> None:
+        self.user32 = FakeUser32()
+        self.loaded: list[str] = []
+
+    def WinDLL(self, name: str) -> FakeUser32:
+        self.loaded.append(name)
+        return self.user32
+
+
+def test_the_message_box_is_the_system_s() -> None:
+    # [0015.24] MessageBoxW through ctypes, which needs no Qt: an error icon, OK, Kresorter
+    module = FakeCtypes()
+
+    launch.message_box("kresorter-ui: why", module)
+
+    assert module.loaded == ["user32"]
+    assert module.user32.calls == [(None, "kresorter-ui: why", "Kresorter", 0x10)]
 
 
 def test_another_import_error_is_not_hidden(monkeypatch: pytest.MonkeyPatch) -> None:

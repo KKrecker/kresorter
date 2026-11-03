@@ -24,7 +24,7 @@ from support.decisions import (
 
 DECISION = "0015"
 # Taken out by the commit that completes each item (the step 8 plan of 0015).
-COMPLETED: frozenset[int] = frozenset({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 19, 31})
+COMPLETED: frozenset[int] = frozenset({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 19, 24, 25, 31})
 PENDING: frozenset[int] = frozenset(range(1, 32)) - COMPLETED
 
 
