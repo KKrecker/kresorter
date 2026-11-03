@@ -189,7 +189,7 @@ def test_a_text_takes_its_values_as_they_are() -> None:
     # [0014.28] [0014.31] a path with braces is not read as a placeholder
     folder = "/home/a/{n} {{x}}"
     for language in LANGUAGES:
-        assert folder in Translator(language).text("overview.folder", folder=folder)
+        assert folder in Translator(language).text("overview.remove", folder=folder)
 
 
 def test_every_value_shown_has_a_label_in_both_languages() -> None:

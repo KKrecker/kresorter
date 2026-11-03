@@ -62,8 +62,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "{task} is still running; the window closes when it ends.",
         "ru": "Ещё выполняется: {task}. Окно закроется, когда это завершится.",
     },
-    "overview.folder": {"en": "Folder {folder}", "ru": "Папка {folder}"},
-    "overview.folders": {"en": "Folders to scan", "ru": "Папки для сканирования"},
     "overview.add": {"en": "Add folder", "ru": "Добавить папку"},
     "overview.remove": {"en": "Remove folder {folder}", "ru": "Убрать папку {folder}"},
     "overview.scan_title": {"en": "Scan", "ru": "Сканирование"},
@@ -612,10 +610,6 @@ PLURALS: dict[str, dict[str, tuple[str, ...]]] = {
     "entry": {
         "en": ("{n} entry", "{n} entries"),
         "ru": ("{n} запись", "{n} записи", "{n} записей"),
-    },
-    "batch": {
-        "en": ("{n} batch", "{n} batches"),
-        "ru": ("{n} пакет", "{n} пакета", "{n} пакетов"),
     },
     "group": {
         "en": ("{n} group", "{n} groups"),
