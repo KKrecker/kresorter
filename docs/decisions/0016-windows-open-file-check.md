@@ -51,8 +51,8 @@ checks the same code through fakes.
    and message, which the policy treats as open (0005); a failing `CloseHandle` raises it
    too.
 3. **A question, not a lock.** The check reads no byte, asks for no write or delete access,
-   holds its handle only between the two calls (closed in `finally`), does not follow a
-   reparse point (`FILE_FLAG_OPEN_REPARSE_POINT`) and does not download a file kept in the
+   holds its handle only between the two calls (nothing is done in between), does not follow
+   a reparse point (`FILE_FLAG_OPEN_REPARSE_POINT`) and does not download a file kept in the
    cloud (`FILE_FLAG_OPEN_NO_RECALL`).
 4. **Long paths.** The path is made absolute and given with `\\?\` (`\\?\UNC\` for a share),
    so a path over 260 characters is checked like any other.
@@ -62,11 +62,12 @@ checks the same code through fakes.
    `"open_file_check": true`, and Overview's note about an unreliable check is not shown
    there.
 6. **Testable everywhere.** The checker takes the calls it needs (`CreateFileW`,
-   `CloseHandle`, the last error) as a protocol; on Windows the default is
-   `ctypes.WinDLL("kernel32", use_last_error=True)`, loaded when the checker is made. Tests on
-   every system give a fake that records each call's arguments and answers a handle or an
-   error, so every line is covered on Linux and on Windows; the live tests of item 7 add
-   checks, not lines.
+   `CloseHandle`, the last error and its message) as a protocol, `Kernel`; the default,
+   `Kernel32`, is `ctypes.WinDLL("kernel32", use_last_error=True)` with the functions' types
+   (a handle as a signed integer, so that `INVALID_HANDLE_VALUE` is -1), loaded when the
+   checker is made. Tests on every system give a fake that records each call's arguments and
+   answers a handle or an error, so every line is covered on Linux and on Windows; the live
+   tests of item 7 add checks, not lines.
 7. **Live on Windows** (skipped elsewhere): a file this process holds open with `open()` is
    open, and so is a file a child process holds; once it is closed, it is not; a hard link to
    an open file is open; a missing file raises `OpenFileCheckError`; after a check the file has
