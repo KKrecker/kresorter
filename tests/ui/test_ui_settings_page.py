@@ -1,8 +1,9 @@
 """The Settings page: the language, which applies the next time the window opens; on Windows
 the machine scope of autostart, turned on only after a confirmation that says what is read; a
 Check of the local AI that runs the checks of ``safeclean llm status`` and shows each; the data
-directory's path. The page says when the settings file was not used, and the file is written
-only when the user changes a setting (decision 0014, items 27, 36 and 37)."""
+directory's path; a card each, the page scrolling under its head. The page says when the
+settings file was not used, and the file is written only when the user changes a setting
+(decision 0014, items 27, 36, 37 and 55)."""
 
 import io
 import json
@@ -11,10 +12,11 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QTreeWidgetItem
+from PySide6.QtWidgets import QFrame, QLabel, QTreeWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeRegistry
+from safeclean.analysis.score import Level
 from safeclean.autostart.registry import Hive, RegValue, ValueKind
 from safeclean.autostart.run_keys import RUN
 from safeclean.cli_llm import run_status
@@ -22,6 +24,8 @@ from safeclean.core.heuristics import Platform
 from safeclean.llm.settings import MODEL_VARIABLE, URL_VARIABLE, Address
 from safeclean.ui.i18n import Language
 from safeclean.ui.settings import Settings, load
+from safeclean.ui.settings_page import SettingsPage
+from safeclean.ui.theme import LIGHT
 from safeclean.ui.window import Window
 from support.cli import autostart_context, run, scan_context
 from support.ollama import TAGS, VERSION, Answer, ScriptedOllama, as_json
@@ -98,6 +102,28 @@ def _child(item: QTreeWidgetItem, index: int) -> QTreeWidgetItem:
     return child
 
 
+def _lines(page: SettingsPage) -> list[str]:
+    """What the check found: Ollama, the model, then the rest."""
+    return [*(found.text() for found in page.found), *page.check.text().splitlines()]
+
+
+def _dots(page: SettingsPage) -> list[object]:
+    return [found.dot.property("dot") for found in page.found]
+
+
+def _titles(card: QFrame) -> list[str]:
+    return [
+        label.text()
+        for label in card.findChildren(QLabel)
+        if label.property("role") == "card-title"
+    ]
+
+
+def _right(widget: QWidget, card: QFrame) -> int:
+    """The right edge of ``widget`` in ``card``."""
+    return widget.mapTo(card, widget.rect().topRight()).x()
+
+
 def _listed(qtbot: QtBot, window: Window) -> list[str]:
     """The names the Autostart page lists, once it has read them again."""
     window.show_page("autostart")
@@ -123,10 +149,10 @@ def test_the_page_shows_the_language_and_the_data_folder_and_writes_nothing(
     assert page.language.currentIndex() == 0
     assert page.language.accessibleName() == "Language"
     assert page.language_note.text() == "A new language applies the next time the window opens."
-    assert page.data_dir.text() == f"Data folder: {data_dir}"
+    assert page.data_dir.toolTip() == str(data_dir)
     assert page.machine.isHidden()
     assert page.unused.isHidden()
-    assert page.check.text() == ""
+    assert _lines(page) == ["", ""]
     assert page.result.text() == ""
     assert page.current == Settings()
     assert not data_dir.exists()
@@ -340,7 +366,8 @@ def _checked(
     window = _window(qtbot, tmp_path, zone, data_dir, llm_env=env)
     window.settings.check_button.click()
     wait_idle(qtbot, window)
-    return window.settings.check.text().splitlines()
+    assert _dots(window.settings) == ["review", "review"]  # [0014.55]
+    return _lines(window.settings)
 
 
 def _steps(*steps: str) -> list[str]:
@@ -372,7 +399,7 @@ def test_the_check_runs_the_checks_of_llm_status_and_shows_each(
         assert ollama.paths() == []
         window.settings.check_button.click()
         wait_idle(qtbot, window)
-        shown = window.settings.check.text().splitlines()
+        shown = _lines(window.settings)
         asked = ollama.paths()
         cli = _status(env)
 
@@ -439,10 +466,100 @@ def test_the_page_in_russian(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir:
 
     assert _choices(window)[1:] == ["English", "Русский"]
     assert page.language_note.text() == "Новый язык применится при следующем открытии окна."
-    assert page.data_dir.text() == f"Папка данных: {data_dir}"
-    assert page.check.text().splitlines()[:2] == [
+    assert _titles(page.data_card) == ["Папка данных"]
+    assert page.address.text() == f"Адрес: {ollama.address.url} · Модель: llama3.2"
+    assert _lines(page)[:2] == [
         f"Ollama: работает по адресу {ollama.address.url} (версия 0.6.2)",
         "Модель: llama3.2: установлена",
     ]
     page.language.setCurrentIndex(1)
     assert page.result.text() == "Сохранено."
+
+
+# --- the cards [0014.55] -------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("platform", ["linux", "windows"])
+def test_a_card_each_the_page_scrolling_under_its_head(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, platform: Platform
+) -> None:
+    # [0014.55] [0014.46] The machine-wide entries on Windows only; the language's choice and
+    # Check at the right of their titles.
+    window = _window(qtbot, tmp_path, zone, data_dir, platform=platform)
+    page = window.settings
+    cards = [page.language_card, page.machine_card, page.ai_card, page.data_card]
+    assert [part.property("role") for part in cards] == ["card"] * 4
+    assert [_titles(part) for part in cards] == [
+        ["Language"],
+        ["Autostart"],
+        ["Local AI (Ollama)"],
+        ["Data folder"],
+    ]
+    assert page.machine_card.isHidden() == (platform != "windows")
+    inside = page.controls.layout()
+    assert inside is not None
+    order = [page.unused, *cards, page.result]
+    places = [inside.indexOf(part) for part in order]
+    assert places == sorted(places)
+    assert places[0] >= 0
+    assert (page.area.widget(), page.area.widgetResizable()) == (page.controls, True)
+    assert page.head.parentWidget() is page
+    language, ai = page.language_card, page.ai_card
+    assert _right(page.language, language) == _right(page.language_note, language)
+    assert _right(page.check_button, ai) == _right(page.address, ai)
+
+
+@pytest.mark.parametrize(
+    ("env", "shown"),
+    [
+        ({}, "Address: http://127.0.0.1:11434 · Model: llama3.2"),
+        (
+            {URL_VARIABLE: "http://127.0.0.1:9", MODEL_VARIABLE: "no model!"},
+            "Address: http://127.0.0.1:9 · Model: no model!",
+        ),
+    ],
+)
+def test_the_local_ai_s_address_and_model_as_the_environment_gives_them(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, env: dict[str, str], shown: str
+) -> None:
+    # [0014.55] In secondary text; whether they are refused is for Check to say.
+    window = _window(qtbot, tmp_path, zone, data_dir, llm_env=env)
+    assert window.settings.address.text() == shown
+    assert window.settings.address.property("role") == "secondary"
+
+
+@pytest.mark.parametrize(
+    ("script", "dots"),
+    [
+        ([VERSION, TAGS], ["safe", "safe"]),
+        ([VERSION, as_json({"models": []})], ["safe", "review"]),
+        ([as_json({"name": "not ollama"})], ["review", "review"]),
+    ],
+)
+def test_each_check_has_a_dot_in_the_safe_colour_when_it_passed_or_the_review_one(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, script: list[Answer], dots: list[str]
+) -> None:
+    # [0014.55] Ollama, then the model; none before a check.
+    with ScriptedOllama(*script) as ollama:
+        window = _window(
+            qtbot, tmp_path, zone, data_dir, llm_env={URL_VARIABLE: ollama.address.url}
+        )
+        page = window.settings
+        assert [found.isHidden() for found in page.found] == [True, True]
+        page.check_button.click()
+        wait_idle(qtbot, window)
+    assert [found.isHidden() for found in page.found] == [False, False]
+    assert _dots(page) == dots
+    drawn = [found.dot.grab().toImage() for found in page.found]
+    colours = [image.pixelColor(4, 4).name().upper() for image in drawn]
+    assert colours == [LIGHT.levels[Level(kind)] for kind in dots]
+
+
+def test_the_data_folder_from_the_home_folder(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path
+) -> None:
+    # [0014.55] The whole path in its tooltip, in secondary text.
+    window = _window(qtbot, tmp_path, zone, data_dir)
+    page = window.settings
+    assert (page.data_dir.text(), page.data_dir.toolTip()) == ("~/data/safeclean", str(data_dir))
+    assert page.data_dir.property("role") == "secondary"
