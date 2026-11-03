@@ -1,30 +1,25 @@
 """Live on Windows (decision 0016, item 9; skipped elsewhere): the quarantine commands with the
 running system's context, in a temporary profile.
 
-The context is ``default_context`` for a made-up profile under ``tmp_path``: its policy, its
-share-mode check, its data directory. One rule leaves its classifier: the runner's temporary
-folder is ``AppData\\Local\\Temp``, which ``windows-user-temp`` marks as junk, as the tests of
-Linux leave ``posix-temp`` out. ``tmp_path`` is taken resolved: a short name (``RUNNER~1``)
-leads elsewhere and is 0017's (item 12).
+The context is ``default_context`` for a made-up profile under ``tmp_path``
+(``support.profile``): its policy, its share-mode check, its data directory.
 """
 
 from __future__ import annotations
 
 import os
 import sys
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from kresorter import environment
-from kresorter.core.heuristics import JunkClassifier, default_rules
 from kresorter.core.open_files import ShareModeChecker
 from kresorter.core.scanner import ScanContext
 from support.cli import run
 from support.files import write
 from support.holder import held_by_a_child
 from support.journal import query
+from support.profile import windows_context
 
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="live Windows quarantine")
 
@@ -43,15 +38,7 @@ def data_dir(home: Path) -> Path:
 
 @pytest.fixture
 def context(home: Path) -> ScanContext:
-    profile = {  # the names the policy reads; os.environ ignores the case on Windows
-        "SystemDrive": os.environ.get("SYSTEMDRIVE", "C:"),
-        "SystemRoot": os.environ.get("SYSTEMROOT", r"C:\Windows"),
-        "USERPROFILE": str(home),
-        "LOCALAPPDATA": str(home / "AppData" / "Local"),
-    }
-    made = environment.default_context(env=profile)
-    rules = [r for r in default_rules() if r.id != "windows-user-temp"]
-    return replace(made, classifier=JunkClassifier(rules, platform="windows"))
+    return windows_context(home)
 
 
 @pytest.fixture
