@@ -7,6 +7,7 @@ journal says, every foreign file as it was, nothing overwritten, nothing deleted
 """
 
 import dataclasses
+import ntpath
 import os
 import sqlite3
 import stat
@@ -16,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, deny_stat, make_policy, other_device
+from kresorter.core.open_files import ShareModeChecker
 from kresorter.core.preflight import RefusalReason
 from kresorter.core.scanner import ScanContext
 from kresorter.organize.journal import identity, journaled
@@ -23,6 +25,7 @@ from kresorter.organize.mover import BatchState, carry_out, check
 from kresorter.organize.planner import Move, plan
 from kresorter.storage.db import connect
 from support.files import write
+from support.kernel import HoldingKernel
 from support.moves import (
     MOVED,
     SOURCES,
@@ -39,6 +42,8 @@ from support.moves import (
     three_files,
     where,
 )
+
+GENERIC_READ = 0x80000000
 
 
 @pytest.fixture
@@ -94,6 +99,21 @@ def test_a_file_a_program_holds_open_is_refused(folder: Path, scan: ScanContext)
     moves = plan(folder, scan).moves
     context = dataclasses.replace(scan, open_files=FakeOpenFiles([folder / B]))
     assert refused(folder, context, moves) == [(B, "open_file")]
+
+
+def test_on_windows_the_share_mode_check_runs_right_before_the_batch(
+    folder: Path, scan: ScanContext
+) -> None:
+    # [0017.5] another process holds b, sharing deletion or not: b stays; the check asks to read
+    # only and shares nothing, so it disturbs no holder (0016 item 3), and closes what it opened
+    moves = plan(folder, scan).moves
+    kernel = HoldingKernel(B)
+    windows = dataclasses.replace(scan, open_files=ShareModeChecker(kernel), platform="windows")
+    assert refused(folder, windows, moves) == [(B, "open_file")]
+    opened = [call for call in kernel.calls if call[0] == "CreateFileW"]
+    assert sorted(ntpath.basename(str(call[1])) for call in opened) == sorted([A, B, C])
+    assert {call[2:4] for call in opened} == {(GENERIC_READ, 0)}
+    assert [call[0] for call in kernel.calls].count("CloseHandle") == 2
 
 
 def test_a_file_the_policy_blocks_now_is_refused(

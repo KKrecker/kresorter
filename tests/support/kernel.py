@@ -2,6 +2,7 @@
 each call and answers a handle or an error, and the part of ``ctypes`` that ``Kernel32`` takes.
 """
 
+import ntpath
 from dataclasses import dataclass, field
 
 INVALID_HANDLE_VALUE = -1
@@ -86,3 +87,30 @@ class FakeCtypes:
 
     def FormatError(self, code: int) -> str:
         return f"formatted {code}"
+
+
+SHARING_VIOLATION = 32
+
+
+class HoldingKernel(FakeKernel):
+    """Windows, where another process holds every file named ``held``: the check's exclusive
+    open meets a sharing violation whatever that process shares, deletion included (decision
+    0016, item 1). Other files open and close."""
+
+    def __init__(self, held: str) -> None:
+        super().__init__()
+        self._held = held
+
+    def CreateFileW(
+        self,
+        name: str,
+        access: int,
+        share: int,
+        security: None,
+        disposition: int,
+        flags: int,
+        template: None,
+        /,
+    ) -> int:
+        self.error = SHARING_VIOLATION if ntpath.basename(name) == self._held else 0
+        return super().CreateFileW(name, access, share, security, disposition, flags, template)
