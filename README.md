@@ -194,7 +194,8 @@ On Linux, Qt needs a few system libraries; on Debian or Ubuntu:
 sudo apt-get install libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
 ```
 
-Without PySide6, `safeclean-ui` says which extra to install and exits with 3.
+Without PySide6, `safeclean-ui` says which extra to install and exits with 3; when Qt cannot
+load one of these libraries, it names the error and the libraries, and exits with 3 too.
 
 The sidebar opens six pages, with the open-file check and the local AI's model under them:
 
