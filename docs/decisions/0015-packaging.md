@@ -89,8 +89,10 @@ Windows can build is checked by CI there (items 21, 22).
    `py.typed`, the icons and their licence, and no test, document or other file; its entry
    points are those of 0014 item 8.
 9. **The sdist makes the same wheel**: it has `src`, `tests`, `docs`, `README.md`,
-   `CHANGELOG.md`, `LICENSE`, `pyproject.toml` and the `PKG-INFO` it is given, and nothing
-   else; the wheel built from it has the same files as the wheel built from the repository.
+   `CHANGELOG.md`, `LICENSE`, `pyproject.toml`, the `PKG-INFO` it is given and the
+   `.gitignore` hatchling adds to every sdist (a wheel made from the sdist leaves out what the
+   repository's leaves out), and nothing else; the wheel built from it has the same files as
+   the wheel built from the repository.
 10. **Installed from the wheel, offline**: in a new virtual environment,
     `pip install --no-index` of the wheel installs nothing else; `kresorter --version`,
     `kresorter scan --json` on a made-up tree and `kresorter-ui` without PySide6 (one line,

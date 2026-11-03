@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 from kresorter.core.scanner import ScanContext
-from support.artifacts import Built, build
+from support.artifacts import Built, Installed, build, install
 from support.cli import scan_context
 from support.live import guard
 
@@ -107,6 +107,12 @@ def no_live_system(
 def built(tmp_path_factory: pytest.TempPathFactory) -> Built:
     """The sdist, and the wheel built from it: once per run, offline (decision 0015)."""
     return build(tmp_path_factory.mktemp("built"))
+
+
+@pytest.fixture(scope="session")
+def installed(built: Built, tmp_path_factory: pytest.TempPathFactory) -> Installed:
+    """That wheel in a new virtual environment, offline: once per run (decision 0015)."""
+    return install(built.wheel, tmp_path_factory.mktemp("installed"))
 
 
 @pytest.fixture
