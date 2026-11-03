@@ -33,8 +33,8 @@ def test_the_extra_and_the_dev_dependencies() -> None:
     extras = project()["optional-dependencies"]
     assert isinstance(extras, dict)
     assert extras["ui"] == [QT]
-    assert QT in extras["dev"]
-    assert any(name.startswith("pytest-qt>=") for name in extras["dev"])
+    assert any(name.startswith("PySide6-Essentials==") for name in extras["dev"])
+    assert any(name.startswith("pytest-qt==") for name in extras["dev"])
     assert project()["dependencies"] == []
 
 
