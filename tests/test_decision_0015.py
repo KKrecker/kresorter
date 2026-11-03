@@ -1,4 +1,4 @@
-"""Every item of decision 0015 is cited by a test (item 24).
+"""Every item of decision 0015 is cited by a test (item 25).
 
 A test cites an item as ``[0015.N]`` in a comment or docstring. This file fails on an item no
 test cites unless it is still pending, on a citation of an item the decision does not have, and
@@ -6,7 +6,7 @@ on a pending item a test already cites. ``PENDING`` starts with every item and i
 the last commit of the step 8 plan of 0015: the commit that completes an item takes it out.
 
 The rules, those of ``support.decisions``, are checked on made-up items and citations first, so
-a wrong rule cannot pass in silence; that check is the test of item 24, and this file is
+a wrong rule cannot pass in silence; that check is the test of item 25, and this file is
 scanned like any other.
 """
 
@@ -24,12 +24,12 @@ from support.decisions import (
 
 DECISION = "0015"
 # Taken out by the commit that completes each item (the step 8 plan of 0015).
-COMPLETED: frozenset[int] = frozenset({24})
-PENDING: frozenset[int] = frozenset(range(1, 25)) - COMPLETED
+COMPLETED: frozenset[int] = frozenset({1, 25})
+PENDING: frozenset[int] = frozenset(range(1, 26)) - COMPLETED
 
 
 def test_the_rules_hold_on_made_up_items_and_citations() -> None:
-    # [0015.24]
+    # [0015.25]
     assert wrong_rules(DECISION) == []
 
 
