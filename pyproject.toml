@@ -8,8 +8,36 @@ dynamic = ["version"]
 description = "Safe, local-first file cleanup analyzer: report first, quarantine, delete only after confirmation."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+# The licence and the metadata (decision 0015, items 5 and 7): an SPDX expression and its files
+# (PEP 639), no licence classifier; Windows and Linux, no macOS.
+license = "MIT"
+license-files = ["LICENSE", "src/kresorter/ui/icons/LICENSE"]
+authors = [{ name = "KKrecker" }]
+keywords = ["cleanup", "duplicates", "files", "organizer", "quarantine", "autostart"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Filesystems",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/KKrecker/kresorter"
+Source = "https://github.com/KKrecker/kresorter"
+Issues = "https://github.com/KKrecker/kresorter/issues"
+Changelog = "https://github.com/KKrecker/kresorter/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 # The desktop window (decision 0014); the core needs nothing.

@@ -254,4 +254,7 @@ Decisions are logged in [`docs/decisions/`](docs/decisions/); the plan is in [`d
 
 ## License
 
-MIT
+Kresorter is under the MIT licence, held by KKrecker: [`LICENSE`](LICENSE). The window's icons
+are Lucide's, under the ISC licence:
+[`src/kresorter/ui/icons/LICENSE`](src/kresorter/ui/icons/LICENSE). Both files are in the wheel
+and the sdist.
