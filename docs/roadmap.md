@@ -37,8 +37,9 @@ Scanner core and `kresorter scan` (read-only report).
   can act.
 - **Parallel runs: solved** by the single-instance lock (0009, addendum); `scan` takes no lock
   because it never touches the data directory.
-- **Rename race:** the `CONFLICT` check and `Path.replace` are two steps; no no-replace rename
-  in the standard library (0007).
+- **Rename race, Linux only:** the `CONFLICT` check and the rename are two steps; no
+  no-replace rename in the standard library (0007). On Windows `Path.rename` refuses a file
+  that arrived in between (0016).
 - **Empty operation directories stay in the vault** (0008): removing them would need a second
   deletion point.
 - **Purge plans live in memory only**: plan and confirmation happen in one process (0008).

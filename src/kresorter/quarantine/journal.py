@@ -88,6 +88,6 @@ def probe(path: Path, size: int, mtime_ns: int) -> Copy:
 def exists(path: Path) -> bool:
     try:
         path.lstat()
-    except FileNotFoundError:
+    except (FileNotFoundError, NotADirectoryError):  # the latter: a parent is a file now
         return False
     return True

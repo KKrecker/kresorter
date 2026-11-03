@@ -15,10 +15,12 @@ overwrites (``CONFLICT``), recreates missing parent directories, refuses a paren
 contains a link, and treats a missing or changed vault copy as ``lost``. Items are independent:
 one failure does not undo the others (unlike the atomic quarantine batch, decision 0007).
 
-Race window: the ``CONFLICT`` check and the rename are two steps, and ``Path.replace``
-overwrites. A file created at the original path in between would be replaced. The standard
-library offers no no-replace rename (``renameat2(RENAME_NOREPLACE)``); the window is accepted
-and kept as short as possible: the check runs immediately before the move.
+Race window: the ``CONFLICT`` check and the rename are two steps. Every move is a
+``Path.rename`` (decision 0016, item 8). On Windows it fails with ``FileExistsError`` where a
+file already is, so a newcomer between the check and the move is a ``CONFLICT`` too and is
+never replaced. On Linux ``rename(2)`` overwrites, and the standard library offers no
+no-replace rename (``renameat2(RENAME_NOREPLACE)``); there the window is accepted and kept as
+short as possible: the check runs immediately before the move.
 
 ``plan_purge()`` reads the journal only and returns a plan to confirm; ``purge()`` accepts that
 exact plan once, from the service that issued it, and deletes vault copies through
@@ -196,7 +198,7 @@ class QuarantineService:
         policy: PathPolicy,
         open_files: OpenFileChecker,
         classifier: JunkClassifier,
-        move: Move = Path.replace,
+        move: Move = Path.rename,
         vault: Vault | None = None,
         delete: Delete = delete_from_vault,
         now: Clock = time.time_ns,
@@ -412,7 +414,12 @@ class QuarantineService:
             item.slot.chmod(stat.S_IMODE(item.mode))
             atime_ns = item.atime_ns if item.atime_ns is not None else item.slot.lstat().st_atime_ns
             os.utime(item.slot, ns=(atime_ns, item.mtime_ns))
+        except OSError as error:
+            return RestoreRefused(item.item_id, RestoreRefusal.MOVE_FAILED, str(error))
+        try:
             self._move(item.slot, item.original)
+        except FileExistsError:  # Windows: something arrived after the check; never replaced
+            return RestoreRefused(item.item_id, RestoreRefusal.CONFLICT, str(item.original))
         except OSError as error:
             return RestoreRefused(item.item_id, RestoreRefusal.MOVE_FAILED, str(error))
         self._set_item(item.item_id, ItemState.RESTORED)
