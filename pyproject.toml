@@ -37,6 +37,8 @@ testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 addopts = "-ra --strict-markers --cov=safeclean --cov-branch --cov-report=term-missing --cov-fail-under=100"
 qt_api = "pyside6"
+# A deprecation fails the tests when it is announced (pre-step-8 audit, A3).
+filterwarnings = ["error"]
 
 [tool.coverage.run]
 source = ["safeclean"]
