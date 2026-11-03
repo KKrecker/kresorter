@@ -31,10 +31,27 @@ class LockBackend(Protocol):
     def unlock(self, fd: int) -> None: ...
 
 
-class FlockBackend:
-    def try_lock(self, fd: int) -> bool:
-        import fcntl
+class _Fcntl(Protocol):
+    LOCK_EX: int
+    LOCK_NB: int
+    LOCK_UN: int
 
+    def flock(self, fd: int, operation: int, /) -> None: ...
+
+
+class FlockBackend:
+    """Locks the whole file; ``fcntl`` is imported only when used, as ``msvcrt`` is."""
+
+    def __init__(self, module: _Fcntl | None = None) -> None:
+        self._module = module
+
+    def _fcntl(self) -> _Fcntl:
+        if self._module is None:
+            self._module = cast("_Fcntl", importlib.import_module("fcntl"))
+        return self._module
+
+    def try_lock(self, fd: int) -> bool:
+        fcntl = self._fcntl()
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -42,8 +59,7 @@ class FlockBackend:
         return True
 
     def unlock(self, fd: int) -> None:
-        import fcntl
-
+        fcntl = self._fcntl()
         fcntl.flock(fd, fcntl.LOCK_UN)
 
 
