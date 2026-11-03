@@ -4,7 +4,9 @@ Never follows symlinks/junctions, prunes blacklisted directories, reports every 
 reason and keeps going after errors. OS failures are injected by patching ``os.scandir``.
 """
 
+import contextlib
 import os
+import stat
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -15,7 +17,10 @@ from fakes import FakeOpenFiles, make_policy
 from kresorter.core.models import FileEntry, Skipped, SkipReason
 from kresorter.core.policy import BlockReason
 from kresorter.core.walker import walk
-from support.host import make_fifo
+from support.host import MTIME_STEP_NS, make_fifo
+
+# A float st_mtime cannot carry it: the smallest step above a round second the system keeps.
+STAMP = 1_000_000_000_000_000_000 + MTIME_STEP_NS
 
 
 def write(path: Path, data: bytes = b"x") -> Path:
@@ -41,12 +46,12 @@ def test_yields_nested_files_with_size_and_mtime_ns(tmp_path: Path) -> None:
     root = tmp_path / "root"
     a = write(root / "a.txt", b"hello")
     b = write(root / "sub" / "deep" / "b.bin", b"12")
-    os.utime(a, ns=(1_000_000_000_000_000_001, 1_000_000_000_000_000_001))
+    os.utime(a, ns=(STAMP, STAMP))
 
     events = run(tmp_path, [root])
 
     assert events == [
-        FileEntry(path=a, size=5, mtime_ns=1_000_000_000_000_000_001),
+        FileEntry(path=a, size=5, mtime_ns=STAMP),
         FileEntry(path=b, size=2, mtime_ns=b.stat().st_mtime_ns),
     ]
 
@@ -146,6 +151,43 @@ def test_special_files_are_skipped(tmp_path: Path) -> None:
     make_fifo(fifo)
 
     assert run(tmp_path, [root]) == [Skipped(path=fifo, reason=SkipReason.SPECIAL)]
+
+
+class SpecialEntry:
+    """A directory entry whose stat says it is a FIFO: on every system, Windows too, which has
+    none (decision 0015, item 20)."""
+
+    def __init__(self, entry: os.DirEntry[str]) -> None:
+        self.name = entry.name
+        self.path = entry.path
+        self._entry = entry
+
+    def is_symlink(self) -> bool:
+        return False
+
+    def is_dir(self, *, follow_symlinks: bool = True) -> bool:
+        return False
+
+    def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
+        real = self._entry.stat(follow_symlinks=follow_symlinks)
+        return os.stat_result((stat.S_IFIFO | 0o644, *tuple(real)[1:]), {})
+
+
+def test_an_entry_that_says_it_is_special_is_skipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0015.20] what is neither a file, a directory nor a link
+    root = tmp_path / "root"
+    pipe = write(root / "pipe")
+    real = os.scandir
+
+    @contextlib.contextmanager
+    def listing(path: Any) -> Iterator[list[Any]]:
+        with real(path) as entries:
+            yield [SpecialEntry(entry) for entry in entries]
+
+    monkeypatch.setattr(os, "scandir", listing)
+    assert run(tmp_path, [root]) == [Skipped(path=pipe, reason=SkipReason.SPECIAL)]
 
 
 def failing_scandir(

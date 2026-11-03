@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from fakes import BrokenOpenFiles, FakeOpenFiles, make_policy
+from fakes import BrokenOpenFiles, FakeOpenFiles, deny_stat, make_policy
 from kresorter.core.hashing import hash_file
 from kresorter.core.models import FileEntry
 from kresorter.core.open_files import NoOpenFileCheck
@@ -23,7 +23,7 @@ from kresorter.core.preflight import (
     UnreliableCheckerError,
 )
 from support.files import write
-from support.host import make_fifo
+from support.host import MTIME_STEP_NS, make_fifo, posix_only
 
 # --- helpers -----------------------------------------------------------------------------------
 
@@ -150,10 +150,11 @@ def test_size_change_is_refused(preflight: Preflight, zone: Path) -> None:
 
 def test_mtime_change_is_refused(preflight: Preflight, zone: Path) -> None:
     entry = scanned(write(zone / "a.bin"))
-    os.utime(entry.path, ns=(entry.mtime_ns, entry.mtime_ns + 1))  # one nanosecond is enough
+    os.utime(entry.path, ns=(entry.mtime_ns, entry.mtime_ns + MTIME_STEP_NS))  # one step is enough
     assert refusal(preflight.check(Candidate(entry=entry))) is RefusalReason.CHANGED
 
 
+@posix_only("on Windows a path through a file is not found")
 def test_unreadable_path_is_refused_with_detail(preflight: Preflight, zone: Path) -> None:
     # Parent directory replaced by a regular file: lstat fails with ENOTDIR.
     entry = scanned(write(zone / "dir" / "a.bin"))
@@ -163,6 +164,18 @@ def test_unreadable_path_is_refused_with_detail(preflight: Preflight, zone: Path
     assert refusal(result) is RefusalReason.UNREADABLE
     assert isinstance(result, Refused)
     assert result.detail
+
+
+def test_a_path_that_cannot_be_read_is_refused_with_detail(
+    preflight: Preflight, zone: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0015.20] on every system: a directory above it that cannot be searched
+    entry = scanned(write(zone / "dir" / "a.bin"))
+    deny_stat(monkeypatch, entry.path)
+    result = preflight.check(Candidate(entry=entry))
+    assert refusal(result) is RefusalReason.UNREADABLE
+    assert isinstance(result, Refused)
+    assert result.detail == "Permission denied"
 
 
 # --- parent swapped for a link -----------------------------------------------------------------
@@ -210,7 +223,7 @@ def test_twin_with_new_mtime_is_refused(
     preflight: Preflight, pair: tuple[FileEntry, FileEntry, str]
 ) -> None:
     entry, twin, digest = pair
-    os.utime(twin.path, ns=(twin.mtime_ns, twin.mtime_ns + 1))
+    os.utime(twin.path, ns=(twin.mtime_ns, twin.mtime_ns + MTIME_STEP_NS))
     result = preflight.check(Candidate(entry=entry, twin=twin, digest=digest))
     assert refusal(result) is RefusalReason.TWIN_CHANGED
 
@@ -263,7 +276,7 @@ def test_policy_is_checked_before_the_disk(tmp_path: Path) -> None:
 def test_open_file_check_runs_last(policy: PathPolicy, zone: Path) -> None:
     open_files = FakeOpenFiles()
     entry = scanned(write(zone / "a.bin"))
-    os.utime(entry.path, ns=(entry.mtime_ns, entry.mtime_ns + 1))
+    os.utime(entry.path, ns=(entry.mtime_ns, entry.mtime_ns + MTIME_STEP_NS))
     result = Preflight(policy, open_files).check(Candidate(entry=entry))
     assert refusal(result) is RefusalReason.CHANGED
     assert open_files.calls == []

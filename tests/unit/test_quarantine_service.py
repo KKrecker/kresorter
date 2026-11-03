@@ -28,7 +28,7 @@ from kresorter.quarantine.service import QuarantineError, QuarantineService
 from kresorter.quarantine.vault import Vault
 from kresorter.storage.db import connect
 from support.files import write
-from support.host import as_kept
+from support.host import MTIME_STEP_NS, as_kept
 from support.journal import rows
 
 NO_RULES = JunkClassifier([], platform="linux")
@@ -521,7 +521,7 @@ def test_rollback_where_the_rename_refuses_a_newcomer_keeps_the_item_quarantined
 # --- recover -----------------------------------------------------------------------------------
 
 JOURNAL_SIZE = 7  # len(b"payload")
-JOURNAL_MTIME_NS = 1
+JOURNAL_MTIME_NS = 1_000_000_000_000_000_000  # kept as it is by every system (NTFS: 100 ns)
 
 
 def vault_file(slot: Path, data: bytes = b"payload", mtime_ns: int = JOURNAL_MTIME_NS) -> Path:
@@ -603,7 +603,7 @@ def test_recover_reports_a_vault_copy_with_another_mtime_as_lost(
     service: QuarantineService, conn: sqlite3.Connection, zone: Path, data_dir: Path
 ) -> None:
     slot = pending_item(conn, Vault(data_dir), zone / "a.bin")
-    vault_file(slot, mtime_ns=JOURNAL_MTIME_NS + 1)
+    vault_file(slot, mtime_ns=JOURNAL_MTIME_NS + MTIME_STEP_NS)
 
     assert service.recover().lost == (zone / "a.bin",)
 
