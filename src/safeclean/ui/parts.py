@@ -23,6 +23,7 @@ from PySide6.QtCore import (
     QPersistentModelIndex,
     QPoint,
     QRect,
+    QRectF,
     QSize,
     Qt,
 )
@@ -38,6 +39,7 @@ from PySide6.QtGui import (
     QPen,
 )
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QAbstractItemView,
     QCheckBox,
     QComboBox,
@@ -65,10 +67,13 @@ __all__ = [
     "CHECK",
     "EMPHASIS",
     "GRID",
+    "INITIAL",
     "PAGE_MARGIN",
     "QUIET",
     "ROW_HEIGHT",
     "SECONDARY",
+    "SWITCH_SIZE",
+    "TILE",
     "CheckBox",
     "Choice",
     "Field",
@@ -76,6 +81,7 @@ __all__ = [
     "Icon",
     "Note",
     "RowDelegate",
+    "Switch",
     "badge",
     "badge_colours",
     "bar",
@@ -91,6 +97,7 @@ __all__ = [
     "page",
     "paint_check",
     "rows",
+    "secondary_ink",
     "shares",
     "surface2_tile",
     "text_ink",
@@ -107,7 +114,10 @@ _ROLE = Qt.ItemDataRole.UserRole + 32
 SECONDARY = _ROLE  # a row's line of secondary text, under its name
 EMPHASIS = _ROLE + 1  # a cell's text in semibold
 QUIET = _ROLE + 2  # a cell's text in secondary text
-BADGE = _ROLE + 3  # a cell drawn as a badge: a level's value, or "danger"
+BADGE = _ROLE + 3  # a cell drawn as a badge: a level's value, "advisory" or "danger"
+INITIAL = _ROLE + 4  # a cell's tile at its left, with an initial on it
+TILE = 32  # px: the side of a cell's tile
+SWITCH_SIZE = QSize(40, 24)  # a switch: its track and, around it, its focus ring
 
 _PAD = 12  # a cell's padding at its sides
 _LINE_GAP = 2
@@ -207,6 +217,11 @@ def text_ink(palette: Palette) -> str:
     return palette.text
 
 
+def secondary_ink(palette: Palette) -> str:
+    """An icon in secondary text's colour."""
+    return palette.secondary
+
+
 def surface2_tile(palette: Palette) -> str:
     """An icon's tile, on surface 2."""
     return palette.surface2
@@ -235,7 +250,7 @@ def dot(kind: str) -> QFrame:
 
 
 def badge(text: str, kind: str) -> QLabel:
-    """A pill: a level's value, or ``danger``."""
+    """A pill: a level's value, ``advisory`` or ``danger``."""
     label = QLabel(text)
     label.setProperty("badge", kind)
     label.setFixedHeight(BADGE_HEIGHT)
@@ -330,6 +345,53 @@ class Choice(QComboBox):
         colour = self._look.palette.secondary
         drawn = icons.pixmap("chevron-down", colour, 16, self.devicePixelRatioF())
         painter.drawPixmap(QPoint(self.width() - 24, (self.height() - 16) // 2), drawn)
+        painter.end()
+
+
+class Switch(QAbstractButton):
+    """A switch, named ``name``: on, its track on the accent and its knob at the right; off,
+    on the border colour with its knob at the left; disabled, at half strength; focused, in a
+    ring of the accent. A click, or Space, asks to turn it (``clicked``): it turns only when it
+    is set, once what it stands for has turned."""
+
+    def __init__(self, look: Look, name: str) -> None:
+        super().__init__()
+        self._look = look
+        self.setCheckable(True)
+        self.setAccessibleName(name)
+        self.setFixedSize(SWITCH_SIZE)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        look.changed.connect(self.update)
+
+    def nextCheckState(self) -> None:
+        """A click does not turn it."""
+
+    def colours(self) -> tuple[str, str]:
+        """Its track's colour and its knob's, in the palette in use."""
+        palette = self._look.palette
+        if self.isChecked():
+            return palette.accent, palette.primary_text
+        return palette.border, palette.canvas
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        track_colour, knob_colour = self.colours()
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.isEnabled():
+            painter.setOpacity(0.5)
+        track = QRectF(self.rect()).adjusted(2, 2, -2, -2)
+        radius = track.height() / 2
+        if self.hasFocus():
+            painter.setPen(QPen(QColor(self._look.palette.accent), 1))
+            ring = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+            painter.drawRoundedRect(ring, radius + 2, radius + 2)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(track_colour))
+        painter.drawRoundedRect(track, radius, radius)
+        side = track.height() - 4
+        left = track.right() - 2 - side if self.isChecked() else track.left() + 2
+        painter.setBrush(QColor(knob_colour))
+        painter.drawEllipse(QRectF(left, track.top() + 2, side, side))
         painter.end()
 
 
@@ -471,7 +533,12 @@ def cell_colours(
 
 
 def badge_colours(kind: str, palette: Palette) -> Badge:
-    return palette.danger_badge if kind == "danger" else palette.badges[Level(kind)]
+    """A badge's colours: ``danger``'s, ``advisory``'s (the text on surface 2) or a level's."""
+    if kind == "danger":
+        return palette.danger_badge
+    if kind == "advisory":
+        return Badge(palette.text, palette.surface2)
+    return palette.badges[Level(kind)]
 
 
 _Index = QModelIndex | QPersistentModelIndex
@@ -507,6 +574,9 @@ class RowDelegate(QStyledItemDelegate):
             height += _LINE_GAP + QFontMetrics(smaller).height()
         if index.data(Qt.ItemDataRole.CheckStateRole) is not None:
             width += CHECK + _PAD
+        if index.data(INITIAL):
+            width += TILE + _PAD
+            height = max(height, TILE)
         return QSize(width + 2 * _PAD, max(ROW_HEIGHT, height + 2 * _PAD))
 
     def check_box(self, option: QStyleOptionViewItem, index: _Index) -> QRect | None:
@@ -533,6 +603,11 @@ class RowDelegate(QStyledItemDelegate):
             state = Qt.CheckState(index.data(Qt.ItemDataRole.CheckStateRole))
             paint_check(painter, box, state, palette)
             left = box.right() + 1 + _PAD
+        initial = index.data(INITIAL)
+        if initial:
+            tile = QRect(left, rect.center().y() - TILE // 2 + 1, TILE, TILE)
+            self._paint_tile(painter, tile, str(initial), option)
+            left = tile.right() + 1 + _PAD
         space = QRect(left, rect.top(), rect.right() + 1 - _PAD - left, rect.height())
         kind = index.data(BADGE)
         if kind:
@@ -542,6 +617,21 @@ class RowDelegate(QStyledItemDelegate):
         else:
             self._paint_text(painter, space, option, index)
         painter.restore()
+
+    def _paint_tile(
+        self, painter: QPainter, tile: QRect, initial: str, option: QStyleOptionViewItem
+    ) -> None:
+        """The cell's tile on surface 2 (radius 8), its initial in semibold on it."""
+        palette = self._look.palette
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(palette.surface2))
+        painter.drawRoundedRect(tile, 8, 8)
+        font = QFont(option.font)
+        font.setWeight(QFont.Weight.DemiBold)
+        painter.setFont(font)
+        painter.setPen(QColor(palette.text))
+        painter.drawText(tile, int(Qt.AlignmentFlag.AlignCenter), initial)
 
     def _paint_badge(
         self, painter: QPainter, space: QRect, text: str, kind: str, option: QStyleOptionViewItem

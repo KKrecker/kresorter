@@ -328,11 +328,12 @@ CATALOG: dict[str, dict[str, str]] = {
     "task.plan_undo": {"en": "Planning the undo", "ru": "Подготовка возврата"},
     "task.undo": {"en": "Moving files back", "ru": "Возврат файлов"},
     "autostart.entries": {"en": "Autostart entries", "ru": "Записи автозагрузки"},
-    "autostart.name": {"en": "Name", "ru": "Название"},
-    "autostart.state": {"en": "State", "ru": "Состояние"},
-    "autostart.scope": {"en": "Scope", "ru": "Область"},
-    "autostart.location": {"en": "Location", "ru": "Расположение"},
-    "autostart.group": {"en": "{source}: {n}", "ru": "{source}: {n}"},
+    "autostart.search": {"en": "Search entries", "ru": "Поиск записей"},
+    "autostart.group": {"en": "{source} · {entries}", "ru": "{source} · {entries}"},
+    "autostart.locked": {
+        "en": "Listed only: safeclean does not change this entry",
+        "ru": "Только для просмотра: safeclean не меняет эту запись",
+    },
     "autostart.total": {
         "en": "{entries}, {disabled} disabled",
         "ru": "{entries}, отключено: {disabled}",
@@ -343,8 +344,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "{source}: {location} ({detail})",
     },
     "autostart.refresh": {"en": "Refresh", "ru": "Обновить"},
-    "autostart.disable": {"en": "Disable…", "ru": "Отключить…"},
-    "autostart.enable": {"en": "Enable…", "ru": "Включить…"},
     "autostart.unchecked": {
         "en": "An unfinished autostart change cannot be checked: {detail}. Fix or move what is"
         " there, then use Recover again.",

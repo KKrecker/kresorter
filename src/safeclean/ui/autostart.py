@@ -1,25 +1,30 @@
-"""The Autostart page: the entries grouped by source, Disable and Enable after confirmation
-(decision 0014, items 3, 13, 24, 26 and 37).
+"""The Autostart page: the entries grouped by source, each turned by its switch after
+confirmation (decision 0014, items 3, 13, 24, 26, 37 and 53).
 
 The entries are read each time the page opens, and on Refresh, as ``autostart list`` reads them:
 nothing is opened, created or changed. On Windows the machine scope is read only when the setting
 says so (``ui.settings``), as ``--include-machine`` reads it, and otherwise the page says what was
-not read. Each group names its source and its count; each entry shows its state, scope and location,
-and the detail of the selected entry its command, the system entry it replaces and its conditions,
-with Explain (local AI) (``ui.explain``). Disable or Enable is offered for an entry that can change
-(``disableable``) and is not in that state already; the confirmation says what is written, as
-``autostart disable`` without ``--yes`` does. Confirmed, the change runs in a session
-(``ui.sessions``) that recovers autostart's own unfinished changes first, and its changer refuses an
-entry that is no longer the one listed. The result says done, refused, rolled back or failed; a
-failed change, and one left unfinished, names Recover, which the banner offers.
+not read. A section per source names it and its count; a row per entry has a tile with its
+initial, its name and under it its location (from the home folder as ``~``), its scope as a
+badge and a switch that is on when it starts. The search field in the head keeps the entries
+whose name or location contains its text, ignoring case. The detail of the selected entry, under
+the list, has its command, the system entry it replaces and its conditions, with Explain (local
+AI) (``ui.explain``). The switch of an entry that can change (``disableable``) asks to disable or
+enable it; the confirmation says what is written, as ``autostart disable`` without ``--yes``
+does. The switch of one that cannot has a lock and does not turn. Confirmed, the change runs in a
+session (``ui.sessions``) that recovers autostart's own unfinished changes first, and its changer
+refuses an entry that is no longer the one listed. The result says done, refused, rolled back or
+failed; a failed change, and one left unfinished, names Recover, which the banner offers. No
+switch turns while a task runs.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtWidgets import QHeaderView, QLabel, QTreeWidget, QTreeWidgetItem, QWidget
 
 from safeclean.autostart.journal import ChangeResult, ChangeState
 from safeclean.autostart.listing import AutostartContext, list_autostart
@@ -29,7 +34,24 @@ from safeclean.storage.pending import Domain
 from safeclean.storage.session import SessionFailed
 from safeclean.ui.dialogs import Confirmation
 from safeclean.ui.explain import ExplainPanel
-from safeclean.ui.parts import Head, Note, button, hbox, page, rows
+from safeclean.ui.parts import (
+    BADGE,
+    EMPHASIS,
+    INITIAL,
+    QUIET,
+    SECONDARY,
+    SWITCH_SIZE,
+    Field,
+    Head,
+    Icon,
+    Note,
+    Switch,
+    button,
+    hbox,
+    page,
+    rows,
+    secondary_ink,
+)
 from safeclean.ui.recovery import autostart_lines
 from safeclean.ui.sessions import (
     Action,
@@ -39,15 +61,18 @@ from safeclean.ui.sessions import (
     Unfinished,
     change_entry,
 )
+from safeclean.ui.shown import shown_path
 from safeclean.ui.tasks import Task
 
 if TYPE_CHECKING:
     from safeclean.ui.window import Window
 
-__all__ = ["AutostartPage"]
+__all__ = ["SEARCH_WIDTH", "SWITCH_COLUMN", "AutostartPage"]
 
 _INDEX = Qt.ItemDataRole.UserRole  # an entry's place in the listing
-_COLUMNS = ("name", "state", "scope", "location")
+_ENTRY, _SCOPE, _SWITCH = range(3)  # the columns
+SEARCH_WIDTH = 240  # px: the search field in the head
+SWITCH_COLUMN = 16 + 8 + SWITCH_SIZE.width() + 12  # px: a lock, the switch, the cell's padding
 
 
 class AutostartPage(QWidget):
@@ -56,15 +81,29 @@ class AutostartPage(QWidget):
         self._window = window
         self._items: tuple[AutostartItem, ...] = ()
         self._rows: list[QTreeWidgetItem] = []
+        self._switches: list[tuple[Switch, AutostartItem]] = []
+        self._groups: list[QTreeWidgetItem] = []
         self._windows = window.environment.autostart_context().platform == "windows"
         text = window.translator.text
 
         look = window.look
+        self.search = Field(look, text("autostart.search"), "search")
+        self.search.setFixedWidth(SEARCH_WIDTH)
+        self.search.textChanged.connect(self._filter)
         self.entries = QTreeWidget()
         rows(self.entries, look)
         self.entries.setAccessibleName(text("autostart.entries"))
-        self.entries.setColumnCount(len(_COLUMNS))
-        self.entries.setHeaderLabels([text(f"autostart.{name}") for name in _COLUMNS])
+        self.entries.setColumnCount(3)
+        self.entries.setHeaderHidden(True)
+        self.entries.setRootIsDecorated(False)
+        self.entries.setItemsExpandable(False)
+        self.entries.setIndentation(0)
+        header = self.entries.header()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(_ENTRY, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(_SCOPE, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(_SWITCH, QHeaderView.ResizeMode.Fixed)
+        header.resizeSection(_SWITCH, SWITCH_COLUMN)
         self.entries.itemSelectionChanged.connect(self._selected)
         self.total = Note(self, role="secondary")
         self.machine = QLabel(text("autostart.machine"))
@@ -73,43 +112,36 @@ class AutostartPage(QWidget):
         self.skipped = Note(self, role="secondary")
         self.detail = Note(self)
         self.explain = ExplainPanel(window)
+        self.explain.hide()  # until an entry is selected
         self.refresh_button = button(look, text("autostart.refresh"), icon="refresh-cw")
         self.refresh_button.clicked.connect(self.load)
-        self.disable_button = button(look, text("autostart.disable"))
-        self.disable_button.clicked.connect(lambda: self._confirm("disable"))
-        self.enable_button = button(look, text("autostart.enable"))
-        self.enable_button.clicked.connect(lambda: self._confirm("enable"))
         self.result = Note(self)
 
-        buttons = hbox(spacing=8)
-        buttons.addStretch(1)
-        buttons.addWidget(self.disable_button)
-        buttons.addWidget(self.enable_button)
-        head = Head(text("page.autostart"), text("head.autostart"), self.refresh_button)
+        head = Head(
+            text("page.autostart"), text("head.autostart"), self.search, self.refresh_button
+        )
         layout = page(self, head)
         layout.addWidget(self.entries, 1)
+        layout.addWidget(self.detail)
+        layout.addWidget(self.explain)
+        layout.addWidget(self.result)
         layout.addWidget(self.total)
         layout.addWidget(self.machine)
         layout.addWidget(self.skipped)
-        layout.addWidget(self.detail)
-        layout.addWidget(self.explain)
-        layout.addLayout(buttons)
-        layout.addWidget(self.result)
         window.add_starter(self.refresh_button)
-        window.add_starter(self.disable_button, lambda: self._can("disable"))
-        window.add_starter(self.enable_button, lambda: self._can("enable"))
+        window.tasks.busy.connect(self._busy)
 
     def row(self, name: str) -> QTreeWidgetItem:
         """The first entry named ``name``."""
-        return next(row for row in self._rows if row.text(0) == name)
+        return next(row for row in self._rows if row.text(_ENTRY) == name)
+
+    def switch(self, name: str) -> Switch:
+        """The switch of the first entry named ``name``."""
+        return next(made for made, item in self._switches if item.name == name)
 
     def selected(self) -> AutostartItem | None:
         rows = self.entries.selectedItems()
         return self._item(rows[0]) if rows else None
-
-    def _can(self, action: Action) -> bool:
-        item = self.selected()
-        return item is not None and item.disableable and item.enabled is (action == "disable")
 
     # --- the listing ---------------------------------------------------------------------------
 
@@ -130,13 +162,14 @@ class AutostartPage(QWidget):
         window.run(Task(window.translator.text("task.autostart"), work, done))
 
     def _list(self, listing: AutostartListing, machine: bool) -> None:
-        """Show ``listing``, grouped by source, read with the machine scope when ``machine``;
-        the entry selected stays selected while one of the same source and name is there."""
+        """Show ``listing``, a section per source, read with the machine scope when
+        ``machine``; the entry selected stays selected while one of the same source and name is
+        there."""
         translator = self._window.translator
         text = translator.text
         chosen = self.selected()
         self.entries.clear()
-        self._items, self._rows = listing.items, []
+        self._items, self._rows, self._switches = listing.items, [], []
         groups: dict[Source, QTreeWidgetItem] = {}
         for index, item in enumerate(listing.items):
             group = groups.get(item.source)
@@ -145,14 +178,22 @@ class AutostartPage(QWidget):
                 group.setFlags(Qt.ItemFlag.ItemIsEnabled)
                 group.setFirstColumnSpanned(True)
                 group.setExpanded(True)
-            row = QTreeWidgetItem(group, self._cells(item))
-            row.setData(0, _INDEX, index)
+                group.setData(_ENTRY, EMPHASIS, True)
+                group.setData(_ENTRY, QUIET, True)
+            row = QTreeWidgetItem(group, [item.name, translator.label(item.scope)])
+            row.setData(_ENTRY, _INDEX, index)
+            row.setData(_ENTRY, EMPHASIS, True)
+            row.setData(_ENTRY, SECONDARY, shown_path(Path(item.location), Path.home()))
+            row.setData(_ENTRY, INITIAL, item.name[:1].upper())
+            row.setToolTip(_ENTRY, item.location)
+            row.setData(_SCOPE, BADGE, "advisory")
+            self.entries.setItemWidget(row, _SWITCH, self._switch(item, row))
             self._rows.append(row)
+        self._groups = list(groups.values())
         for source, group in groups.items():
-            found = group.childCount()
-            group.setText(0, text("autostart.group", source=translator.label(source), n=found))
-        for column in range(self.entries.columnCount()):
-            self.entries.resizeColumnToContents(column)
+            entries = translator.count("entry", group.childCount())
+            named = translator.label(source)
+            group.setText(_ENTRY, text("autostart.group", source=named, entries=entries))
         entries = translator.count("entry", len(listing.items))
         disabled = sum(not item.enabled for item in listing.items)
         self.total.setText(text("autostart.total", entries=entries, disabled=disabled))
@@ -172,19 +213,54 @@ class AutostartPage(QWidget):
         again = [row for row in self._rows if chosen is not None and _same(self._item(row), chosen)]
         if again:
             again[0].setSelected(True)
-        self._window.update_starters()
+        self._filter()
 
-    def _cells(self, item: AutostartItem) -> list[str]:
-        translator = self._window.translator
-        state = translator.text("entry.enabled" if item.enabled else "entry.disabled")
-        return [item.name, state, translator.label(item.scope), item.location]
+    def _switch(self, item: AutostartItem, row: QTreeWidgetItem) -> QWidget:
+        """The entry's switch, on when it starts, and the lock of an entry that cannot change."""
+        window = self._window
+        text = window.translator.text
+        holder = QWidget()
+        layout = hbox(holder, margins=(0, 0, 12, 0), spacing=8)
+        layout.addStretch(1)
+        if not item.disableable:
+            lock = Icon(window.look, "lock", secondary_ink)
+            lock.setToolTip(text("autostart.locked"))
+            layout.addWidget(lock)
+        made = Switch(window.look, item.name)
+        made.setChecked(item.enabled)
+        made.setToolTip(text("entry.enabled" if item.enabled else "entry.disabled"))
+        made.setEnabled(item.disableable and window.tasks.running is None)
+        made.clicked.connect(lambda _=False: self._turn(row))
+        layout.addWidget(made)
+        self._switches.append((made, item))
+        return holder
+
+    def _busy(self, running: bool) -> None:
+        """No switch turns while a task runs."""
+        for made, item in self._switches:
+            made.setEnabled(item.disableable and not running)
+
+    def _filter(self) -> None:
+        """Keep the entries whose name or location contains the search's text, ignoring case,
+        and the sections that keep one; an entry put away is no longer selected."""
+        needle = self.search.text().casefold()
+        for row in self._rows:
+            item = self._item(row)
+            away = needle not in item.name.casefold() and needle not in item.location.casefold()
+            row.setHidden(away)
+            if away:
+                row.setSelected(False)
+        for group in self._groups:
+            kept = [row for row in self._rows if row.parent() is group]
+            group.setHidden(all(row.isHidden() for row in kept))
 
     def _item(self, row: QTreeWidgetItem) -> AutostartItem:
-        return self._items[int(row.data(0, _INDEX))]
+        return self._items[int(row.data(_ENTRY, _INDEX))]
 
     def _selected(self) -> None:
         item = self.selected()
         self.detail.setText("" if item is None else "\n".join(self._detail(item)))
+        self.explain.setHidden(item is None)
         self.explain.show_for(item)
 
     def _detail(self, item: AutostartItem) -> list[str]:
@@ -197,11 +273,16 @@ class AutostartPage(QWidget):
 
     # --- a change ------------------------------------------------------------------------------
 
-    def _confirm(self, action: Action) -> None:
+    def _turn(self, row: QTreeWidgetItem) -> None:
+        """The entry's switch was clicked: select the entry, and ask to turn it."""
+        self.entries.clearSelection()
+        row.setSelected(True)
+        item = self._item(row)
+        self._confirm("disable" if item.enabled else "enable", item)
+
+    def _confirm(self, action: Action, item: AutostartItem) -> None:
         window, translator = self._window, self._window.translator
         text = translator.text
-        [row] = self.entries.selectedItems()  # enabled with one entry selected, the most there is
-        item = self._item(row)
         context = window.environment.autostart_context()
         named = {"name": item.name, "source": translator.label(item.source)}
         asked = Confirmation(
