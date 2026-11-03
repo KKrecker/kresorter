@@ -120,6 +120,7 @@ def _move(
         detail = f" ({no.detail})" if no.detail else ""
         _write(out, [f"Refused: {folder}: {no.reason}{detail}"])
         return 1
+    folder = found.folder  # on Windows, as the system spells it (decision 0017, item 12)
     shown.extend(found.stays)
     stays = _stays(found.stays, folder)
     if not found.moves:

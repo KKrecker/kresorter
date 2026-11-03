@@ -1,8 +1,9 @@
 """Where organize moves files (decision 0012, items 37-39), and how it renames there (0017).
 
 A blocker is a reason organize does not move files on a system. ``no_open_file_check`` comes
-from the open-file checker; the others belong to the system and are pinned in ``_SYSTEM``.
-Removing one is a decision of its own; the reasons are in the decision, not here.
+from the open-file checker; ``cloud_sync`` belongs to macOS and is pinned in ``_SYSTEM``, where
+Linux and Windows have none (0017, items 1 and 2). Removing one is a decision of its own; the
+reasons are in the decisions, not here.
 
 ``renamer`` is the rename of every move of organize on a system: forward, back in a rollback
 and in an undo batch. On Windows a file another program holds without sharing deletion refuses
@@ -28,8 +29,6 @@ DELAYS: tuple[float, ...] = (0.1, 0.2, 0.4, 0.8, 1.6)  # seconds: six tries, 3.1
 
 class Blocker(StrEnum):
     NO_OPEN_FILE_CHECK = "no_open_file_check"
-    SHARING_VIOLATIONS = "sharing_violations"
-    PATH_LENGTH_LIMIT = "path_length_limit"
     CLOUD_SYNC = "cloud_sync"
 
 
@@ -37,9 +36,7 @@ _SYSTEM: Mapping[Platform, frozenset[Blocker]] = MappingProxyType(
     {
         "linux": frozenset(),
         "darwin": frozenset({Blocker.CLOUD_SYNC}),
-        "windows": frozenset(
-            {Blocker.SHARING_VIOLATIONS, Blocker.PATH_LENGTH_LIMIT, Blocker.CLOUD_SYNC}
-        ),
+        "windows": frozenset(),
     }
 )
 
@@ -48,11 +45,6 @@ _LINE: Mapping[Blocker, str] = MappingProxyType(
         Blocker.NO_OPEN_FILE_CHECK: (
             "no reliable open-file check: a file a program holds open could be moved from under it"
         ),
-        Blocker.SHARING_VIOLATIONS: (
-            "a file another program holds open can refuse to move halfway through a batch,"
-            " and so can the move back"
-        ),
-        Blocker.PATH_LENGTH_LIMIT: "one directory deeper, a path can pass the 260-character limit",
         Blocker.CLOUD_SYNC: (
             "Desktop and Documents can be synced to the cloud: a move would reach every device"
         ),

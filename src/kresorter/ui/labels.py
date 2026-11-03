@@ -150,10 +150,6 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "no_open_file_check": _both(
             "Files in use cannot be recognized here", "Здесь нельзя распознать открытые файлы"
         ),
-        "sharing_violations": _both(
-            "Windows can refuse to move files in use", "Windows может не дать переместить файл"
-        ),
-        "path_length_limit": _both("Windows limits path length", "Windows ограничивает длину пути"),
         "cloud_sync": _both("Folders synced to the cloud", "Папки синхронизируются с облаком"),
     },
     BatchKind: {
