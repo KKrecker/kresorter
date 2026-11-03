@@ -68,6 +68,11 @@ path = "src/kresorter/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/kresorter"]
 
+[tool.hatch.build.targets.sdist]
+# What makes the wheel, its tests and documents, nothing else (decision 0015, item 9); hatchling
+# adds .gitignore, so that a wheel made from the sdist leaves out what the repository's does.
+only-include = ["src", "tests", "docs", "README.md", "CHANGELOG.md", "LICENSE"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests"]
