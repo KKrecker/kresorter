@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 
 from kresorter.core.scanner import ScanContext
+from support.artifacts import Built, build
 from support.cli import scan_context
 from support.live import guard
 
@@ -100,6 +101,12 @@ def no_live_system(
     ``support.live``)."""
     if _WINDOW_TESTS in Path(request.node.path).resolve().parents:
         guard(monkeypatch, tmp_path_factory.mktemp("home"))
+
+
+@pytest.fixture(scope="session")
+def built(tmp_path_factory: pytest.TempPathFactory) -> Built:
+    """The sdist, and the wheel built from it: once per run, offline (decision 0015)."""
+    return build(tmp_path_factory.mktemp("built"))
 
 
 @pytest.fixture
