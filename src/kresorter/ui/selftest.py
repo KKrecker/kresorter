@@ -4,8 +4,9 @@ The window opens as it always does, shows each page in the sidebar's order, wait
 page's tasks run and closes; ``REPORT`` then has one line per page and the exit code is 0. The
 pages only read: nothing is changed. A failure is its traceback in ``REPORT`` and exit 1: an
 error raised while the window opens or reaching the event loop (caught by an ``ErrorHook``,
-which writes it on stderr too), a page whose task ends with an error (the window's message), or
-a page still working after ``LIMIT`` seconds, whose task is left behind.
+or raised where the events are processed, as Qt may do), a page whose task ends with an error
+(the window's message), or a page still working after ``LIMIT`` seconds, whose task is left
+behind. With a standard error, the traceback is written there too, once.
 """
 
 from __future__ import annotations
@@ -47,10 +48,12 @@ def self_test(application: QCoreApplication, environment: Environment, report: P
     previous, sys.excepthook = sys.excepthook, ErrorHook(caught.append)
     try:
         lines = _pages(application, environment, caught)
-    except _Caught as stopped:
+    except _Caught as stopped:  # the hook wrote it on stderr
         text, code = stopped.found.trace, 1
     except Exception as error:
         text, code = failure(type(error), error, error.__traceback__).trace, 1
+        if sys.stderr is not None:
+            sys.stderr.write(text)
     else:
         text, code = "".join(f"{line}\n" for line in lines), 0
     finally:
