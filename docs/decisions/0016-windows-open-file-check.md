@@ -84,11 +84,12 @@ checks the same code through fakes.
    that cannot be created stays `move_failed`, and a parent that became a file no longer
    breaks the restore. On Linux `rename(2)` is what ran before, and the check right before the
    move stays the guard (the race window of `quarantine.service`).
-9. **Live on Windows** (skipped elsewhere), in a temporary profile: `kresorter quarantine
-   --from-analysis --yes` moves the safe findings of a made-up tree into the vault,
-   `kresorter quarantine restore` puts them back with their `mtime_ns`, and `kresorter
-   quarantine purge` deletes the vault's copies; a file a child process holds open is refused
-   `open_file`; where the runner has a second drive, a file on it is refused `cross_device`.
+9. **Live on Windows** (skipped elsewhere), in a temporary profile: `kresorter quarantine add
+   --from-analysis --level safe --yes` moves the safe findings of a made-up tree into the
+   vault, `kresorter quarantine restore` puts them back with their `mtime_ns`, and `kresorter
+   quarantine purge --yes` deletes the vault's copies; a file a child process holds open is
+   refused `open_file`; where the runner has a second drive (the checkout's, apart from the
+   temporary folder's), a file on it is refused `cross_device`.
 10. **Organize's open-file blocker is lifted on Windows**: with `ShareModeChecker`, the
     blockers of Windows no longer include `no_open_file_check` (0012 item 39), and its line
     leaves organize's refusal there; the other blockers of its column are 0017's to lift.

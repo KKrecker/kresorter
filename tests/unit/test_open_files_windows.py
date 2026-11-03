@@ -2,16 +2,20 @@
 
 Every system runs these through a fake kernel that records each call and answers a handle or an
 error; ``Kernel32``, the default, is checked against a fake ``ctypes``. What only Windows can
-show is in the live tests (item 7).
+show is in the live tests (item 7), skipped elsewhere.
 """
 
-from pathlib import PureWindowsPath
+import os
+import sys
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
 from kresorter.core.open_files import OpenFileCheckError
 from kresorter.core.open_files.windows import Kernel, Kernel32, ShareModeChecker
 from kresorter.core.policy import BlockReason, PathPolicy, Verdict
+from support.files import write
+from support.holder import held_by_a_child
 from support.kernel import FakeCtypes, FakeKernel
 
 GENERIC_READ = 0x80000000
@@ -131,3 +135,58 @@ def test_the_default_kernel_is_loaded_when_the_checker_is_made(kernel32: FakeCty
     assert kernel32.loaded == [("kernel32", True)]
     assert checker.is_open(FILE) is False
     assert kernel32.library.CloseHandle.calls == [(11,)]
+
+
+# --- live on Windows ---------------------------------------------------------------------------
+
+live = pytest.mark.skipif(sys.platform != "win32", reason="live Windows share-mode check")
+
+
+@pytest.fixture
+def held(tmp_path: Path) -> Path:
+    return write(tmp_path / "held.txt", b"held")
+
+
+@live
+def test_live_a_file_this_process_holds_is_open_until_it_is_closed(held: Path) -> None:
+    # [0016.7]
+    checker = ShareModeChecker()
+    with held.open("rb"):
+        assert checker.is_open(held) is True
+    assert checker.is_open(held) is False
+
+
+@live
+def test_live_a_file_a_child_process_holds_is_open_until_it_is_closed(held: Path) -> None:
+    # [0016.7]
+    checker = ShareModeChecker()
+    with held_by_a_child(held):
+        assert checker.is_open(held) is True
+    assert checker.is_open(held) is False
+
+
+@live
+def test_live_a_hard_link_to_an_open_file_is_open(held: Path, tmp_path: Path) -> None:
+    # [0016.7] the share mode is the file's, whatever name it is opened by
+    link = tmp_path / "link.txt"
+    os.link(held, link)
+    with held.open("rb"):
+        assert ShareModeChecker().is_open(link) is True
+
+
+@live
+def test_live_a_missing_file_fails_closed(tmp_path: Path) -> None:
+    # [0016.7]
+    with pytest.raises(OpenFileCheckError):
+        ShareModeChecker().is_open(tmp_path / "missing.txt")
+
+
+@live
+def test_live_a_check_leaves_the_file_as_it_was_and_free(held: Path) -> None:
+    # [0016.7] no byte read or written, the handle closed before the check returns
+    before = held.stat()
+    assert ShareModeChecker().is_open(held) is False
+    after = held.stat()
+    assert (after.st_size, after.st_mtime_ns) == (before.st_size, before.st_mtime_ns)
+    with held.open("r+b") as opened:
+        assert opened.read() == b"held"
