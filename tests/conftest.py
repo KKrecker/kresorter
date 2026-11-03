@@ -10,8 +10,11 @@ import ipaddress
 import os
 import socket
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from importlib.abc import MetaPathFinder
+from importlib.machinery import ModuleSpec
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -136,6 +139,38 @@ def without_qt(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setitem(sys.modules, name, None)
     for root in _QT_ROOTS:
         monkeypatch.setitem(sys.modules, root, None)
+    _forget_the_window(monkeypatch)
+
+
+QT_LIBRARY = "libGL.so.1: cannot open shared object file: No such file or directory"
+
+
+class _QtWithoutItsLibrary(MetaPathFinder):
+    """Every module under PySide6 and shiboken6 fails to load a library, as on a Linux without
+    libGL: the error names the module alone (``QtWidgets``), not PySide6."""
+
+    def find_spec(
+        self, fullname: str, path: Sequence[str] | None, target: ModuleType | None = None
+    ) -> ModuleSpec | None:
+        root, _, module = fullname.partition(".")
+        if root in _QT_ROOTS and module:
+            raise ImportError(QT_LIBRARY, name=module, path=f"/{root}/{module}.abi3.so")
+        return None
+
+
+@pytest.fixture
+def qt_without_its_library(monkeypatch: pytest.MonkeyPatch) -> None:
+    """PySide6 and shiboken6 are installed, but none of their modules can load a library it
+    needs; the window's modules need them again, as without Qt (decision 0014, item 9)."""
+    for name in [name for name in sys.modules if name.split(".")[0] in _QT_ROOTS]:
+        if "." in name:
+            monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setattr(sys, "meta_path", [_QtWithoutItsLibrary(), *sys.meta_path])
+    _forget_the_window(monkeypatch)
+
+
+def _forget_the_window(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every module of the window but ``safeclean.ui`` and its launch is imported again."""
     window = sys.modules.get("safeclean.ui")
     for name in [name for name in sys.modules if name.startswith("safeclean.ui.")]:
         if name != "safeclean.ui.launch":

@@ -112,6 +112,32 @@ def no_environment() -> Environment:
     raise AssertionError("no environment without Qt")
 
 
+@pytest.mark.usefixtures("qt_without_its_library")
+def test_a_library_qt_cannot_load_is_one_line_and_exit_3(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    # [0014.9] PySide6 is there, libGL is not (pre-step-8 audit, A1)
+    assert launch.main([], environment=UNTOUCHED) == 3
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    line, end = captured.err.split("\n")
+    assert end == ""
+    assert line.startswith("safeclean-ui: Qt cannot load a library it needs (libGL.so.1: ")
+    assert all(library in line for library in LIBRARIES)
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.usefixtures("without_qt")
+def test_without_a_standard_error_nothing_is_written_and_exit_3(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # [0014.9] a GUI script on Windows runs without one (pre-step-8 audit, A1)
+    monkeypatch.setattr(sys, "stderr", None)
+
+    assert launch.main([], environment=UNTOUCHED) == 3
+
+
 def test_another_import_error_is_not_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
     # [0014.9] only Qt's absence is the one line; a broken module of the window is raised
     monkeypatch.setitem(sys.modules, "safeclean.ui.app", None)
