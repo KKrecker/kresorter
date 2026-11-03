@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 from kresorter.core.scanner import ScanContext
-from support.artifacts import Built, Installed, build, install, lend_qt
+from support.artifacts import Built, Installed, built_for_the_run, install, lend_qt
 from support.cli import scan_context
 from support.kernel import FakeCtypes
 from support.live import guard
@@ -106,8 +106,9 @@ def no_live_system(
 
 @pytest.fixture(scope="session")
 def built(tmp_path_factory: pytest.TempPathFactory) -> Built:
-    """The sdist, and the wheel built from it: once per run, offline (decision 0015)."""
-    return build(tmp_path_factory.mktemp("built"))
+    """The sdist, and the wheel built from it: once per run, offline, or those of CI's build job
+    (decision 0015, item 21)."""
+    return built_for_the_run(tmp_path_factory.mktemp("built"))
 
 
 @pytest.fixture(scope="session")

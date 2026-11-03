@@ -45,17 +45,18 @@ def test_the_section_installs_the_extra_and_starts_the_window_both_ways() -> Non
 
 
 def test_the_section_names_the_system_libraries_ci_installs() -> None:
-    # [0014.41] The same packages as the workflow, in one command.
+    # [0014.41] The same packages as the workflow, in one command; every job of the workflow that
+    # installs them installs the same ones (decision 0015, item 21).
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    [ci] = [
-        line.split("apt-get install -y")[1].split()
+    (ci,) = {
+        tuple(line.split("apt-get install -y")[1].split())
         for line in workflow.splitlines()
         if "apt-get install" in line
-    ]
+    }
     [shown] = [
         line.split("apt-get install")[1].split() for line in commands() if "apt-get install" in line
     ]
-    assert shown == ci
+    assert tuple(shown) == ci
     assert "Linux" in "\n".join(desktop())
 
 

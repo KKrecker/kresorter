@@ -1,14 +1,24 @@
-"""The wheel and the sdist (decision 0015, items 8 and 9).
+"""The wheel and the sdist (decision 0015, items 8, 9 and 21).
 
 One wheel for every system, with the package and nothing else; an sdist with what makes that
-wheel, and the wheel it makes is the one the repository makes.
+wheel, and the wheel it makes is the one the repository makes. In CI's build job they are the
+ones it built and keeps, named by ``KRESORTER_DIST``.
 """
 
 import configparser
 import zipfile
 from pathlib import Path
 
-from support.artifacts import ROOT, Built, sdist_files, wheel_files, wheel_from_tree
+import pytest
+
+from support.artifacts import (
+    ROOT,
+    Built,
+    built_for_the_run,
+    sdist_files,
+    wheel_files,
+    wheel_from_tree,
+)
 
 DIST_INFO = "kresorter-0.1.0.dist-info/"
 SDIST = {"src", "tests", "docs", "README.md", "CHANGELOG.md", "LICENSE", "pyproject.toml"}
@@ -74,3 +84,23 @@ def test_the_sdist_has_what_makes_the_wheel_and_nothing_else(built: Built) -> No
 def test_the_sdist_makes_the_wheel_the_repository_makes(built: Built, tmp_path: Path) -> None:
     # [0015.9] the same files, byte for byte
     assert contents(built.wheel) == contents(wheel_from_tree(tmp_path))
+
+
+def test_ci_s_build_job_checks_the_ones_it_built(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # [0015.21] nothing is built when KRESORTER_DIST names the folder
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "kresorter-0.1.0.tar.gz").write_bytes(b"sdist")
+    (dist / "kresorter-0.1.0-py3-none-any.whl").write_bytes(b"wheel")
+    monkeypatch.setenv("KRESORTER_DIST", str(dist))
+    out = tmp_path / "out"
+    out.mkdir()
+
+    found = built_for_the_run(out)
+
+    assert found == Built(
+        dist / "kresorter-0.1.0.tar.gz", dist / "kresorter-0.1.0-py3-none-any.whl"
+    )
+    assert list(out.iterdir()) == []

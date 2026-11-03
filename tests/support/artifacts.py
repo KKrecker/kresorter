@@ -1,7 +1,8 @@
 """The wheel and the sdist, built once per run, offline, into a temporary folder (decision 0015).
 
 ``python -m build --no-isolation`` makes the sdist from the repository, then the wheel from the
-sdist, with the ``hatchling`` of the running Python: nothing is downloaded. ``wheel_from_tree``
+sdist, with the ``hatchling`` of the running Python: nothing is downloaded; in CI's build job
+they are those it built and keeps. ``wheel_from_tree``
 makes a second wheel straight from the repository, to compare with the first. ``install`` puts a
 wheel in a new virtual environment, offline, and ``run`` runs a command there in a profile of its
 own, without the variables that would point it at the source tree. ``lend_qt`` makes the running
@@ -35,9 +36,21 @@ def _build(out: Path, *options: str) -> None:
 
 def build(out: Path) -> Built:
     _build(out)
-    (sdist,) = out.glob("*.tar.gz")
-    (wheel,) = out.glob("*.whl")
+    return prebuilt(out)
+
+
+def prebuilt(folder: Path) -> Built:
+    """The one sdist and the one wheel in ``folder``."""
+    (sdist,) = folder.glob("*.tar.gz")
+    (wheel,) = folder.glob("*.whl")
     return Built(sdist, wheel)
+
+
+def built_for_the_run(out: Path) -> Built:
+    """Those CI's build job made, when ``KRESORTER_DIST`` names their folder (decision 0015,
+    item 21): items 8 to 10 are checked on what is published. Otherwise built into ``out``."""
+    folder = os.environ.get("KRESORTER_DIST")
+    return prebuilt(Path(folder).resolve()) if folder else build(out)
 
 
 def wheel_from_tree(out: Path) -> Path:
