@@ -32,13 +32,14 @@ from typing import TextIO
 
 from kresorter import cli_llm
 from kresorter.cli_journal import RECOVER, UNSAFE, unfinished, with_journal
+from kresorter.core.heuristics import Platform
 from kresorter.core.preflight import Refused
 from kresorter.core.scanner import ScanContext
 from kresorter.organize.folders import FolderRefused
 from kresorter.organize.journal import BatchKind, BatchState, summaries
 from kresorter.organize.mover import BatchResult, Planned, carry_out, check
 from kresorter.organize.planner import Move, Stay, plan
-from kresorter.organize.platforms import refusal
+from kresorter.organize.platforms import refusal, renamer
 from kresorter.organize.recovery import RecoveredBatch, RecoveryReport, recover
 from kresorter.organize.undo import UndoMove, UndoRefused, plan_undo
 from kresorter.storage.pending import pending_domains
@@ -139,7 +140,7 @@ def _move(
         head = [f"Moved {_files(cleared)}, in {folder} (batch {batch_id}):"]
         return [*head, *_by_category(cleared)], [f"'{UNDO} {batch_id}' moves {them} back"]
 
-    return _carry(conn, folder, cleared, refused, stays, out, done=done)
+    return _carry(conn, folder, cleared, refused, stays, out, platform=ctx.platform, done=done)
 
 
 def _undo(
@@ -177,7 +178,16 @@ def _undo(
 
     undoes = [move.undoes for move in cleared]
     return _carry(
-        conn, folder, cleared, refused, stays, out, done=done, undoes=undoes, undoing=args.batch
+        conn,
+        folder,
+        cleared,
+        refused,
+        stays,
+        out,
+        platform=ctx.platform,
+        done=done,
+        undoes=undoes,
+        undoing=args.batch,
     )
 
 
@@ -218,14 +228,16 @@ def _carry(
     stays: list[str],
     out: TextIO,
     *,
+    platform: Platform,
     done: Done,
     undoes: Sequence[int] | None = None,
     undoing: int | None = None,
 ) -> int:
-    """Carry the cleared moves out as one batch, an undo of ``undoing`` when ``undoes`` names
-    the move each one reverses, and say what happened."""
+    """Carry the cleared moves out as one batch, renamed as ``platform`` renames (decision
+    0017, item 3), an undo of ``undoing`` when ``undoes`` names the move each one reverses, and
+    say what happened."""
     moves = [(move.source, move.destination) for move in cleared]
-    result = carry_out(conn, folder, moves, undoes=undoes)
+    result = carry_out(conn, folder, moves, rename=renamer(platform), undoes=undoes)
     if result.state is not BatchState.DONE:
         _write(out, [*_stopped(result, undoing), *_refused(refused), *stays])
         return UNSAFE

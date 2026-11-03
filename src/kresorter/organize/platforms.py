@@ -1,18 +1,29 @@
-"""Where organize moves files (decision 0012, items 37-39).
+"""Where organize moves files (decision 0012, items 37-39), and how it renames there (0017).
 
 A blocker is a reason organize does not move files on a system. ``no_open_file_check`` comes
 from the open-file checker; the others belong to the system and are pinned in ``_SYSTEM``.
 Removing one is a decision of its own; the reasons are in the decision, not here.
+
+``renamer`` is the rename of every move of organize on a system: forward, back in a rollback
+and in an undo batch. On Windows a file another program holds without sharing deletion refuses
+to be renamed for a moment (an antivirus, the search indexer, a thumbnail being made), so a
+``PermissionError`` is tried again after each of ``DELAYS``.
 """
 
-from collections.abc import Mapping
+import os
+import time
+from collections.abc import Callable, Mapping
 from enum import StrEnum
+from pathlib import Path
 from types import MappingProxyType
 
 from kresorter.core.heuristics import Platform
 from kresorter.core.open_files import OpenFileChecker
+from kresorter.organize.mover import Rename
 
-__all__ = ["Blocker", "blockers", "refusal"]
+__all__ = ["DELAYS", "Blocker", "blockers", "refusal", "renamer"]
+
+DELAYS: tuple[float, ...] = (0.1, 0.2, 0.4, 0.8, 1.6)  # seconds: six tries, 3.1 s of waits
 
 
 class Blocker(StrEnum):
@@ -69,3 +80,28 @@ def refusal(platform: Platform, open_files: OpenFileChecker) -> str | None:
     lines = [f"kresorter: organize does not move files on {_NAME[platform]}; nothing was changed"]
     lines += [f"  - {_LINE[b]}" for b in found]
     return "\n".join(lines) + "\n"
+
+
+def renamer(
+    platform: Platform,
+    *,
+    rename: Rename = os.rename,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Rename:
+    """Organize's rename on ``platform`` (decision 0017, item 3): ``rename`` itself on Linux and
+    macOS, tried once; on Windows tried again after each of ``DELAYS`` while it raises
+    ``PermissionError``. Any other error, and the sixth ``PermissionError``, is raised."""
+    if platform != "windows":
+        return rename
+
+    def patient(source: Path, destination: Path) -> None:
+        for delay in DELAYS:
+            try:
+                rename(source, destination)
+            except PermissionError:
+                sleep(delay)
+            else:
+                return
+        rename(source, destination)
+
+    return patient

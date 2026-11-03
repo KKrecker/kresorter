@@ -29,6 +29,7 @@ from kresorter.autostart.listing import AutostartContext, list_autostart
 from kresorter.autostart.models import AutostartItem, AutostartListing
 from kresorter.autostart.registry import RegistryError
 from kresorter.autostart.run_changes import RunKeyChanges
+from kresorter.core.heuristics import Platform
 from kresorter.core.preflight import Refused, UnreliableCheckerError
 from kresorter.core.scanner import ScanContext
 from kresorter.organize import recovery as organize_recovery
@@ -36,6 +37,7 @@ from kresorter.organize.folders import FolderRefused
 from kresorter.organize.journal import Summary, summaries
 from kresorter.organize.mover import BatchResult, Planned, carry_out, check
 from kresorter.organize.planner import Move, Plan, plan
+from kresorter.organize.platforms import renamer
 from kresorter.organize.undo import UndoMove, UndoPlan, UndoRefused, plan_undo
 from kresorter.quarantine import recovery as quarantine_recovery
 from kresorter.quarantine.journal import QuarantinedItem, quarantined
@@ -185,7 +187,7 @@ def sort_folder(folder: Path, confirmed: Sequence[Move]) -> Act[Carried | Folder
             return found
         still, changed = _still(confirmed, found.moves)
         cleared, refused = check(still, folder, context)
-        return _carry(conn, folder, cleared, refused, changed)
+        return _carry(conn, folder, cleared, refused, changed, context.platform)
 
     return act
 
@@ -212,7 +214,7 @@ def undo_batch(batch_id: int, confirmed: Sequence[UndoMove]) -> Act[Carried]:
         still, changed = _still(confirmed, found.moves)
         cleared, refused = check(still, found.folder, context) if still else ((), ())
         undoes = [move.undoes for move in cleared]
-        return _carry(conn, found.folder, cleared, refused, changed, undoes)
+        return _carry(conn, found.folder, cleared, refused, changed, context.platform, undoes)
 
     return act
 
@@ -238,12 +240,13 @@ def _carry(
     cleared: Sequence[Planned],
     refused: Sequence[Refused],
     changed: tuple[Path, ...],
+    platform: Platform,
     undoes: Sequence[int] | None = None,
 ) -> Carried:
     if not cleared:
         return Carried(folder, None, (), tuple(refused), changed)
     moves = [(move.source, move.destination) for move in cleared]
-    batch = carry_out(conn, folder, moves, undoes=undoes)
+    batch = carry_out(conn, folder, moves, rename=renamer(platform), undoes=undoes)
     return Carried(folder, batch, tuple(cleared), tuple(refused), changed)
 
 
