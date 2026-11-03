@@ -86,6 +86,7 @@ def test_a_file_goes_one_level_down_under_its_own_name(zone: Path, scan: ScanCon
 
 def test_the_stay_reasons_are_pinned() -> None:
     # [0012.5] adding or removing one is a decision of its own; missing is for undo (item 30)
+    # [0017.7] path_too_long, Windows's, after program and before conflict
     assert [reason.value for reason in StayReason] == [
         "not_regular",
         "folder_metadata",
@@ -94,6 +95,7 @@ def test_the_stay_reasons_are_pinned() -> None:
         "unknown_kind",
         "companion",
         "program",
+        "path_too_long",
         "conflict",
         "category_blocked",
         "missing",
