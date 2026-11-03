@@ -1,10 +1,10 @@
 """CI (decision 0015, items 20 to 23): the checks on two systems, then the artifacts, run, and
 a tag that publishes them.
 
-The checks run on ``ubuntu-latest`` for every Python of the matrix, and on ``windows-latest``
-for the oldest and the newest while the repository is private; every push is checked, a step's
-branch too. Qt's system libraries are installed on Linux only; the window's tests run offscreen
-on both. The checkout is the same on both: the files keep their LF line endings on Windows.
+The checks run on ``ubuntu-latest`` and on ``windows-latest`` for every Python of the matrix,
+now that the repository is public; every push is checked, a step's branch too. Qt's system
+libraries are installed on Linux only; the window's tests run offscreen on both. The checkout
+is the same on both: the files keep their LF line endings on Windows.
 
 After the checks, the build job makes the sdist, then the wheel from it, checks items 8 to 10
 on them and runs the wheel; the windows job makes from that wheel the folder, the zip and the
@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PYTHONS = ["3.11", "3.12", "3.13", "3.14"]
 SYSTEMS = ["ubuntu-latest", "windows-latest"]
-WINDOWS = {"3.11", "3.14"}  # while the repository is private
+WINDOWS = set(PYTHONS)  # the repository is public
 
 
 def workflow() -> list[str]:
@@ -65,15 +65,16 @@ def combinations() -> set[tuple[str, str]]:
     systems = listed(value(matrix, "os"))
     pythons = listed(value(matrix, "python-version"))
     excluded: set[tuple[str, str]] = set()
-    entries = "\n".join(block(matrix, "exclude")).split("- ")[1:]
+    excludes = any(line.strip() == "exclude:" for line in matrix)
+    entries = "\n".join(block(matrix, "exclude")).split("- ")[1:] if excludes else []
     for entry in entries:
         pairs = dict(re.findall(r"([a-z-]+): *\"?([^\"\n]+)\"?", entry))
         excluded.add((pairs["os"], pairs["python-version"]))
     return {(s, p) for s in systems for p in pythons} - excluded
 
 
-def test_linux_for_every_python_and_windows_for_the_oldest_and_the_newest() -> None:
-    # [0015.20]
+def test_linux_and_windows_for_every_python() -> None:
+    # [0015.20] Windows for the oldest and the newest only while the repository was private
     found = combinations()
     assert {p for s, p in found if s == "ubuntu-latest"} == set(PYTHONS)
     assert {p for s, p in found if s == "windows-latest"} == WINDOWS
