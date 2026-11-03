@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SCANNED_DIRS = ("src", "tests", "scripts")
+SCANNED_DIRS = ("src", "tests", "scripts", "packaging")
 
 # Method names that delete regardless of the receiver.
 FORBIDDEN_METHODS = frozenset({"unlink", "rmdir", "rmtree", "removedirs"})
