@@ -5,10 +5,11 @@ One level only: the regular files directly in the folder are the candidates, and
 either moved or kept in place with its reason, never skipped in silence. A file is kept by the
 first of, in this order: not a regular file, the folder's metadata, work in progress, junk, no
 kind in the table, a program next to its libraries, on Windows a new path past the limit, its
-category path not a directory, its destination taken. Then companions: a file whose stem (the
-name before its first dot) it shares with an entry that would not go to the same category
-directory stays too. Names are compared folded (``names``); whether a path is taken is asked of
-the file system. The plan is sorted, so it does not depend on the order the folder is listed in.
+category path not a directory (``mover.is_directory``), its destination taken. Then companions:
+a file whose stem (the name before its first dot) it shares with an entry that would not go to
+the same category directory stays too. Names are compared folded (``names``); whether a path
+is taken is asked of the file system. The plan is sorted, so it does not depend on the order the
+folder is listed in.
 
 The limit (decision 0017, item 6) is Windows's without long paths, whether they are enabled or
 not: a category directory of at most ``DIRECTORY_LIMIT`` characters and a destination of at most
@@ -27,6 +28,7 @@ from pathlib import Path
 from kresorter.core.scanner import ScanContext
 from kresorter.organize.categories import default_table
 from kresorter.organize.folders import entries
+from kresorter.organize.mover import is_directory
 from kresorter.organize.names import first_match, fold
 
 __all__ = ["Move", "Plan", "Stay", "StayReason", "plan"]
@@ -84,8 +86,9 @@ class Plan:
 
 
 def plan(folder: Path, context: ScanContext) -> Plan:
-    """The plan for ``folder``. Raises FolderRefused when it is not one organize sorts."""
-    found = entries(folder, context)
+    """The plan for ``folder``, as the system spells it. Raises FolderRefused when it is not one
+    organize sorts."""
+    folder, found = entries(folder, context)
     table = default_table()
     libraries = any(first_match(name, LIBRARIES) for name in found)
     blocked: dict[str, str | None] = {}
@@ -172,7 +175,7 @@ def _not_a_directory(path: Path) -> str | None:
         return None
     except OSError as error:
         return error.strerror or str(error)
-    return None if stat.S_ISDIR(info.st_mode) else ""
+    return None if is_directory(info) else ""
 
 
 def _taken(path: Path) -> str | None:

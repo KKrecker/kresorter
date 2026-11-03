@@ -7,6 +7,9 @@ cache or temp directory. What marks the first two lives in ``folders.toml``, rea
 here; the third is the junk rules' (``JunkClassifier.classify_directory``). Markers are compared
 with folded names (``names.first_match``): a wrong match only refuses a folder, a missed one
 breaks what is in it.
+
+On Windows a folder given in another case than the system's is the folder the system spells,
+checked again so (0017, item 12); any other difference from its real path is a link.
 """
 
 from __future__ import annotations
@@ -92,11 +95,12 @@ def default_markers() -> FolderMarkers:
     return load_markers(data)
 
 
-def entries(folder: Path, context: ScanContext) -> dict[str, os.stat_result]:
-    """The entries of ``folder`` by name, each as ``lstat`` saw it, once ``folder`` is one
-    organize sorts. Raises FolderRefused otherwise, ValueError for a relative ``folder``."""
+def entries(folder: Path, context: ScanContext) -> tuple[Path, dict[str, os.stat_result]]:
+    """``folder`` as the system spells it, and its entries by name, each as ``lstat`` saw it,
+    once ``folder`` is one organize sorts. Raises FolderRefused otherwise, ValueError for a
+    relative ``folder``."""
     markers = default_markers()
-    _check_path(folder, context, markers)
+    folder = _check_path(folder, context, markers)
     found = _list(folder)
     for name in sorted(found):
         for reason, patterns in (
@@ -106,10 +110,13 @@ def entries(folder: Path, context: ScanContext) -> dict[str, os.stat_result]:
             marker = first_match(name, patterns)
             if marker is not None:
                 raise FolderRefused(folder, reason, marker)
-    return found
+    return folder, found
 
 
-def _check_path(folder: Path, context: ScanContext, markers: FolderMarkers) -> None:
+def _check_path(
+    folder: Path, context: ScanContext, markers: FolderMarkers, *, spelled: bool = False
+) -> Path:
+    """``folder``, or on Windows the system's spelling of it, checked as any folder once."""
     verdict = context.policy.check_path(folder)
     if not verdict.allowed:
         raise FolderRefused(folder, FolderReason.BLOCKED, f"{verdict.reason}")
@@ -122,7 +129,11 @@ def _check_path(folder: Path, context: ScanContext, markers: FolderMarkers) -> N
     except OSError as error:
         raise FolderRefused(folder, FolderReason.UNREADABLE, _why(error)) from None
     real = os.path.realpath(folder)
-    if stat.S_ISLNK(info.st_mode) or real != os.fspath(folder):
+    if stat.S_ISLNK(info.st_mode):
+        raise FolderRefused(folder, FolderReason.LINK, real)
+    if real != os.fspath(folder):
+        if context.platform == "windows" and not spelled and fold(real) == fold(str(folder)):
+            return _check_path(Path(real), context, markers, spelled=True)
         raise FolderRefused(folder, FolderReason.LINK, real)
     if not stat.S_ISDIR(info.st_mode):
         raise FolderRefused(folder, FolderReason.NOT_A_DIRECTORY)
@@ -138,6 +149,7 @@ def _check_path(folder: Path, context: ScanContext, markers: FolderMarkers) -> N
         for name in markers.version_control:
             if os.path.lexists(directory / name):
                 raise FolderRefused(folder, FolderReason.PROJECT, name)
+    return folder
 
 
 def _check_synced(folder: Path, context: ScanContext) -> None:

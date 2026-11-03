@@ -3,7 +3,9 @@
 ``check`` takes every planned file again right before the batch, as the quarantine does (0004
 item 5): allowed by the policy and not open, the size and ``mtime_ns`` of the plan, a parent not
 swapped for a link, on the folder's device, and a destination still free in a real directory on
-that device. A file that fails is refused; the others form the batch.
+that device. A real directory is one ``lstat`` says is a directory, without a reparse point: on
+Windows a junction or a mount point leads elsewhere, as a link does (0017, item 11). A file that
+fails is refused; the others form the batch.
 
 ``carry_out`` journals the batch and every move ``pending`` before anything is made or moved,
 then, move by move, makes the category directory (default mode; an existing one is used as it
@@ -168,7 +170,7 @@ def _refusal(preflight: Preflight, move: Planned, device: int) -> Refused | None
     except OSError as error:
         return Refused(source, RefusalReason.UNREADABLE, detail=f"{parent}: {_why(error)}")
     else:
-        if not stat.S_ISDIR(info.st_mode):
+        if not is_directory(info):
             return Refused(source, RefusalReason.CONFLICT, detail=f"{parent}: not a directory")
         if info.st_dev != device:
             return Refused(source, RefusalReason.CROSS_DEVICE, detail=str(parent))
@@ -181,13 +183,20 @@ def _refusal(preflight: Preflight, move: Planned, device: int) -> Refused | None
     return Refused(source, RefusalReason.CONFLICT, detail=str(move.destination))
 
 
+def is_directory(info: os.stat_result) -> bool:
+    """Whether ``lstat``'s ``info`` is a directory organize moves files into: one with a reparse
+    point, which only Windows's ``lstat`` reports, is a link (decision 0017, item 11)."""
+    attributes: int = getattr(info, "st_file_attributes", 0)
+    return stat.S_ISDIR(info.st_mode) and not attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT
+
+
 def _make_room(destination: Path, device: int) -> None:
     """Make the destination's directory if it is missing, then raise OSError unless it is a
     real directory on the folder's device and the destination is free."""
     parent = destination.parent
     parent.mkdir(exist_ok=True)
     info = parent.lstat()
-    if not stat.S_ISDIR(info.st_mode):
+    if not is_directory(info):
         raise NotADirectoryError(errno.ENOTDIR, "not a directory", str(parent))
     if info.st_dev != device:
         raise OSError(errno.EXDEV, "on another device than the folder", str(parent))
