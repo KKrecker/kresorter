@@ -557,3 +557,15 @@ def test_the_data_folder_from_the_home_folder(
     page = window.settings
     assert (page.data_dir.text(), page.data_dir.toolTip()) == ("~/data/kresorter", str(data_dir))
     assert page.data_dir.property("role") == "secondary"
+
+
+@pytest.mark.parametrize("language", ["en", "ru"])
+def test_the_version_under_the_data_folder(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, language: Language
+) -> None:
+    # [0015.4] in both languages, the card's last line
+    window = _window(qtbot, tmp_path, zone, data_dir, language=language)
+    page = window.settings
+    shown = [label for label in page.data_card.findChildren(QLabel) if label.isVisibleTo(page)]
+    assert [label.text() for label in shown][-2:] == [page.data_dir.text(), "Kresorter 0.1.0"]
+    assert shown[-1].property("role") == "secondary"

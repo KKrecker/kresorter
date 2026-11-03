@@ -6,8 +6,13 @@ import kresorter
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_version_is_exposed() -> None:
-    assert kresorter.__version__ == "0.0.1"
+def test_the_version_is_written_once() -> None:
+    # [0015.2] in the package; pyproject.toml reads it from there and has none of its own
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert kresorter.__version__ == "0.1.0"
+    assert "version" not in project["project"]
+    assert project["project"]["dynamic"] == ["version"]
+    assert project["tool"]["hatch"]["version"] == {"path": "src/kresorter/__init__.py"}
 
 
 def test_a_warning_fails_the_tests() -> None:
