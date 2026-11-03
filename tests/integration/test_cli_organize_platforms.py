@@ -1,13 +1,14 @@
-"""`kresorter organize` on macOS and Windows, on Linux without a reliable open-file check, and
-folded names end to end (decision 0012, items 20, 37-39).
+"""`kresorter organize` on macOS, on Linux and Windows without a reliable open-file check, on
+Windows with one, and folded names end to end (decision 0012, items 20, 37-39; 0017, items 1
+and 12).
 
 On a blocked system `move` and `undo` refuse before anything, with or without `--yes`: before
 the journal is opened (the data directory is not made), before planning, and without asking
-the open-file check. On macOS and Windows the checker is the one kresorter gives that system
-today, or a reliable fake: a backend alone does not lift the refusal (item 39); on Linux an
-unreliable checker is the one blocker. `list` and `recover` move nothing and run everywhere.
-The platform is the one the scan context was made for (`ScanContext.platform`, required);
-real temporary trees.
+the open-file check. On macOS the checker is the one kresorter gives that system today, or a
+reliable fake: a backend alone does not lift the refusal (item 39); on Linux and Windows an
+unreliable checker is the one blocker, and with a reliable one Windows sorts as Linux does.
+`list` and `recover` move nothing and run everywhere. The platform is the one the scan context
+was made for (`ScanContext.platform`, required); real temporary trees.
 """
 
 import dataclasses
@@ -27,7 +28,10 @@ from support.files import snapshot, write
 from support.journal import query
 from support.moves import B, crash, planned, three_files, tree
 
-BLOCKED = pytest.mark.parametrize("platform", ["darwin", "windows"])
+BLOCKED = pytest.mark.parametrize("platform", ["darwin", "windows"])  # without a reliable check
+UNCHECKED = pytest.mark.parametrize(
+    ("platform", "name"), [("linux", "Linux"), ("windows", "Windows")]
+)
 ACTING = pytest.mark.parametrize(
     "action",
     [["move", "FOLDER"], ["move", "FOLDER", "--yes"], ["undo", "1"], ["undo", "1", "--yes"]],
@@ -57,9 +61,12 @@ def everything(root: Path) -> tuple[list[str], list[tuple[str, int, int, bytes]]
 # --- move and undo refuse on macOS and Windows -------------------------------------------------
 
 
-@BLOCKED
 @ACTING
-@pytest.mark.parametrize("reliable", [False, True], ids=["today", "with-a-backend"])
+@pytest.mark.parametrize(
+    ("platform", "reliable"),
+    [("darwin", False), ("darwin", True), ("windows", False)],
+    ids=["macos-today", "macos-with-a-backend", "windows-unchecked"],
+)
 def test_move_and_undo_refuse_before_anything(
     platform: Platform,
     action: list[str],
@@ -68,7 +75,8 @@ def test_move_and_undo_refuse_before_anything(
     zone: Path,
     data_dir: Path,
 ) -> None:
-    # [0012.37] [0012.39] no plan, no journal, no category directory, the message of item 38
+    # [0012.37] [0012.39] [0017.1] no plan, no journal, no category directory, the message of
+    # item 38
     folder = downloads(zone)
     open_files = FakeOpenFiles() if reliable else NoOpenFileCheck()
     context = scan_context(tmp_path, zone, data_dir, open_files, platform=platform)
@@ -79,17 +87,16 @@ def test_move_and_undo_refuse_before_anything(
     assert not data_dir.exists()
 
 
-@BLOCKED
 @ACTING
 def test_the_open_file_check_is_never_asked(
-    platform: Platform, action: list[str], tmp_path: Path, zone: Path, data_dir: Path
+    action: list[str], tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
-    # [0012.37] the refusal is not a preflight: it comes first
+    # [0012.37] the refusal is not a preflight: it comes first, on macOS whatever its check
     folder = downloads(zone)
     open_files = FakeOpenFiles([folder / "report.pdf"])
     run(
         organize(action, folder),
-        scan_context(tmp_path, zone, data_dir, open_files, platform=platform),
+        scan_context(tmp_path, zone, data_dir, open_files, platform="darwin"),
     )
     assert open_files.calls == []
 
@@ -124,18 +131,20 @@ def test_usage_errors_come_first(
 # --- Linux without a reliable open-file check, and the platform of the context -----------------
 
 
+@UNCHECKED
 @ACTING
-def test_linux_without_a_reliable_check_refuses_before_anything(
-    action: list[str], tmp_path: Path, zone: Path, data_dir: Path
+def test_without_a_reliable_check_linux_and_windows_refuse_before_anything(
+    platform: Platform, name: str, action: list[str], tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
-    # [0012.36] [0012.37] [0012.38] [0012.39] the open-file check's line alone; nothing changed
+    # [0012.36] [0012.37] [0012.38] [0012.39] [0017.1] [0017.2] the open-file check's line
+    # alone; nothing changed
     folder = downloads(zone)
-    context = scan_context(tmp_path, zone, data_dir, NoOpenFileCheck())
+    context = scan_context(tmp_path, zone, data_dir, NoOpenFileCheck(), platform=platform)
     before = everything(tmp_path)
     assert run(organize(action, folder), context) == (
         3,
         "",
-        "kresorter: organize does not move files on Linux; nothing was changed\n"
+        f"kresorter: organize does not move files on {name}; nothing was changed\n"
         "  - no reliable open-file check: a file a program holds open could be moved"
         " from under it\n",
     )
@@ -143,15 +152,54 @@ def test_linux_without_a_reliable_check_refuses_before_anything(
     assert not data_dir.exists()
 
 
+@UNCHECKED
 @ACTING
-def test_linux_without_a_reliable_check_never_asks_it(
-    action: list[str], tmp_path: Path, zone: Path, data_dir: Path
+def test_without_a_reliable_check_linux_and_windows_never_ask_it(
+    platform: Platform, name: str, action: list[str], tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
-    # [0012.37] the refusal is not a preflight: it comes first
+    # [0012.37] [0017.1] the refusal is not a preflight: it comes first
     folder = downloads(zone)
     unreliable = UnreliableOpenFiles([folder / "report.pdf"])
-    run(organize(action, folder), scan_context(tmp_path, zone, data_dir, unreliable))
+    context = scan_context(tmp_path, zone, data_dir, unreliable, platform=platform)
+    run(organize(action, folder), context)
     assert unreliable.calls == []
+
+
+# --- Windows sorts with a reliable check (decision 0017, items 1 and 12) ------------------------
+
+
+def test_windows_with_a_reliable_check_moves_and_undoes(
+    tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0017.1] as on Linux: the batch, then its undo, every file back where it was
+    folder = three_files(zone)
+    before = tree(zone)
+    windows = scan_context(tmp_path, zone, data_dir, platform="windows")
+    code, out, err = run(["organize", "move", str(folder), "--yes"], windows)
+    assert (code, err) == (0, "")
+    assert out.startswith(f"Moved 3 files, 15 B, in {folder} (batch 1):\n")
+    assert sorted(p.name for p in folder.iterdir()) == ["Audio", "Documents", "Images"]
+    code, out, err = run(["organize", "undo", "1", "--yes"], windows)
+    assert (code, err) == (0, "")
+    made = {f"Downloads/{category}": "dir" for category in ("Audio", "Documents", "Images")}
+    assert tree(zone) == {**before, **made}
+
+
+def test_on_windows_a_folder_given_in_another_case_is_sorted_as_the_system_spells_it(
+    tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0017.12] the plan, the batch and the journal take the system's spelling; here a link
+    # from the other case stands for it, as this system tells case apart
+    (zone / "ann").symlink_to(zone / "Ann")
+    real = three_files(zone / "Ann")
+    given = zone / "ann" / "Downloads"
+    windows = scan_context(tmp_path, zone, data_dir, platform="windows")
+    code, out, _ = run(["organize", "move", str(given)], windows)
+    assert (code, out.splitlines()[0]) == (1, f"Would move 3 files, 15 B, in {real}:")
+    code, out, _ = run(["organize", "move", str(given), "--yes"], windows)
+    assert (code, out.splitlines()[0]) == (0, f"Moved 3 files, 15 B, in {real} (batch 1):")
+    assert query(data_dir, "SELECT folder FROM move_batches") == [(str(real),)]
+    assert sorted(p.name for p in real.iterdir()) == ["Audio", "Documents", "Images"]
 
 
 def test_list_and_recover_run_on_linux_without_a_reliable_check(

@@ -71,8 +71,9 @@ def _window(
     dialogs: FakeDialogs,
     *,
     open_files: OpenFileChecker | None = None,
+    platform: Platform = "linux",
 ) -> Window:
-    made = environment(tmp_path, zone, data_dir, open_files=open_files)
+    made = environment(tmp_path, zone, data_dir, platform=platform, open_files=open_files)
     window = make_window(qtbot, made, dialogs=dialogs)
     _opened(qtbot, window)
     return window
@@ -167,18 +168,11 @@ def _lines(window: Window) -> list[str]:
 @pytest.mark.parametrize(
     ("platform", "open_files", "why"),
     [
-        (
-            "windows",
-            FakeOpenFiles(),
-            [
-                "Windows can refuse to move files in use",
-                "Windows limits path length",
-                "Folders synced to the cloud",
-            ],
-        ),
+        ("darwin", FakeOpenFiles(), ["Folders synced to the cloud"]),
         ("linux", UnreliableOpenFiles(), ["Files in use cannot be recognized here"]),
+        ("windows", UnreliableOpenFiles(), ["Files in use cannot be recognized here"]),
     ],
-    ids=["windows", "no-open-file-check"],
+    ids=["macos", "no-open-file-check", "windows-no-open-file-check"],
 )
 def test_where_organize_does_not_move_files_the_page_says_why_and_nothing_else(
     qtbot: QtBot,
@@ -189,7 +183,8 @@ def test_where_organize_does_not_move_files_the_page_says_why_and_nothing_else(
     open_files: OpenFileChecker,
     why: list[str],
 ) -> None:
-    # [0014.23] 0012 item 37; not even the batches are read.
+    # [0014.23] [0017.2] 0012 item 37; not even the batches are read. Windows is told what Linux
+    # is, macOS its synced folders: the lines Windows lost are gone.
     blocked = environment(tmp_path, zone, data_dir, platform=platform, open_files=open_files)
     window = make_window(qtbot, blocked)
     _opened(qtbot, window)
@@ -201,6 +196,25 @@ def test_where_organize_does_not_move_files_the_page_says_why_and_nothing_else(
     assert page.blocked.isVisible()
     assert not page.controls.isVisible()
     assert not data_dir.exists()
+
+
+def test_on_windows_with_a_reliable_check_the_page_sorts_and_undoes(
+    qtbot: QtBot,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    dialogs: FakeDialogs,
+    folder: Path,
+) -> None:
+    # [0017.1] as on Linux: nothing blocks Windows any more
+    window = _window(qtbot, tmp_path, zone, data_dir, dialogs, platform="windows")
+    page = window.organize
+    assert not page.blocked.isVisible()
+    assert page.controls.isVisible()
+    _sorted(qtbot, window, dialogs)
+    assert files(folder) == {**SORTED, **STAYING}
+    _undo(qtbot, window, 1)
+    assert files(folder) == {**UNSORTED, **STAYING}
 
 
 # --- the plan [0014.23] --------------------------------------------------------------------------
