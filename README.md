@@ -49,8 +49,11 @@ kresorter quarantine purge --yes 3             # permanently delete the vault co
 
 Every file is checked again right before it moves. `--from-analysis` takes `safe` findings, or
 `safe` and `likely_safe` with `--level likely_safe`; `review` is never moved in bulk. The
-quarantine needs a reliable open-file check: Linux has one; on macOS and Windows these commands
-refuse (exit code 3) until their backends exist.
+quarantine needs a reliable open-file check: Linux and Windows have one; on macOS these commands
+refuse (exit code 3) until its backend exists. On Windows the check is an exclusive open, closed
+at once, so it sees every program that reads, writes or deletes the file, but not one that
+holds it open for its attributes only, nor a file mapped into memory after its handle was
+closed.
 
 ### Autostart
 
