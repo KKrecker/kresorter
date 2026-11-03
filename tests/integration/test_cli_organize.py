@@ -9,7 +9,7 @@ what moved, what was refused and what stays. Real temporary trees, a reliable fa
 check; the platform's own refusals are in ``test_cli_organize_platforms.py``.
 """
 
-import functools
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,8 +17,10 @@ import pytest
 
 from fakes import FakeOpenFiles, other_device
 from kresorter import cli_organize
+from kresorter.core.heuristics import Platform
 from kresorter.core.scanner import ScanContext
-from kresorter.organize.mover import carry_out
+from kresorter.organize.mover import Rename
+from kresorter.organize.platforms import renamer
 from support.cli import run, scan_context
 from support.files import write
 from support.journal import query
@@ -29,9 +31,12 @@ from support.moves import (
     B,
     C,
     FlakyRename,
+    HeldRename,
+    Sleeps,
     content,
     crash,
     planned,
+    renaming,
     three_files,
     tree,
 )
@@ -353,7 +358,7 @@ def test_a_batch_that_stopped_names_the_files_still_sorted(
         write(folder / A, b"newcomer")
 
     rename = FlakyRename({folder / C: "before"}, meanwhile={folder / C: newcomer})
-    monkeypatch.setattr(cli_organize, "carry_out", functools.partial(carry_out, rename=rename))
+    monkeypatch.setattr(cli_organize, "renamer", renaming(rename))
 
     code, out, _ = run(organize("move", folder, "--yes"), scan)
 
@@ -364,6 +369,76 @@ def test_a_batch_that_stopped_names_the_files_still_sorted(
         f"    {folder / MOVED[A]}\n",
     )
     assert query(data_dir, "SELECT state FROM move_batches") == [("failed",)]
+
+
+def test_move_and_undo_rename_as_the_contexts_system_does(
+    scan: ScanContext, zone: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0017.3] forward, back and in an undo batch: organize.platforms.renamer(platform)
+    asked: list[Platform] = []
+
+    def recorded(platform: Platform) -> Rename:
+        asked.append(platform)
+        return os.rename
+
+    monkeypatch.setattr(cli_organize, "renamer", recorded)
+    folder = three_files(zone)
+
+    sorted_by_cli(scan, folder)
+    assert run(organize("undo", 1, "--yes"), scan)[0] == 0
+
+    assert asked == ["linux", "linux"]
+    assert tree(folder) == {**content(SOURCES), **CATEGORIES}
+
+
+def test_a_move_back_held_through_every_try_is_left_for_undo(
+    scan: ScanContext, zone: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0017.4] a moves, c is held through six tries, so is a on its way back (b, sorted after c,
+    # is never tried): a stays sorted, named with the undo that takes it; nothing tries again
+    # until that undo, recovery renames nothing
+    folder = three_files(zone)
+    held = HeldRename({folder / C: 6, folder / MOVED[A]: 6})
+    sleeps = Sleeps()
+    windows = renamer("windows", rename=held, sleep=sleeps)
+    monkeypatch.setattr(cli_organize, "renamer", renaming(windows))
+
+    code, out, _ = run(organize("move", folder, "--yes"), scan)
+
+    assert (code, out) == (
+        3,
+        f"Stopped: [Errno 13] used by another process: '{folder / C}'\n"
+        "  [1] failed: 1 file still sorted; 'kresorter organize undo 1' moves it back\n"
+        f"    {folder / MOVED[A]}\n",
+    )
+    assert len(sleeps.delays) == 10
+    tried = len(held.calls)
+    assert run(organize("list"), scan)[0] == 0
+    assert run(["recover"], scan)[0] == 0
+    assert len(held.calls) == tried
+    assert tree(folder) == {**content({A: MOVED[A], B: B, C: C}), "Audio": "dir", "Images": "dir"}
+    assert query(data_dir, "SELECT state FROM move_batches") == [("failed",)]
+
+    assert run(organize("undo", 1, "--yes"), scan)[0] == 0
+    assert tree(folder) == {**content(SOURCES), "Audio": "dir", "Images": "dir"}
+
+
+def test_an_undo_waits_for_a_handle_that_goes(
+    scan: ScanContext, zone: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0017.3] [0017.4] a is held for two tries of the undo, then moves back
+    folder = three_files(zone)
+    sorted_by_cli(scan, folder)
+    held = HeldRename({folder / MOVED[A]: 2})
+    sleeps = Sleeps()
+    monkeypatch.setattr(
+        cli_organize, "renamer", renaming(renamer("windows", rename=held, sleep=sleeps))
+    )
+
+    assert run(organize("undo", 1, "--yes"), scan)[0] == 0
+
+    assert sleeps.delays == [0.1, 0.2]
+    assert tree(folder) == {**content(SOURCES), **CATEGORIES}
 
 
 def test_another_domain_unfinished_refuses_move_and_undo(
@@ -532,7 +607,7 @@ def test_an_undo_that_stopped_names_the_batch_it_undoes(
     folder = three_files(zone)
     sorted_by_cli(scan, folder)
     rename = FlakyRename({folder / MOVED[A]: "before"})
-    monkeypatch.setattr(cli_organize, "carry_out", functools.partial(carry_out, rename=rename))
+    monkeypatch.setattr(cli_organize, "renamer", renaming(rename))
 
     code, out, _ = run(organize("undo", 1, "--yes"), scan)
 

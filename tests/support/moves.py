@@ -73,6 +73,42 @@ class FlakyRename:
             os._exit(CRASHED)
 
 
+class HeldRename:
+    """``os.rename``, except that the first ``held[path]`` renames of a path raise
+    ``PermissionError``, as Windows does while another program holds the file without sharing
+    deletion (decision 0017, item 3). Every call is recorded."""
+
+    def __init__(self, held: Mapping[Path, int]) -> None:
+        self._held = dict(held)
+        self.calls: list[tuple[Path, Path]] = []
+
+    def __call__(self, source: Path, destination: Path) -> None:
+        self.calls.append((source, destination))
+        if self._held.get(source, 0) > 0:
+            self._held[source] -= 1
+            raise PermissionError(errno.EACCES, "used by another process", str(source))
+        source.rename(destination)
+
+
+class Sleeps:
+    """``time.sleep`` that only records how long it was asked to wait."""
+
+    def __init__(self) -> None:
+        self.delays: list[float] = []
+
+    def __call__(self, seconds: float) -> None:
+        self.delays.append(seconds)
+
+
+def renaming(rename: Callable[[Path, Path], None]) -> Callable[[str], Callable[[Path, Path], None]]:
+    """A stand-in for ``organize.platforms.renamer``: ``rename`` on every system."""
+
+    def renamer(platform: str) -> Callable[[Path, Path], None]:
+        return rename
+
+    return renamer
+
+
 def three_files(zone: Path) -> Path:
     """``zone/Downloads`` with a photo, a document and a song, each holding its own name."""
     folder = zone / "Downloads"

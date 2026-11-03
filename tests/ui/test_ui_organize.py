@@ -4,6 +4,7 @@ folder's plan, the batch carried out after confirmation and named, the batches a
 moves it still holds unchanged are carried out, and what no longer holds is reported."""
 
 import functools
+import os
 import time
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from pytestqt.qtbot import QtBot
 from fakes import FakeOpenFiles, UnreliableOpenFiles
 from kresorter.core.heuristics import Platform
 from kresorter.core.open_files import OpenFileChecker
-from kresorter.organize.mover import carry_out
+from kresorter.organize.mover import Rename
 from kresorter.organize.planner import StayReason
 from kresorter.ui import sessions
 from kresorter.ui.dialogs import Confirmation
@@ -27,7 +28,7 @@ from kresorter.ui.window import Window
 from support.cli import run, scan_context
 from support.files import write
 from support.journal import pending_quarantine, query
-from support.moves import A, B, C, FlakyRename, files, three_files
+from support.moves import A, B, C, FlakyRename, files, renaming, three_files
 from support.window import FakeDialogs, children, environment, make_window, wait_idle
 
 UNSORTED = {A: b"a.jpg", B: b"b.pdf", C: b"c.mp3"}
@@ -418,7 +419,7 @@ def test_a_batch_that_stops_says_what_is_still_sorted(
 ) -> None:
     # [0014.23] c.mp3 cannot be moved, and a.jpg, moved before it, cannot be moved back.
     faults = FlakyRename({folder / C: "before", folder / "Images" / A: "before"})
-    monkeypatch.setattr(sessions, "carry_out", functools.partial(carry_out, rename=faults))
+    monkeypatch.setattr(sessions, "renamer", renaming(faults))
     _planned(qtbot, window)
     window.organize.move_button.click()
     wait_idle(qtbot, window)
@@ -436,7 +437,7 @@ def test_a_batch_rolled_back_has_nothing_still_sorted(
 ) -> None:
     # [0014.23]
     faults = FlakyRename({folder / C: "before"})
-    monkeypatch.setattr(sessions, "carry_out", functools.partial(carry_out, rename=faults))
+    monkeypatch.setattr(sessions, "renamer", renaming(faults))
     _planned(qtbot, window)
     window.organize.move_button.click()
     wait_idle(qtbot, window)
@@ -613,13 +614,34 @@ def test_an_undo_that_stops_names_what_takes_the_rest(
     _sorted(qtbot, window, dialogs)
     source = folder / "Audio" / C
     faults = FlakyRename({source: "before"})
-    monkeypatch.setattr(sessions, "carry_out", functools.partial(carry_out, rename=faults))
+    monkeypatch.setattr(sessions, "renamer", renaming(faults))
     _undo(qtbot, window, 1)
     assert _lines(window) == [
         f"Stopped: [Errno 13] refused before the move: '{source}'. Batch 2: Rolled back.",
         "Undo batch 1 again to move back the files still sorted.",
     ]
     assert files(folder) == {**SORTED, **STAYING}
+
+
+def test_sort_and_undo_rename_as_the_contexts_system_does(
+    qtbot: QtBot,
+    window: Window,
+    dialogs: FakeDialogs,
+    folder: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # [0017.3] the window's batches take organize.platforms.renamer(platform) too
+    asked: list[Platform] = []
+
+    def recorded(platform: Platform) -> Rename:
+        asked.append(platform)
+        return os.rename
+
+    monkeypatch.setattr(sessions, "renamer", recorded)
+    _sorted(qtbot, window, dialogs)
+    _undo(qtbot, window, 1)
+    assert asked == ["linux", "linux"]
+    assert files(folder) == {A: b"a.jpg", B: b"b.pdf", C: b"c.mp3", **STAYING}
 
 
 # --- in Russian [0014.23] [0014.44] --------------------------------------------------------------
