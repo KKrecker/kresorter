@@ -20,7 +20,7 @@ from kresorter.core.policy import PathPolicy
 from kresorter.core.scanner import ScanContext
 from kresorter.llm.transport import LIMITS, Limits
 
-__all__ = ["Environment", "default_context", "detect_platform"]
+__all__ = ["Environment", "default_context", "detect_platform", "program_folders"]
 
 _PLATFORMS: dict[str, Platform] = {"win32": "windows", "linux": "linux", "darwin": "darwin"}
 
@@ -32,21 +32,33 @@ def detect_platform(sys_platform: str = sys.platform) -> Platform:
         raise RuntimeError(f"unsupported platform: {sys_platform}") from None
 
 
+def program_folders() -> tuple[Path, ...]:
+    """The folders kresorter runs from (decision 0015, item 16): its package's, and when frozen
+    (``Kresorter.exe``) the executable's."""
+    package = Path(__file__).resolve().parent
+    if getattr(sys, "frozen", False):
+        return (package, Path(sys.executable).resolve().parent)
+    return (package,)
+
+
 def default_context(
     platform: Platform | None = None,
     env: Mapping[str, str] | None = None,
     home: Path | None = None,
 ) -> ScanContext:
-    """Context for the current system (arguments exist for tests)."""
+    """Context for the current system (arguments exist for tests). The folders kresorter runs
+    from are the running system's: a context made for another has none."""
     current = platform or detect_platform()
+    program = program_folders() if current == detect_platform() else ()
     if current == "windows":
-        policy = PathPolicy.for_windows(os.environ if env is None else env)
+        policy = PathPolicy.for_windows(os.environ if env is None else env, program_dirs=program)
     else:
         posix: Literal["linux", "darwin"] = "darwin" if current == "darwin" else "linux"
         policy = PathPolicy.for_posix(
             home=PurePosixPath(home or Path.home()),
             platform=posix,
             env=os.environ if env is None else env,
+            program_dirs=program,
         )
     open_files = checker_for_platform(current)
     return ScanContext(

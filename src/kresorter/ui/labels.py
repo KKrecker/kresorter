@@ -91,6 +91,7 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "profile": _both("Profile settings", "Настройки профиля"),
         "open_file": _both("In use", "Используется"),
         "app_data": _both("kresorter's own data", "Данные kresorter"),
+        "app_program": _both("kresorter's own program", "Программа kresorter"),
     },
     SkipReason: {
         "symlink": _both("A link, not followed", "Ссылка, без перехода по ней"),

@@ -29,6 +29,7 @@ class BlockReason(StrEnum):
     PROFILE = "profile"
     OPEN_FILE = "open_file"
     APP_DATA = "app_data"  # kresorter's own data dir: vault and journal (decision 0004)
+    APP_PROGRAM = "app_program"  # the folders it runs from (decision 0015, item 16)
 
 
 @dataclass(frozen=True)
@@ -76,12 +77,18 @@ class PathPolicy:
         profile: tuple[PurePath, PurePath, Sequence[PurePath], Sequence[str]],
         default_roots: Sequence[PurePath],
         app_data_dir: PurePath,
+        program_dirs: Sequence[PurePath] = (),
     ) -> None:
         self._flavor = flavor
         self._case_sensitive = case_sensitive
         self._app_data_dir = app_data_dir
-        # APP_DATA first: the vault is blocked even inside a default root or a system path.
-        rules = [(app_data_dir, BlockReason.APP_DATA), *prefix_rules]
+        # APP_DATA first: the vault is blocked even inside a default root or a system path;
+        # then the folders kresorter runs from, which say so inside a system path too.
+        rules = [
+            (app_data_dir, BlockReason.APP_DATA),
+            *((d, BlockReason.APP_PROGRAM) for d in program_dirs),
+            *prefix_rules,
+        ]
         self._prefix_rules = tuple((self._normalize(p), r) for p, r in rules)
         self._root_entry_names = frozenset(self._fold(n) for n in root_entry_names)
         users_root, home, subpaths, name_prefixes = profile
@@ -97,8 +104,11 @@ class PathPolicy:
     # --- construction ------------------------------------------------------------------------
 
     @classmethod
-    def for_windows(cls, env: Mapping[str, str]) -> PathPolicy:
-        """Build a Windows policy. Environment values are added to defaults, never replace them."""
+    def for_windows(
+        cls, env: Mapping[str, str], *, program_dirs: Sequence[PurePath] = ()
+    ) -> PathPolicy:
+        """Build a Windows policy. Environment values are added to defaults, never replace them.
+        ``program_dirs``: the folders kresorter runs from, blocked like its data."""
         drive = env.get("SystemDrive", "C:")
         root = PureWindowsPath(drive + "\\")
         home = PureWindowsPath(env.get("USERPROFILE", str(root / "Users" / "Default")))
@@ -137,6 +147,7 @@ class PathPolicy:
             ),
             default_roots=[home / ".cache", home / "Downloads"],
             app_data_dir=local_root / APP_NAME,
+            program_dirs=program_dirs,
         )
 
     @classmethod
@@ -146,8 +157,10 @@ class PathPolicy:
         home: PurePosixPath,
         platform: Literal["linux", "darwin"],
         env: Mapping[str, str] | None = None,
+        program_dirs: Sequence[PurePath] = (),
     ) -> PathPolicy:
-        """Build a Linux or macOS policy. macOS paths are compared case-insensitively (APFS)."""
+        """Build a Linux or macOS policy. macOS paths are compared case-insensitively (APFS).
+        ``program_dirs``: the folders kresorter runs from, blocked like its data."""
         system: tuple[str, ...]
         program_files: tuple[str, ...]
         common = ("/bin", "/sbin", "/usr", "/etc", "/dev", "/var/lib", "/var/db")
@@ -172,6 +185,7 @@ class PathPolicy:
             profile=(home.parent, home, [PurePosixPath(".ssh"), PurePosixPath(".gnupg")], []),
             default_roots=[home / ".cache", home / "Downloads"],
             app_data_dir=data_root / APP_NAME,
+            program_dirs=program_dirs,
         )
 
     # --- public API ----------------------------------------------------------------------------

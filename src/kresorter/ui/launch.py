@@ -5,19 +5,23 @@ that installs it) or a library Qt cannot load (and those Qt needs on Linux); not
 created, and the exit code is 3. Without a standard error, as for a GUI script on Windows and
 ``Kresorter.exe``, the line is shown in the system's message box there (``MessageBoxW``
 through ``ctypes``, which needs no Qt) and nowhere elsewhere (decision 0015, item 24). An
-import error of the window's own modules is raised.
+import error of the window's own modules is raised. The one option, ``--self-test REPORT``, is
+read before Qt is imported (item 17).
 """
 
 from __future__ import annotations
 
+import argparse
 import importlib
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol, cast
 
 from kresorter.environment import Environment
 
-__all__ = ["main"]
+__all__ = ["Options", "main", "options"]
 
 NO_QT = 'kresorter-ui: the desktop window needs PySide6 (pip install "kresorter[ui]"): {}\n'
 NO_LIBRARY = (
@@ -38,8 +42,28 @@ class _Ctypes(Protocol):
     def WinDLL(self, name: str) -> _User32: ...
 
 
+@dataclass(frozen=True)
+class Options:
+    self_test: Path | None = None  # the report of the self-test, which runs instead
+
+
+def options(argv: Sequence[str]) -> Options:
+    """The options of ``argv`` (without the program's name); usage errors exit with 2."""
+    parser = argparse.ArgumentParser(prog="kresorter-ui", description="Kresorter's desktop window.")
+    parser.add_argument(
+        "--self-test",
+        metavar="REPORT",
+        type=Path,
+        help="open the window, show each page and close it, changing nothing; write one line"
+        " per page to REPORT and exit with 0, or the traceback of a failure and exit with 1",
+    )
+    return Options(parser.parse_args(list(argv)).self_test)
+
+
 def main(argv: Sequence[str] | None = None, *, environment: Environment | None = None) -> int:
-    """Open the window; its exit code once it is closed (0), or 3 without Qt."""
+    """Open the window; its exit code once it is closed (0), or 3 without Qt. ``argv``: the
+    arguments after the program's name."""
+    chosen = options(sys.argv[1:] if argv is None else argv)
     try:
         importlib.import_module("PySide6.QtWidgets")
     except ImportError as error:  # a binding that cannot load a library names itself alone
@@ -47,7 +71,7 @@ def main(argv: Sequence[str] | None = None, *, environment: Environment | None =
         _say((NO_QT if missing else NO_LIBRARY).format(error))
         return NO_WINDOW
     run = importlib.import_module("kresorter.ui.app").run
-    return int(run(sys.argv[:1] if argv is None else argv, environment or Environment()))
+    return int(run(sys.argv[:1], environment or Environment(), chosen.self_test))
 
 
 def _say(line: str) -> None:
