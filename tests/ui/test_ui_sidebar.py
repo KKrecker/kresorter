@@ -270,6 +270,23 @@ def test_a_click_on_settings_unmarks_the_page_marked_before(window: Window) -> N
     assert sidebar.lists[0].currentRow() == -1
 
 
+@pytest.mark.parametrize("reason", [Qt.FocusReason.TabFocusReason, Qt.FocusReason.OtherFocusReason])
+def test_the_focus_on_the_other_list_keeps_the_current_page(
+    qtbot: QtBot, window: Window, reason: Qt.FocusReason
+) -> None:
+    # [0014.18] [0018.4] As when the window opens again on Settings: the list above, focused
+    # first, has no current row and takes none.
+    sidebar = window.sidebar
+    window.show_page("settings")
+    with qtbot.waitActive(window):
+        window.activateWindow()
+    sidebar.lists[0].setFocus(reason)
+    qtbot.waitUntil(sidebar.lists[0].hasFocus)
+    assert sidebar.currentRow() == len(PAGES) - 1
+    assert window.pages.currentWidget() is window.page("settings")
+    assert sidebar.lists[0].currentRow() == -1
+
+
 # --- the status lines ----------------------------------------------------------------------------
 
 
