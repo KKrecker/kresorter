@@ -37,6 +37,7 @@ from kresorter.ui.i18n import Translator
 from kresorter.ui.window import Window
 from support.files import aged, write
 from support.host import host_classifier, host_rules
+from support.offscreen import system_fonts
 
 __all__ = ["HEIGHT", "OUT", "SCREENS", "WIDTH", "main", "shoot"]
 
@@ -293,6 +294,7 @@ def shoot(out: Path, screens: Sequence[str] = SCREENS) -> list[Path]:
 def main(argv: Sequence[str] | None = None, out: Path = OUT) -> int:
     """The screens named, every one by default, into ``out``; each file written is named."""
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    system_fonts()
     for path in shoot(out, list(sys.argv[1:] if argv is None else argv) or SCREENS):
         print(path)
     return 0

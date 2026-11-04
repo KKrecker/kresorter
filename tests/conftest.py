@@ -25,10 +25,12 @@ from support.artifacts import Built, Installed, built_for_the_run, install, lend
 from support.cli import scan_context
 from support.kernel import FakeCtypes
 from support.live import guard
+from support.offscreen import system_fonts
 
 # The window's tests run on Qt's offscreen platform, set before any application is made
-# (decision 0014, item 38).
+# (decision 0014, item 38), with the system's fonts on Windows too.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+system_fonts()
 
 _IPV4_LOOPBACK = ipaddress.IPv4Network("127.0.0.0/8")
 _IPV6_LOOPBACK = ipaddress.IPv6Address("::1")

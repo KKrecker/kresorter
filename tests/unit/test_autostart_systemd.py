@@ -88,7 +88,8 @@ def test_an_enabled_service(units: Path, vendor: Path) -> None:
 
 def test_a_relative_link_is_resolved_from_its_directory(units: Path) -> None:
     unit(units, "sync.service")
-    link = enable(units, "default.target", "sync.service", "../sync.service")
+    # written as the system writes a path: Windows follows no link written with '/'
+    link = enable(units, "default.target", "sync.service", Path("..", "sync.service"))
 
     found = only(read_systemd_user(units))
 
