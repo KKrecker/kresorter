@@ -551,3 +551,16 @@ def test_the_reasons_are_pinned() -> None:
     missing = ExplanationUnavailable(Unavailable.EMPTY, "nothing left once cleaned")
     assert (missing.reason, missing.detail) == (Unavailable.EMPTY, "nothing left once cleaned")
     assert str(missing) == "empty: nothing left once cleaned"
+
+
+def test_status_keeps_the_models_ollama_lists() -> None:
+    # [0018.32] For the window's choice; none before the tags are read.
+    tags = as_json({"models": [{"name": "llama3.2:latest"}, {"name": "qwen2.5:7b"}]})
+    with ScriptedOllama(VERSION, tags) as ollama:
+        found = status(env_for(ollama.address))
+    assert found.models == ("llama3.2:latest", "qwen2.5:7b")
+    with ScriptedOllama(VERSION, as_json({"models": [{"name": "qwen2.5:7b"}]})) as ollama:
+        missing = status(env_for(ollama.address))
+    assert (missing.installed, missing.models) == (False, ("qwen2.5:7b",))
+    with ScriptedOllama(VERSION, as_json({}, status=500)) as ollama:
+        assert status(env_for(ollama.address)).models == ()

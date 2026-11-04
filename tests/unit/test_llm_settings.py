@@ -11,7 +11,9 @@ from kresorter.llm.settings import (
     Address,
     address_from,
     installed,
+    is_model_name,
     model_from,
+    with_model,
 )
 
 
@@ -159,3 +161,26 @@ def test_a_model_is_installed_by_its_name_or_latest(
 ) -> None:
     # [0013.9]
     assert installed(model, names) is found
+
+
+# --- the model chosen in the window's settings (decision 0018, item 32) --------------------------
+
+
+def test_a_model_name_is_one_the_environment_would_take() -> None:
+    # [0018.32] [0013.9]
+    assert is_model_name("qwen2.5:7b")
+    assert is_model_name("library/mistral:latest")
+    assert not is_model_name("no model!")
+    assert not is_model_name("llam\u0430")
+    assert not is_model_name("a" * 101)
+
+
+def test_the_model_chosen_is_used_unless_the_environment_names_one() -> None:
+    # [0018.32] KRESORTER_OLLAMA_MODEL, when set, wins; the rest of the environment as it is.
+    url = {"KRESORTER_OLLAMA_URL": "http://127.0.0.1:9"}
+    assert model_from(with_model(url, "qwen2.5:3b")) == "qwen2.5:3b"
+    assert with_model(url, "qwen2.5:3b")["KRESORTER_OLLAMA_URL"] == "http://127.0.0.1:9"
+    assert with_model(url, None) == url
+    named = {**url, "KRESORTER_OLLAMA_MODEL": "llama3.2"}
+    assert model_from(with_model(named, "qwen2.5:3b")) == "llama3.2"
+    assert url == {"KRESORTER_OLLAMA_URL": "http://127.0.0.1:9"}

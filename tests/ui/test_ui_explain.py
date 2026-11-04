@@ -33,6 +33,7 @@ from support.window import (
     junk_tree,
     make_window,
     scanned,
+    settled,
     wait_idle,
 )
 
@@ -120,6 +121,30 @@ def _plan(page: OrganizePage) -> list[str]:
 
 
 # --- a finding -----------------------------------------------------------------------------------
+
+
+def test_an_explanation_asks_the_model_chosen_in_settings(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.32] And its note names it.
+    settled(data_dir, model="qwen2.5:3b")
+    tags = as_json({"models": [{"name": "qwen2.5:3b"}]})
+    tree = junk_tree(zone)
+    with ScriptedOllama(VERSION, tags, generated(ANSWER)) as ollama:
+        window = _window(qtbot, tmp_path, zone, data_dir, ollama.address)
+        page = window.findings
+        scanned(qtbot, window)
+        page.tree.setCurrentItem(page.item(tree["m"]))
+        page.explain.button.click()
+        wait_idle(qtbot, window)
+        models = [
+            json.loads(received.body)["model"]
+            for received in ollama.received
+            if (received.method, received.path) == GENERATE
+        ]
+
+    assert models == ["qwen2.5:3b"]
+    assert _said(page) == (ANSWER, "qwen2.5:3b via Ollama · may be wrong")
 
 
 def test_a_finding_s_detail_asks_for_its_one_subject_only_on_request(

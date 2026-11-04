@@ -23,6 +23,7 @@ from kresorter.autostart.registry import Hive, RegValue, ValueKind
 from kresorter.autostart.run_keys import RUN
 from kresorter.cli_llm import run_status
 from kresorter.core.heuristics import Platform
+from kresorter.llm.machine import GIB, Machine
 from kresorter.llm.settings import MODEL_VARIABLE, URL_VARIABLE, Address
 from kresorter.ui.i18n import Language
 from kresorter.ui.settings import Settings, load
@@ -212,6 +213,190 @@ def test_a_setting_that_cannot_be_saved_says_why_and_stays_as_it_was(
     assert page.language.currentIndex() == 0
     assert page.current == Settings()
     assert data_dir.read_bytes() == b"not a directory"
+
+
+# --- the model [0018.32] [0018.33] [0018.34] ------------------------------------------------------
+
+LISTED = as_json(
+    {"models": [{"name": "llama3.2:latest"}, {"name": "qwen2.5:3b"}, {"name": "no model!"}]}
+)
+CHECKS = [("GET", "/api/version"), ("GET", "/api/tags")]
+
+
+def _models(page: SettingsPage) -> list[str]:
+    return [page.model.itemText(index) for index in range(page.model.count())]
+
+
+def _checked(qtbot: QtBot, window: Window) -> SettingsPage:
+    page = window.settings
+    page.check_button.click()
+    wait_idle(qtbot, window)
+    return page
+
+
+def test_check_lists_the_models_ollama_has_in_a_choice(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.32] Only names a model may have; the one in use is the one chosen.
+    with ScriptedOllama(VERSION, LISTED) as ollama:
+        env = {URL_VARIABLE: ollama.address.url}
+        window = _window(qtbot, tmp_path, zone, data_dir, llm_env=env)
+        assert window.settings.model.isHidden()
+        page = _checked(qtbot, window)
+
+    assert not page.model.isHidden()
+    assert _models(page) == ["llama3.2:latest", "qwen2.5:3b"]
+    assert page.model.currentIndex() == 0
+    assert page.model.isEnabled()
+    assert page.model.accessibleName() == "Model"
+    assert page.model_note.isHidden()
+    assert not data_dir.exists()
+
+
+def test_a_model_chosen_is_saved_and_used_by_the_check_and_named_in_the_sidebar(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.32] [0018.34] Chosen, the check runs again with it.
+    with ScriptedOllama(VERSION, LISTED, VERSION, LISTED) as ollama:
+        url = ollama.address.url
+        window = _window(qtbot, tmp_path, zone, data_dir, llm_env={URL_VARIABLE: url})
+        page = _checked(qtbot, window)
+        page.model.setCurrentIndex(1)
+        wait_idle(qtbot, window)
+        asked = ollama.paths()
+
+    assert _saved(data_dir) == {
+        "language": "system",
+        "include_machine": False,
+        "skipped_zones": [],
+        "theme": "system",
+        "model": "qwen2.5:3b",
+    }
+    assert page.current == Settings(model="qwen2.5:3b")
+    assert page.result.text() == "Saved."
+    assert asked == [*CHECKS, *CHECKS]
+    assert page.address.text() == f"Address: {url} · Model: qwen2.5:3b"
+    assert _lines(page)[1] == "Model: qwen2.5:3b: installed"
+    assert window.sidebar.ai.text() == "AI explanations: qwen2.5:3b"
+    assert page.model.currentIndex() == 1
+
+
+def test_the_window_opens_with_the_model_remembered(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.32] [0018.34]
+    settled(data_dir, model="qwen2.5:3b")
+    window = _window(qtbot, tmp_path, zone, data_dir)
+    assert window.settings.address.text() == "Address: http://127.0.0.1:11434 · Model: qwen2.5:3b"
+    assert window.sidebar.ai.text() == "AI explanations: qwen2.5:3b"
+
+
+def test_the_environment_s_model_wins_and_the_card_says_so(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.32] Before a check too; the choice cannot change it.
+    settled(data_dir, model="qwen2.5:3b")
+    with ScriptedOllama(VERSION, LISTED) as ollama:
+        url = ollama.address.url
+        env = {URL_VARIABLE: url, MODEL_VARIABLE: "llama3.2"}
+        window = _window(qtbot, tmp_path, zone, data_dir, llm_env=env)
+        note = window.settings.model_note
+        assert note.text() == (
+            "KRESORTER_OLLAMA_MODEL sets the model: llama3.2. The model chosen here applies"
+            " once it is unset."
+        )
+        assert not note.isHidden()
+        page = _checked(qtbot, window)
+
+    assert page.address.text() == f"Address: {url} · Model: llama3.2"
+    assert _lines(page)[1] == "Model: llama3.2: installed"
+    assert window.sidebar.ai.text() == "AI explanations: llama3.2"
+    assert page.model.currentIndex() == 0
+    assert not page.model.isEnabled()
+
+
+def test_a_model_that_cannot_be_saved_is_not_used(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.32] [0014.35] Nothing changes, and nothing is asked again.
+    data_dir.parent.mkdir(parents=True)
+    data_dir.write_bytes(b"not a directory")
+    with ScriptedOllama(VERSION, LISTED, VERSION, LISTED) as ollama:
+        env = {URL_VARIABLE: ollama.address.url}
+        window = _window(qtbot, tmp_path, zone, data_dir, llm_env=env)
+        page = _checked(qtbot, window)
+        page.model.setCurrentIndex(1)
+        wait_idle(qtbot, window)
+        asked = ollama.paths()
+
+    assert page.result.text().startswith("Not saved: The data folder cannot be used: ")
+    assert page.model.currentIndex() == 0
+    assert page.current == Settings()
+    assert asked == CHECKS
+    assert window.sidebar.ai.text() == "AI explanations: llama3.2"
+
+
+def test_the_card_recommends_a_model_for_the_machine_and_how_to_get_it(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.33] kresorter installs nothing.
+    env = environment(tmp_path, zone, data_dir, machine=Machine(16 * GIB, 8))
+    window = make_window(qtbot, env)
+    size = window.translator.size(16 * GIB)
+    assert window.settings.recommended.text() == (
+        f"Recommended for this computer ({size} of memory, 8 processors): qwen2.5:7b; Qwen 2.5"
+        " writes Russian as well as English. To get it: ollama pull qwen2.5:7b (kresorter"
+        " installs nothing itself)."
+    )
+    assert window.settings.ai_card.isAncestorOf(window.settings.recommended)
+
+
+@pytest.mark.parametrize(
+    ("machine", "language", "shown"),
+    [
+        (
+            Machine(8 * GIB, 1),
+            "en",
+            "Recommended for this computer (8.0 GiB of memory, 1 processor): qwen2.5:1.5b;",
+        ),
+        (
+            Machine(None, None),
+            "ru",
+            "Рекомендуется для этого компьютера (память неизвестна, число процессоров"
+            " неизвестно): qwen2.5:1.5b;",
+        ),
+        (
+            Machine(32 * GIB, 2),
+            "ru",
+            "Рекомендуется для этого компьютера (32,0 ГиБ памяти, 2 процессора): qwen2.5:7b;",
+        ),
+    ],
+)
+def test_the_recommendation_says_what_it_comes_from(
+    qtbot: QtBot,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    machine: Machine,
+    language: Language,
+    shown: str,
+) -> None:
+    # [0018.33]
+    env = environment(tmp_path, zone, data_dir, machine=machine)
+    window = make_window(qtbot, env, language=language)
+    assert window.settings.recommended.text().startswith(shown)
+
+
+def test_the_recommendation_in_russian(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.33]
+    env = environment(tmp_path, zone, data_dir, machine=Machine(4 * GIB, 8))
+    window = make_window(qtbot, env, language="ru")
+    assert window.settings.recommended.text().endswith(
+        ": qwen2.5:1.5b; Qwen 2.5 пишет и по-русски, и по-английски. Чтобы получить её: ollama"
+        " pull qwen2.5:1.5b (kresorter сам ничего не устанавливает)."
+    )
 
 
 # --- a restart [0018.3] [0018.4] -----------------------------------------------------------------

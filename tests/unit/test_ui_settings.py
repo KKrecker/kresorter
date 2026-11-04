@@ -69,6 +69,7 @@ def test_the_settings_are_the_language_and_the_machine_scope() -> None:
         "include_machine",
         "skipped_zones",
         "theme",
+        "model",
     ]
     assert Settings() == DEFAULTS == Settings(language="system", include_machine=False)
     assert LANGUAGE_SETTINGS == ("system", "en", "ru")
@@ -359,4 +360,48 @@ def test_any_other_theme_is_a_wrong_value(
 ) -> None:
     # [0018.1] [0014.36] The file is not used at all.
     _write(data_dir, json.dumps({"language": "ru", "theme": value}).encode())
+    assert load(context) == Loaded(DEFAULTS, Unused.WRONG_VALUE, detail)
+
+
+# --- the model [0018.32] -------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("model", ["qwen2.5:7b", "llama3.2", "library/mistral:latest"])
+def test_the_model_chosen_is_remembered(context: ScanContext, data_dir: Path, model: str) -> None:
+    # [0018.32]
+    settings = Settings(model=model)
+    assert save(context, settings) is None
+    assert load(context) == Loaded(settings)
+    saved = json.loads((data_dir / SETTINGS_NAME).read_text(encoding="utf-8"))
+    assert saved["model"] == model
+
+
+def test_a_model_left_out_is_the_default_and_none_chosen_is_not_written(
+    context: ScanContext, data_dir: Path
+) -> None:
+    # [0018.32] The default is the local AI's (llm.settings), unless one is chosen.
+    assert DEFAULTS.model is None
+    assert save(context, Settings(language="ru")) is None
+    saved = json.loads((data_dir / SETTINGS_NAME).read_text(encoding="utf-8"))
+    assert "model" not in saved
+    assert load(context) == Loaded(Settings(language="ru"))
+
+
+@pytest.mark.parametrize(
+    ("value", "detail"),
+    [
+        ("no model!", 'model="no model!"'),
+        ("", 'model=""'),
+        ("-x", 'model="-x"'),
+        ("a" * 101, f'model="{"a" * 101}"'),
+        (1, "model=1"),
+        (None, "model=null"),
+        (["qwen2.5:7b"], 'model=["qwen2.5:7b"]'),
+    ],
+)
+def test_a_model_that_is_no_model_name_is_a_wrong_value(
+    context: ScanContext, data_dir: Path, value: object, detail: str
+) -> None:
+    # [0018.32] A name decision 0013's item 9 accepts, as KRESORTER_OLLAMA_MODEL.
+    _write(data_dir, json.dumps({"language": "ru", "model": value}).encode())
     assert load(context) == Loaded(DEFAULTS, Unused.WRONG_VALUE, detail)
