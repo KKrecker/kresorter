@@ -10,7 +10,7 @@ import os
 import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePath, PurePosixPath
 from typing import Literal
 
 from kresorter.autostart.listing import AutostartContext, default_autostart_context
@@ -45,12 +45,13 @@ def program_folders() -> tuple[Path, ...]:
 def default_context(
     platform: Platform | None = None,
     env: Mapping[str, str] | None = None,
-    home: Path | None = None,
+    home: PurePath | None = None,
 ) -> ScanContext:
     """Context for the current system (arguments exist for tests). The folders kresorter runs
     from, the open-file check and the synced folders are the running system's: a context made
     for another has no folder, no check and no synced folder (decision 0015, item 16; 0016,
-    item 5; 0017, item 10)."""
+    item 5; 0017, item 10). ``home`` is written as that system writes it: a POSIX path for
+    Linux or macOS, even on Windows."""
     current = platform or detect_platform()
     running = current == detect_platform()
     program = program_folders() if running else ()
