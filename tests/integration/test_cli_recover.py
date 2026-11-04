@@ -21,7 +21,6 @@ from kresorter.autostart.changes import AutostartStore, XdgChanges
 from kresorter.autostart.registry import Hive, RegValue, ValueKind
 from kresorter.autostart.run_keys import APPROVED, RUN
 from kresorter.autostart.xdg import read_xdg
-from kresorter.core.heuristics import JunkClassifier, default_rules
 from kresorter.core.open_files import NoOpenFileCheck
 from kresorter.core.scanner import ScanContext
 from kresorter.organize.mover import carry_out
@@ -31,6 +30,7 @@ from kresorter.storage.db import connect
 from kresorter.storage.lock import InstanceLock
 from support.cli import autostart_context, run, scan_context
 from support.files import write
+from support.host import host_classifier, host_rules
 from support.interrupted import (
     APP,
     crashed_batch,
@@ -441,9 +441,9 @@ def test_a_partial_stub_that_cannot_be_moved_stops_with_the_reason(
 def test_an_unsafe_data_directory_is_refused_before_anything_is_created(
     tmp_path: Path, zone: Path
 ) -> None:
-    rules = [r for r in default_rules() if r.id != "posix-temp"]
+    rules = host_rules()
     policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=zone)
-    classifier = JunkClassifier(rules, platform="linux")
+    classifier = host_classifier(rules)
     unsafe = ScanContext(policy, FakeOpenFiles(), classifier, True, "linux", NoSyncedFolders())
 
     code, _, err = run(["autostart", "recover"], unsafe, autostart_context("linux", tmp_path))

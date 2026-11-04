@@ -11,11 +11,11 @@ import pytest
 from fakes import FakeOpenFiles, make_policy
 from kresorter import cli
 from kresorter.analysis.duplicates import KeepReason
-from kresorter.core.heuristics import JunkClassifier, default_rules
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from kresorter.organize.synced import NoSyncedFolders
 from support.files import snapshot
+from support.host import host_classifier, host_rules
 
 DAY_NS = 86_400 * 10**9
 MIB = 1024**2
@@ -43,12 +43,12 @@ def tree(tmp_path: Path) -> Path:
 
 
 def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
-    # Same as test_cli_scan: drop "posix-temp", which would flag all of tmp_path as junk.
-    rules = [r for r in default_rules() if r.id != "posix-temp"]
+    # Same as test_cli_scan: without the rule that would flag all of tmp_path as junk.
+    rules = host_rules()
     return ScanContext(
         policy=make_policy(tmp_path, tree / "blocked", default_roots=[tree]),
         open_files=FakeOpenFiles(),
-        classifier=JunkClassifier(rules, platform="linux"),
+        classifier=host_classifier(rules),
         open_files_checked=checked,
         platform="linux",
         synced=NoSyncedFolders(),

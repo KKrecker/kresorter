@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from kresorter.core.heuristics import JunkClassifier
 from kresorter.core.models import FileEntry
 from kresorter.core.preflight import Candidate
 from kresorter.quarantine.journal import QuarantinedItem, quarantined
 from kresorter.quarantine.service import QuarantineService
 from kresorter.storage.db import connect
 from support.files import write
+from support.host import host_classifier
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def service(conn: sqlite3.Connection, tmp_path: Path, zone: Path) -> QuarantineS
         conn,
         policy=policy,
         open_files=FakeOpenFiles(),
-        classifier=JunkClassifier([], platform="linux"),
+        classifier=host_classifier([]),
     )
 
 

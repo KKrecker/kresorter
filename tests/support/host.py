@@ -10,6 +10,12 @@ has not is ``posix_only``, with the reason.
 On Windows ``os.open`` opens a file in text mode unless ``os.O_BINARY`` is given: each ``\\n``
 written becomes ``\\r\\n``. ``record_opens`` shows the flags a file is opened with on every
 system: where ``os.O_BINARY`` is missing, a bit no system uses stands for it.
+
+The junk rules read a path as their system writes it: ``host_classifier`` is the system's own,
+Windows' rules on Windows and Linux's elsewhere, for the paths under ``tmp_path``. Its
+temporary folder is junk to one rule, ``posix-temp`` (``/tmp``) on Linux and
+``windows-user-temp`` (``AppData\\Local\\Temp``) on Windows: ``host_rules`` are the default rules
+without it, so that a test's tree is junk only where the test makes it so.
 """
 
 from __future__ import annotations
@@ -17,14 +23,30 @@ from __future__ import annotations
 import os
 import stat
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 
 import pytest
 
+from kresorter.core.heuristics import JunkClassifier, JunkRule, default_rules
+
 WINDOWS = sys.platform == "win32"
 MTIME_STEP_NS = 100 if WINDOWS else 1  # the smallest change of a time the system keeps
 UNUSED_BIT = 1 << 30  # stands for os.O_BINARY where there is none
+
+
+TEMP_RULE = "windows-user-temp" if WINDOWS else "posix-temp"  # tmp_path is junk to it
+
+
+def host_rules() -> list[JunkRule]:
+    """Every default rule but ``TEMP_RULE``."""
+    return [rule for rule in default_rules() if rule.id != TEMP_RULE]
+
+
+def host_classifier(rules: Iterable[JunkRule]) -> JunkClassifier:
+    """``rules`` on the running system's paths: Windows' on Windows, Linux's elsewhere."""
+    return JunkClassifier(rules, platform="windows" if WINDOWS else "linux")
 
 
 def posix_only(reason: str) -> pytest.MarkDecorator:

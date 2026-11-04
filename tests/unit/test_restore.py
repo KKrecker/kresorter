@@ -15,7 +15,6 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy, windows_rename
-from kresorter.core.heuristics import JunkClassifier
 from kresorter.core.models import FileEntry
 from kresorter.core.policy import PathPolicy
 from kresorter.core.preflight import Candidate
@@ -23,10 +22,10 @@ from kresorter.quarantine.journal import OperationState
 from kresorter.quarantine.service import QuarantineError, QuarantineService, RestoreRefusal
 from kresorter.storage.db import connect
 from support.files import write
-from support.host import as_kept
+from support.host import as_kept, host_classifier
 from support.journal import rows
 
-NO_RULES = JunkClassifier([], platform="linux")
+NO_RULES = host_classifier([])
 ATIME_NS = 1_000_000_000_000_000_000
 MTIME_NS = 1_100_000_000_000_000_000
 

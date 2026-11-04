@@ -7,12 +7,13 @@ import pytest
 
 from fakes import FakeOpenFiles, make_policy
 from kresorter.core import hashing
-from kresorter.core.heuristics import JunkCategory, JunkClassifier, load_rules
+from kresorter.core.heuristics import JunkCategory, load_rules
 from kresorter.core.models import FileEntry, Skipped, SkipReason
 from kresorter.core.policy import BlockReason
 from kresorter.core.scanner import DuplicateGroup, ScanContext, scan
 from kresorter.organize.synced import NoSyncedFolders
 from support.files import write
+from support.host import host_classifier
 
 RULES = """
 [[rule]]
@@ -27,7 +28,7 @@ def context(tmp_path: Path, *blocked: Path) -> ScanContext:
     return ScanContext(
         policy=make_policy(tmp_path, *blocked),
         open_files=FakeOpenFiles(),
-        classifier=JunkClassifier(load_rules(RULES), platform="linux"),
+        classifier=host_classifier(load_rules(RULES)),
         open_files_checked=True,
         platform="linux",
         synced=NoSyncedFolders(),

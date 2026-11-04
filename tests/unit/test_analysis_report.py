@@ -16,12 +16,13 @@ from fakes import FakeOpenFiles, make_policy
 from kresorter.analysis.report import AnalysisReport, Finding, LevelTotal, analyze
 from kresorter.analysis.score import Evidence, Level, Reason
 from kresorter.analysis.size_age import DAY_NS, Thresholds
-from kresorter.core.heuristics import JunkClassifier, load_rules
+from kresorter.core.heuristics import load_rules
 from kresorter.core.models import FileEntry
 from kresorter.core.preflight import Candidate
 from kresorter.core.scanner import ScanContext, scan
 from kresorter.organize.synced import NoSyncedFolders
 from support.files import snapshot
+from support.host import host_classifier
 
 RULES = """
 [[rule]]
@@ -36,7 +37,7 @@ category = "temp"
 description = "temp"
 files = ["*.tmp"]
 """
-CLASSIFIER = JunkClassifier(load_rules(RULES), platform="linux")
+CLASSIFIER = host_classifier(load_rules(RULES))
 NOW = 1_700_000_000_000_000_000
 RECENT = NOW - DAY_NS
 THRESHOLDS = Thresholds(large_bytes=1000, old_after_days=365)

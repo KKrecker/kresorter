@@ -12,14 +12,14 @@ import pytest
 import kresorter
 from fakes import FakeOpenFiles, make_policy
 from kresorter import cli, environment
-from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
+from kresorter.core.heuristics import Platform
 from kresorter.core.open_files.windows import ShareModeChecker
 from kresorter.core.policy import BlockReason, Verdict
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from kresorter.organize.synced import NoSyncedFolders
 from support.files import snapshot, write
-from support.host import posix_only
+from support.host import host_classifier, host_rules, posix_only
 from support.kernel import FakeKernel
 
 
@@ -35,13 +35,13 @@ def tree(tmp_path: Path) -> Path:
 
 
 def ctx(tmp_path: Path, tree: Path, *, checked: bool = True) -> ScanContext:
-    # tmp_path lives under /tmp, which the real "posix-temp" rule (rightly) marks as junk.
-    # Drop that one rule so the test sees the tree's own junk, not its location.
-    rules = [r for r in default_rules() if r.id != "posix-temp"]
+    # tmp_path lives in the system's temporary folder, which a real rule (rightly) marks as
+    # junk: without that one rule the test sees the tree's own junk, not its location.
+    rules = host_rules()
     return ScanContext(
         policy=make_policy(tmp_path, tree / "blocked", default_roots=[tree]),
         open_files=FakeOpenFiles(),
-        classifier=JunkClassifier(rules, platform="linux"),
+        classifier=host_classifier(rules),
         open_files_checked=checked,
         platform="linux",
         synced=NoSyncedFolders(),

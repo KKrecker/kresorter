@@ -16,7 +16,6 @@ from pathlib import Path
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
-from kresorter.core.heuristics import JunkClassifier
 from kresorter.core.models import FileEntry
 from kresorter.core.policy import PathPolicy
 from kresorter.core.preflight import Candidate
@@ -31,9 +30,10 @@ from kresorter.quarantine.service import (
 )
 from kresorter.storage.db import connect
 from support.files import write
+from support.host import host_classifier
 from support.journal import rows
 
-NO_RULES = JunkClassifier([], platform="linux")
+NO_RULES = host_classifier([])
 MTIME_NS = 1_100_000_000_000_000_000
 
 # --- helpers -----------------------------------------------------------------------------------

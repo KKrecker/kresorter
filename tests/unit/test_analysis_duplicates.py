@@ -20,18 +20,19 @@ import pytest
 
 from fakes import FakeOpenFiles, make_policy
 from kresorter.analysis.duplicates import DuplicateDecision, KeepReason, decide
-from kresorter.core.heuristics import JunkClassifier, load_rules
+from kresorter.core.heuristics import load_rules
 from kresorter.core.models import FileEntry
 from kresorter.core.preflight import Candidate
 from kresorter.core.scanner import ScanContext, scan
 from kresorter.organize.synced import NoSyncedFolders
+from support.host import host_classifier
 
 DIGEST = "ab" * 32
 SIZE = 4096
 T0 = 1_600_000_000_000_000_000
 
 RULES = '[[rule]]\nid = "cachedir"\ncategory = "cache"\ndescription = "x"\ndirs = ["cache"]\n'
-CLASSIFIER = JunkClassifier(load_rules(RULES), platform="linux")
+CLASSIFIER = host_classifier(load_rules(RULES))
 
 
 @pytest.fixture

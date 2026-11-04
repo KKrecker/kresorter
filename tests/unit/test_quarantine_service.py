@@ -17,7 +17,7 @@ import pytest
 
 from fakes import FakeOpenFiles, make_policy, windows_rename
 from kresorter.core.hashing import hash_file
-from kresorter.core.heuristics import JunkClassifier, load_rules
+from kresorter.core.heuristics import load_rules
 from kresorter.core.models import FileEntry
 from kresorter.core.open_files import NoOpenFileCheck
 from kresorter.core.policy import PathPolicy
@@ -28,10 +28,10 @@ from kresorter.quarantine.service import QuarantineError, QuarantineService
 from kresorter.quarantine.vault import Vault
 from kresorter.storage.db import connect
 from support.files import write
-from support.host import MTIME_STEP_NS, as_kept
+from support.host import MTIME_STEP_NS, as_kept, host_classifier
 from support.journal import rows
 
-NO_RULES = JunkClassifier([], platform="linux")
+NO_RULES = host_classifier([])
 
 # --- helpers -----------------------------------------------------------------------------------
 
@@ -126,7 +126,7 @@ def test_data_dir_matching_a_junk_rule_is_refused(
             conn,
             policy=policy,
             open_files=FakeOpenFiles(),
-            classifier=JunkClassifier(rules, platform="linux"),
+            classifier=host_classifier(rules),
         )
 
 

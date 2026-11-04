@@ -28,7 +28,6 @@ from PySide6.QtWidgets import QApplication
 from fakes import FakeOpenFiles, make_policy
 from kresorter.analysis.score import Level
 from kresorter.autostart.listing import AutostartContext
-from kresorter.core.heuristics import JunkClassifier, default_rules
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from kresorter.llm.transport import LIMITS
@@ -37,6 +36,7 @@ from kresorter.ui.dialogs import Confirmation, ConfirmDialog, Dialogs
 from kresorter.ui.i18n import Translator
 from kresorter.ui.window import Window
 from support.files import aged, write
+from support.host import host_classifier, host_rules
 
 __all__ = ["HEIGHT", "OUT", "SCREENS", "WIDTH", "main", "shoot"]
 
@@ -107,11 +107,11 @@ def made_up_home(home: Path) -> None:
 
 
 def environment(home: Path) -> Environment:
-    """The window's environment on the made-up home: Linux's rules but ``posix-temp`` (the home
-    is under the temporary folder), ``~/.cache`` and ``~/Downloads`` the safe zones, autostart
-    in ``~/.config/autostart``, no local AI."""
+    """The window's environment on the made-up home: the running system's rules but the one
+    that marks the temporary folder as junk (the home is in it), ``~/.cache`` and
+    ``~/Downloads`` the safe zones, autostart in ``~/.config/autostart``, no local AI."""
     data_dir = home / ".local" / "share" / "kresorter"
-    rules = [rule for rule in default_rules() if rule.id != "posix-temp"]
+    rules = host_rules()
     roots = [home / ".cache", home / "Downloads"]
     checker = FakeOpenFiles()
 
@@ -119,7 +119,7 @@ def environment(home: Path) -> Environment:
         return ScanContext(
             policy=make_policy(home, default_roots=roots, app_data_dir=data_dir),
             open_files=checker,
-            classifier=JunkClassifier(rules, platform="linux"),
+            classifier=host_classifier(rules),
             open_files_checked=checker.reliable,
             platform="linux",
             synced=NoSyncedFolders(),

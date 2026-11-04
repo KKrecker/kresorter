@@ -11,11 +11,12 @@ from fakes import FakeOpenFiles, FakeRegistry, make_policy
 from kresorter import cli
 from kresorter.autostart.listing import AutostartContext
 from kresorter.autostart.registry import UserRegistry
-from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
+from kresorter.core.heuristics import Platform
 from kresorter.core.open_files import OpenFileChecker
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from kresorter.organize.synced import NoSyncedFolders, SyncedFolders
+from support.host import host_classifier, host_rules
 
 
 def scan_context(
@@ -27,18 +28,18 @@ def scan_context(
     platform: Platform = "linux",
     synced: SyncedFolders | None = None,
 ) -> ScanContext:
-    """``zone`` the one default root, ``data_dir`` the data directory, every default rule but
-    ``posix-temp``: tmp_path lives under /tmp, which it marks as junk, so the data directory
-    itself would look like junk and be refused. ``platform`` is the system the context says it
-    was made for; its rules stay Linux's, which read the temporary paths of the tests. No folder
-    is synced unless ``synced`` names some."""
-    rules = [r for r in default_rules() if r.id != "posix-temp"]
+    """``zone`` the one default root, ``data_dir`` the data directory, the running system's
+    rules but the one that marks tmp_path as junk (``support.host.host_rules``), so that the
+    data directory does not look like junk and get refused. ``platform`` is the system the
+    context says it was made for; its rules stay the running system's, which read the temporary
+    paths of the tests. No folder is synced unless ``synced`` names some."""
+    rules = host_rules()
     checker = open_files or FakeOpenFiles()
     policy = make_policy(tmp_path, tmp_path / "system", default_roots=[zone], app_data_dir=data_dir)
     return ScanContext(
         policy=policy,
         open_files=checker,
-        classifier=JunkClassifier(rules, platform="linux"),
+        classifier=host_classifier(rules),
         open_files_checked=checker.reliable,
         platform=platform,
         synced=NoSyncedFolders() if synced is None else synced,
