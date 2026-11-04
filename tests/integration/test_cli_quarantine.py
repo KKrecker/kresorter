@@ -8,7 +8,7 @@ first. Purge deletes only with ``--yes``; without it the plan is shown and nothi
 import functools
 import os
 import time
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PurePosixPath
 
 import pytest
 
@@ -375,14 +375,15 @@ def test_the_running_system_s_context_has_the_check_of_its_system() -> None:
 
 
 @pytest.mark.parametrize("platform", ["linux", "darwin", "windows"])
-def test_a_context_for_another_system_discloses_the_missing_check(
-    tmp_path: Path, platform: Platform
-) -> None:
+def test_a_context_for_another_system_discloses_the_missing_check(platform: Platform) -> None:
     # [0016.5] the check is the running system's: a context made for another has none
     if platform == environment.detect_platform():
         pytest.skip("the running system")
     env = {"USERPROFILE": r"C:\Users\Alice"}
-    context = environment.default_context(platform=platform, env=env, home=tmp_path)
+    # [0015.20] a home as the context's system writes it, on Windows too
+    context = environment.default_context(
+        platform=platform, env=env, home=PurePosixPath("/home/alice")
+    )
     assert isinstance(context.open_files, NoOpenFileCheck)
     assert context.open_files_checked is False
 

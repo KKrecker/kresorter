@@ -6,7 +6,7 @@ OneDrive sets three variables; every client of the Cloud Files API registers its
 environment a mapping, the registry ``FakeRegistry``; the real registry is read on Windows.
 """
 
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
 
@@ -191,14 +191,15 @@ def test_the_running_system_s_context_asks_its_system() -> None:
 
 
 @pytest.mark.parametrize("platform", ["linux", "darwin", "windows"])
-def test_a_context_for_another_system_names_no_synced_folder(
-    tmp_path: Path, platform: Platform
-) -> None:
+def test_a_context_for_another_system_names_no_synced_folder(platform: Platform) -> None:
     # [0017.10] the synced folders are the running system's, as its open-file check (0016.5)
     if platform == environment.detect_platform():
         pytest.skip("the running system")
     env = {"USERPROFILE": r"C:\Users\Alice", "OneDrive": r"C:\Users\Alice\OneDrive"}
-    context = environment.default_context(platform=platform, env=env, home=tmp_path)
+    # [0015.20] a home as the context's system writes it, on Windows too
+    context = environment.default_context(
+        platform=platform, env=env, home=PurePosixPath("/home/alice")
+    )
     assert isinstance(context.synced, NoSyncedFolders)
 
 

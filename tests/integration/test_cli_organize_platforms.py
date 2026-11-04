@@ -12,7 +12,7 @@ was made for (`ScanContext.platform`, required); real temporary trees.
 """
 
 import dataclasses
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
@@ -226,12 +226,13 @@ def test_list_and_recover_run_on_linux_without_a_reliable_check(
 
 
 @pytest.mark.parametrize("platform", ["linux", "darwin", "windows"])
-def test_a_scan_context_carries_the_platform_it_was_made_for(
-    tmp_path: Path, platform: Platform
-) -> None:
+def test_a_scan_context_carries_the_platform_it_was_made_for(platform: Platform) -> None:
     # [0012.37] [0012.39] the refusal asks the context, not the system the tests run on
     env = {"USERPROFILE": r"C:\Users\Alice"}
-    context = environment.default_context(platform=platform, env=env, home=tmp_path)
+    # [0015.20] a home as the context's system writes it, on Windows too
+    context = environment.default_context(
+        platform=platform, env=env, home=PurePosixPath("/home/alice")
+    )
     assert context.platform == platform
 
 
