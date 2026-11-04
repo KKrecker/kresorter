@@ -25,6 +25,7 @@ _OPTIONAL = ("dirs", "files", "platforms")
 
 class JunkCategory(StrEnum):
     CACHE = "cache"
+    BROWSER_CACHE = "browser_cache"  # for review: the owner's choice (decision 0018, item 20)
     TEMP = "temp"
     THUMBNAILS = "thumbnails"
     CRASH_DUMP = "crash_dump"

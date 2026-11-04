@@ -64,6 +64,7 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "junk_temp": _both("Temporary file", "Временный файл"),
         "junk_crash_dump": _both("Crash dump", "Дамп сбоя"),
         "duplicate_copy": _both("Duplicate copy", "Копия дубликата"),
+        "junk_browser_cache": _both("Browser cache", "Кэш браузера"),
         "large": _both("Large file", "Большой файл"),
         "old": _both("Not changed for a long time", "Давно не изменялся"),
     },

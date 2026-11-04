@@ -2,7 +2,7 @@
 #
 # Fields:
 #   id           unique, stable identifier (used in reports, journal and tests)
-#   category     cache | temp | thumbnails | crash_dump | os_metadata
+#   category     cache | browser_cache | temp | thumbnails | crash_dump | os_metadata
 #   description  short human explanation of why this is junk
 #   dirs         path patterns that must appear as consecutive parent directories;
 #                segments are globs; a leading "/" anchors at the filesystem root
@@ -15,7 +15,11 @@
 #
 # Deliberately NOT junk: node_modules and build dirs (break projects), partial downloads
 # (*.part, *.crdownload: resumable), Office lock files (~$*: live while a document is open),
-# browser cookies/sessions, generic folders named "cache" or "tmp" inside user data.
+# browser cookies/sessions and site data (Local Storage, IndexedDB, Service Worker: a web
+# app's offline data), generic folders named "cache" or "tmp" inside user data.
+#
+# A browser's cache is a category of its own, for review (decision 0018, item 20): the
+# browsers say it holds copies of pages, not sign-ins, but it costs every page loaded again.
 
 [[rule]]
 id = "python-bytecode"
@@ -31,24 +35,47 @@ dirs = [".pytest_cache", ".mypy_cache", ".ruff_cache"]
 
 [[rule]]
 id = "chromium-cache"
-category = "cache"
+category = "browser_cache"
 description = "Chromium-based browser cache (Chrome, Edge, Brave); re-downloaded as needed."
 dirs = ["User Data/*/Cache", "User Data/*/Code Cache", "User Data/*/GPUCache"]
 platforms = ["windows"]
 
 [[rule]]
+id = "opera-cache"
+category = "browser_cache"
+description = "Opera browser cache (Opera, Opera GX); re-downloaded as needed."
+dirs = ["Opera Software/*/Cache"]
+platforms = ["windows"]
+
+[[rule]]
 id = "firefox-cache"
-category = "cache"
+category = "browser_cache"
 description = "Firefox disk cache; re-downloaded as needed."
 dirs = ["Mozilla/Firefox/Profiles/*/cache2"]
 platforms = ["windows"]
 
 [[rule]]
 id = "inet-cache"
-category = "cache"
-description = "Windows internet cache (WinINet)."
+category = "browser_cache"
+description = "Windows internet cache (WinINet: Internet Explorer, Edge in IE mode)."
 dirs = ["AppData/Local/Microsoft/Windows/INetCache"]
 platforms = ["windows"]
+
+[[rule]]
+id = "browser-caches"
+category = "browser_cache"
+description = "Browser cache under ~/.cache (Chrome, Chromium, Firefox, Brave, Edge, Opera, Vivaldi, Yandex); re-downloaded as needed."
+dirs = [
+    ".cache/google-chrome",
+    ".cache/chromium",
+    ".cache/mozilla",
+    ".cache/BraveSoftware",
+    ".cache/microsoft-edge",
+    ".cache/opera",
+    ".cache/vivaldi",
+    ".cache/yandex-browser",
+]
+platforms = ["linux"]
 
 [[rule]]
 id = "windows-thumbcache"
@@ -77,6 +104,13 @@ category = "cache"
 description = "macOS application caches; rebuilt by applications."
 dirs = ["Library/Caches"]
 platforms = ["darwin"]
+
+[[rule]]
+id = "xdg-thumbnails"
+category = "thumbnails"
+description = "Thumbnails of the freedesktop standard; made again from the originals."
+dirs = [".cache/thumbnails"]
+platforms = ["linux"]
 
 [[rule]]
 id = "user-cache-dir"

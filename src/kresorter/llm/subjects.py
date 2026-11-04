@@ -22,6 +22,7 @@ EXTENSION_CHARACTERS = 16
 _JUNK = frozenset(
     {
         Evidence.JUNK_CACHE,
+        Evidence.JUNK_BROWSER_CACHE,
         Evidence.JUNK_THUMBNAILS,
         Evidence.JUNK_OS_METADATA,
         Evidence.JUNK_TEMP,

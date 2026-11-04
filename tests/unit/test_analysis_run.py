@@ -18,7 +18,7 @@ def test_without_paths_the_safe_zones_are_analyzed(scan: ScanContext, zone: Path
 
     assert scanned.files_scanned == 1
     assert [(f.entry.path.name, f.level) for f in analysis.findings] == [
-        ("m.cpython-313.pyc", Level.SAFE)
+        ("m.cpython-313.pyc", Level.LIKELY_SAFE)
     ]
     assert snapshot(zone) == before
 

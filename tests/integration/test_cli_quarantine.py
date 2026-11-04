@@ -412,9 +412,9 @@ def aged(path: Path, days: int) -> Path:
 
 @pytest.fixture
 def junk(zone: Path) -> dict[str, Path]:
-    """One SAFE file (bytecode), one LIKELY_SAFE copy and its kept original, one plain file."""
+    """One SAFE file (thumbnails), one LIKELY_SAFE copy and its kept original, one plain file."""
     return {
-        "pyc": write(zone / "proj" / "__pycache__" / "m.cpython-313.pyc", b"bytecode"),
+        "thumbs": write(zone / "proj" / "Thumbs.db", b"bytecode"),
         "original": aged(write(zone / "photos" / "img.jpg", b"jpeg-bytes"), 10),
         "copy": aged(write(zone / "backup" / "img.jpg", b"jpeg-bytes"), 5),
         "notes": write(zone / "notes.txt", b"hello"),
@@ -429,8 +429,8 @@ def test_bulk_add_without_yes_shows_the_plan_and_moves_nothing(
     assert code == 1
     assert out.splitlines() == [
         "Would quarantine 1 file, 8 B (level: safe):",
-        f"  {junk['pyc']}  8 B",
-        "    junk_cache: python-bytecode",
+        f"  {junk['thumbs']}  8 B",
+        "    junk_thumbnails: thumbs-db",
         "Nothing was moved. Re-run with --yes to quarantine these files.",
     ]
     assert all(path.exists() for path in junk.values())
@@ -444,8 +444,8 @@ def test_bulk_add_with_yes_moves_only_the_chosen_level(
     code, out, err = run(args, context)
 
     assert (code, err) == (0, "")
-    assert out.splitlines() == ["Quarantined 1 file, 8 B", f"  [1] {junk['pyc']}"]
-    assert not junk["pyc"].exists()
+    assert out.splitlines() == ["Quarantined 1 file, 8 B", f"  [1] {junk['thumbs']}"]
+    assert not junk["thumbs"].exists()
     assert junk["copy"].exists()
     assert states(data_dir) == [(1, "quarantined")]
 
@@ -458,7 +458,7 @@ def test_likely_safe_includes_safe_and_keeps_the_original(
 
     assert code == 0
     assert "Quarantined 2 files, 18 B" in out
-    assert not junk["pyc"].exists()
+    assert not junk["thumbs"].exists()
     assert not junk["copy"].exists()
     assert junk["original"].read_bytes() == b"jpeg-bytes"
     assert junk["notes"].exists()
@@ -467,8 +467,8 @@ def test_likely_safe_includes_safe_and_keeps_the_original(
 def test_bulk_add_never_moves_a_kept_copy_even_when_it_is_junk(
     context: ScanContext, zone: Path
 ) -> None:
-    kept = aged(write(zone / "a" / "__pycache__" / "x.pyc", b"same"), 9)
-    copy = aged(write(zone / "b" / "__pycache__" / "x.pyc", b"same"), 3)
+    kept = aged(write(zone / "a" / "Thumbs.db", b"same"), 9)
+    copy = aged(write(zone / "b" / "Thumbs.db", b"same"), 3)
 
     args = ["quarantine", "add", "--from-analysis", "--level", "likely_safe", "--yes"]
     code, _, _ = run(args, context)
@@ -481,7 +481,7 @@ def test_bulk_add_never_moves_a_kept_copy_even_when_it_is_junk(
 def test_bulk_add_analyzes_only_the_given_paths(
     context: ScanContext, junk: dict[str, Path]
 ) -> None:
-    root = str(junk["pyc"].parent.parent)
+    root = str(junk["thumbs"].parent)
     args = ["quarantine", "add", "--from-analysis", root, "--level", "likely_safe", "--yes"]
     code, out, _ = run(args, context)
 
@@ -509,14 +509,14 @@ class OpenedAfterTheScan:
 def test_bulk_add_rechecks_each_file_and_moves_the_rest(
     tmp_path: Path, zone: Path, data_dir: Path, junk: dict[str, Path]
 ) -> None:
-    context = scan_context(tmp_path, zone, data_dir, OpenedAfterTheScan(junk["pyc"]))
+    context = scan_context(tmp_path, zone, data_dir, OpenedAfterTheScan(junk["thumbs"]))
 
     args = ["quarantine", "add", "--from-analysis", "--level", "likely_safe", "--yes"]
     code, out, _ = run(args, context)
 
     assert code == 1
-    assert f"open_file: {junk['pyc']}" in out
-    assert junk["pyc"].exists()
+    assert f"open_file: {junk['thumbs']}" in out
+    assert junk["thumbs"].exists()
     assert not junk["copy"].exists()
 
 

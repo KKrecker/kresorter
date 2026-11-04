@@ -132,8 +132,8 @@ def test_a_row_has_the_name_its_original_folder_the_size_and_the_id_in_secondary
     assert [header.text(column) for column in range(3)] == ["Name", "Size", "ID"]
     first = _listed(window)[0]
     assert (first.text(0), first.data(0, SECONDARY)) == (
-        "n.cpython-313.pyc",
-        str(Path("~", "zone", "lib", "__pycache__")),
+        "ehthumbs.db",
+        str(Path("~", "zone", "lib")),
     )
     assert (first.text(1), first.text(2)) == ("15 B", "1")
     assert [first.data(column, QUIET) for column in (1, 2)] == [True, True]

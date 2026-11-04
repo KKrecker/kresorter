@@ -55,14 +55,15 @@ def settled(data_dir: Path, **values: object) -> Path:
 
 
 def junk_tree(zone: Path) -> dict[str, Path]:
-    """Four Safe files (``kept`` the kept copy of a duplicate pair, ``copy`` the other), a
-    Likely safe copy (``backup``, of ``photo``, which is no finding), a Review file and a file
-    that is no finding."""
+    """Four Safe files, thumbnails (``kept`` the kept copy of a duplicate pair, ``copy`` the
+    other), a Likely safe copy (``backup``, of ``photo``, which is no finding), a Review file and
+    a file that is no finding. A cache is likely safe (decision 0018, item 19): the Safe files
+    are thumbnails."""
     return {
-        "m": write(zone / "proj" / "__pycache__" / "m.cpython-313.pyc", b"bytecode"),
-        "n": write(zone / "lib" / "__pycache__" / "n.cpython-313.pyc", b"other bytecode!"),
-        "kept": aged(write(zone / "a" / "__pycache__" / "x.pyc", b"same"), 9),
-        "copy": aged(write(zone / "b" / "__pycache__" / "x.pyc", b"same"), 3),
+        "m": write(zone / "proj" / "Thumbs.db", b"bytecode"),
+        "n": write(zone / "lib" / "ehthumbs.db", b"other bytecode!"),
+        "kept": aged(write(zone / "a" / "Thumbs.db", b"same"), 9),
+        "copy": aged(write(zone / "b" / "Thumbs.db", b"same"), 3),
         "photo": aged(write(zone / "photos" / "img.jpg", b"jpeg-bytes"), 10),
         "backup": aged(write(zone / "backup" / "img.jpg", b"jpeg-bytes"), 5),
         "old": aged(write(zone / "old" / "report.pdf", b"old report"), 800),

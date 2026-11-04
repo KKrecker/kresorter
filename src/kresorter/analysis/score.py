@@ -1,4 +1,5 @@
-"""Safety levels with their reasons (decision 0010, items 11-13).
+"""Safety levels with their reasons (decision 0010, items 11-13; a cache likely safe and a
+browser's cache for review, decision 0018, items 19 and 20).
 
 No number: three levels, a pinned level per kind of evidence, and the level of a finding is
 that of its strongest evidence. "Large" and "old" are ``REVIEW`` evidence, so they never raise
@@ -32,22 +33,25 @@ class Evidence(StrEnum):
     JUNK_TEMP = "junk_temp"
     JUNK_CRASH_DUMP = "junk_crash_dump"
     DUPLICATE_COPY = "duplicate_copy"
+    JUNK_BROWSER_CACHE = "junk_browser_cache"
     LARGE = "large"
     OLD = "old"
 
 
 _LEVELS: dict[Evidence, Level] = {
-    Evidence.JUNK_CACHE: Level.SAFE,
+    Evidence.JUNK_CACHE: Level.LIKELY_SAFE,  # rebuilt, by the program that made it (0018)
     Evidence.JUNK_THUMBNAILS: Level.SAFE,
     Evidence.JUNK_OS_METADATA: Level.SAFE,
     Evidence.JUNK_TEMP: Level.LIKELY_SAFE,
     Evidence.JUNK_CRASH_DUMP: Level.LIKELY_SAFE,
     Evidence.DUPLICATE_COPY: Level.LIKELY_SAFE,
+    Evidence.JUNK_BROWSER_CACHE: Level.REVIEW,  # the owner's choice (decision 0018, item 20)
     Evidence.LARGE: Level.REVIEW,
     Evidence.OLD: Level.REVIEW,
 }
 _JUNK: dict[JunkCategory, Evidence] = {
     JunkCategory.CACHE: Evidence.JUNK_CACHE,
+    JunkCategory.BROWSER_CACHE: Evidence.JUNK_BROWSER_CACHE,
     JunkCategory.THUMBNAILS: Evidence.JUNK_THUMBNAILS,
     JunkCategory.OS_METADATA: Evidence.JUNK_OS_METADATA,
     JunkCategory.TEMP: Evidence.JUNK_TEMP,

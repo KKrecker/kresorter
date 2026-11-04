@@ -118,7 +118,9 @@ OLD = Reason(Evidence.OLD, "unmodified for 1000 days")
 
 
 def test_the_strongest_evidence_sets_the_level() -> None:
-    assert assess([COPY, CACHE]).level is Level.SAFE
+    thumbnails = Reason(Evidence.JUNK_THUMBNAILS, "thumbs-db")
+    assert assess([COPY, thumbnails]).level is Level.SAFE
+    assert assess([LARGE, CACHE]).level is Level.LIKELY_SAFE
 
 
 def test_large_and_old_never_raise_a_level() -> None:

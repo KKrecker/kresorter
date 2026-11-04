@@ -27,8 +27,8 @@ from support.host import host_classifier
 RULES = """
 [[rule]]
 id = "cachedir"
-category = "cache"
-description = "cache"
+category = "thumbnails"
+description = "thumbnails, safe: a cache is likely safe (decision 0018, item 19)"
 dirs = ["cache"]
 
 [[rule]]
@@ -95,7 +95,7 @@ def test_junk_becomes_a_safe_finding_with_a_plain_candidate(tmp_path: Path, root
         Finding(
             entry=entry(junk),
             level=Level.SAFE,
-            reasons=(Reason(Evidence.JUNK_CACHE, "cachedir"),),
+            reasons=(Reason(Evidence.JUNK_THUMBNAILS, "cachedir"),),
             candidate=Candidate(entry=entry(junk)),
             keeps=None,
         ),

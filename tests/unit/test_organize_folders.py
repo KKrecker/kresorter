@@ -243,7 +243,7 @@ def test_the_markers_include_every_one_the_decision_names() -> None:
 @pytest.mark.parametrize(
     ("folder", "rule"),
     [
-        (".cache/thumbnails", "user-cache-dir"),
+        (".cache/thumbnails", "xdg-thumbnails"),
         ("app/__pycache__", "python-bytecode"),
         ("app/.pytest_cache", "tool-caches"),
     ],

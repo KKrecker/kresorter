@@ -236,7 +236,8 @@ def test_every_default_rule_has_an_example() -> None:
 
 DIRECTORY_EXAMPLES: list[tuple[Platform, str, str | None]] = [
     ("linux", "/home/a/.cache", "user-cache-dir"),  # the directory a rule names
-    ("linux", "/home/a/.cache/thumbnails/large", "user-cache-dir"),  # and below it
+    ("linux", "/home/a/.cache/pip/http", "user-cache-dir"),  # and below it
+    ("linux", "/home/a/.cache/thumbnails/large", "xdg-thumbnails"),  # a rule before it
     ("linux", "/home/a/proj/__pycache__", "python-bytecode"),
     ("linux", "/var/tmp/build", "posix-temp"),  # anchored at the root
     ("windows", LOCAL + r"\TEMP\setup", "windows-user-temp"),  # any case on Windows

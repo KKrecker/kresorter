@@ -172,7 +172,7 @@ def test_scan_takes_the_folders_added(
 ) -> None:
     # [0014.19]
     extra = tmp_path / "extra"
-    write(extra / "__pycache__" / "e.cpython-313.pyc", b"extra")
+    write(extra / "Thumbs.db", b"extra")
     dialogs = FakeDialogs(folders=[extra])
     window = make_window(qtbot, environment(tmp_path, zone, data_dir), dialogs=dialogs)
     window.overview.add_button.click()
@@ -225,7 +225,7 @@ def test_after_a_scan_a_card_per_level_with_its_size_its_files_and_their_stronge
         for level, card in page.levels.items()
     }
     assert shown == {
-        Level.SAFE: ("Safe", "31 B", "4 files: cache", "Review findings →"),
+        Level.SAFE: ("Safe", "31 B", "4 files: thumbnails", "Review findings →"),
         Level.LIKELY_SAFE: ("Likely safe", "10 B", "1 file: duplicate copy", "Review findings →"),
         Level.REVIEW: (
             "Review",
@@ -245,7 +245,7 @@ def test_a_level_without_files_says_so(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
     # [0014.48]
-    write(zone / "proj" / "__pycache__" / "m.cpython-313.pyc", b"bytecode")
+    write(zone / "proj" / "Thumbs.db", b"bytecode")
     window = make_window(qtbot, environment(tmp_path, zone, data_dir))
     scanned(qtbot, window)
     cards = window.overview.levels
@@ -296,7 +296,7 @@ def test_the_cards_in_russian(
     )
     shown = {level: (card.name.text(), card.files.text()) for level, card in page.levels.items()}
     assert shown == {
-        Level.SAFE: ("Безопасно", "4 файла: кэш"),
+        Level.SAFE: ("Безопасно", "4 файла: миниатюры"),
         Level.LIKELY_SAFE: ("Скорее безопасно", "1 файл: копия дубликата"),
         Level.REVIEW: (
             "Проверить",

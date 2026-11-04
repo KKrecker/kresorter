@@ -130,11 +130,11 @@ def aged(path: Path, data: bytes, days: int = 1) -> Path:
 
 
 def findings(zone: Path) -> list[str]:
-    """``analyze``: four subjects in the order of its output. An old bytecode file, two more that
-    share one subject, a duplicate copy (its older twin is kept), an old letter."""
-    aged(zone / "old" / "__pycache__" / "c.cpython-313.pyc", b"cccc", days=40)
-    aged(zone / "proj" / "__pycache__" / "b.cpython-313.pyc", b"bbb")
-    aged(zone / "proj" / "__pycache__" / "a.cpython-313.pyc", b"aa")
+    """``analyze``: four subjects in the order of its output. An old thumbnail database, two more
+    that share one subject, a duplicate copy (its older twin is kept), an old letter."""
+    aged(zone / "old" / "Thumbs.db", b"cccc", days=40)
+    aged(zone / "proj" / "Thumbs.db", b"bbb")
+    aged(zone / "lib" / "Thumbs.db", b"aa")
     aged(zone / "photos" / "img.jpg", b"jpeg-bytes", days=10)
     aged(zone / "backup" / "img.jpg", b"jpeg-bytes", days=5)
     aged(zone / "archive" / "letter.txt", b"dear", days=40)
@@ -142,8 +142,8 @@ def findings(zone: Path) -> list[str]:
 
 
 FINDINGS = [
-    "level=safe, reasons=junk_cache:python-bytecode+old, extension=.pyc",
-    "level=safe, reasons=junk_cache:python-bytecode, extension=.pyc",
+    "level=safe, reasons=junk_thumbnails:thumbs-db+old, extension=.db",
+    "level=safe, reasons=junk_thumbnails:thumbs-db, extension=.db",
     "level=likely_safe, reasons=duplicate_copy, extension=.jpg",
     "level=review, reasons=old, extension=.txt",
 ]
@@ -645,8 +645,8 @@ def test_json_subjects_are_their_facts(tmp_path: Path, zone: Path, scan: ScanCon
         "subject": {
             "kind": "finding",
             "level": "safe",
-            "reasons": ["junk_cache:python-bytecode", "old"],
-            "extension": ".pyc",
+            "reasons": ["junk_thumbnails:thumbs-db", "old"],
+            "extension": ".db",
         },
         "text": "Explained.",
     }

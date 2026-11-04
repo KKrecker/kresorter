@@ -32,7 +32,7 @@ def write(path: Path, data: bytes, *, days_ago: int = 1) -> Path:
 @pytest.fixture
 def tree(tmp_path: Path) -> Path:
     root = tmp_path / "root"
-    write(root / "proj" / "__pycache__" / "m.cpython-313.pyc", b"bytecode")
+    write(root / "proj" / "Thumbs.db", b"bytecode")  # thumbnails: Safe, a cache is not
     write(root / "photos" / "img.jpg", b"jpeg-bytes", days_ago=10)  # older copy: kept
     write(root / "backup" / "img.jpg", b"jpeg-bytes", days_ago=5)
     write(root / "notes.txt", b"hello")
@@ -70,15 +70,15 @@ def section(out: str, title: str) -> list[str]:
 
 def test_text_report_groups_findings_by_level(tmp_path: Path, tree: Path) -> None:
     code, out = run(["analyze", str(tree)], ctx(tmp_path, tree))
-    pyc = tree / "proj" / "__pycache__" / "m.cpython-313.pyc"
+    thumbs = tree / "proj" / "Thumbs.db"
 
     assert code == 0
     assert out.startswith("kresorter analyze - report only, nothing was changed\n")
     assert "Scanned: 6 files" in out
     assert section(out, "Safe:") == [
         "Safe: 1 file, 8 B",
-        f"  {pyc}  8 B",
-        "    junk_cache: python-bytecode",
+        f"  {thumbs}  8 B",
+        "    junk_thumbnails: thumbs-db",
     ]
     assert section(out, "Likely safe:") == [
         "Likely safe: 1 file, 10 B",
@@ -126,8 +126,8 @@ def test_thresholds_from_the_command_line(tmp_path: Path, tree: Path) -> None:
 
 
 def test_a_kept_copy_is_shown_but_never_proposed(tmp_path: Path, tree: Path) -> None:
-    kept = write(tree / "a" / "__pycache__" / "x.pyc", b"same", days_ago=9)
-    copy = write(tree / "b" / "__pycache__" / "x.pyc", b"same", days_ago=3)
+    kept = write(tree / "a" / "Thumbs.db", b"same", days_ago=9)
+    copy = write(tree / "b" / "Thumbs.db", b"same", days_ago=3)
 
     _, out = run(["analyze", str(tree)], ctx(tmp_path, tree))
     safe = section(out, "Safe:")
@@ -176,8 +176,8 @@ def test_json_report(tmp_path: Path, tree: Path) -> None:
 
 
 def test_json_marks_a_kept_copy(tmp_path: Path, tree: Path) -> None:
-    kept = write(tree / "a" / "__pycache__" / "x.pyc", b"same", days_ago=9)
-    write(tree / "b" / "__pycache__" / "x.pyc", b"same", days_ago=3)
+    kept = write(tree / "a" / "Thumbs.db", b"same", days_ago=9)
+    write(tree / "b" / "Thumbs.db", b"same", days_ago=3)
 
     _, out = run(["analyze", "--json", str(tree)], ctx(tmp_path, tree))
     found = {f["path"]: f for f in json.loads(out)["findings"]}

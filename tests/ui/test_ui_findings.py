@@ -3,6 +3,7 @@ selection; Review never preselected; quarantine from the findings (decision 0014
 21 and 49)."""
 
 import functools
+import os
 import time
 from pathlib import Path
 
@@ -106,7 +107,7 @@ def test_findings_are_grouped_by_their_strongest_reason_with_files_rules_and_siz
     # [0014.20] [0014.49] Under a group's reason its files and, for junk, its rules; for
     # duplicate copies, that one copy of each stays.
     assert [_row(group) for group in _groups(window)] == [
-        ("Cache", "4 files · python-bytecode", "31 B", "Safe"),
+        ("Thumbnails", "4 files · thumbs-db", "31 B", "Safe"),
         ("Duplicate copy", "1 file · one copy of each stays", "10 B", "Likely safe"),
         ("Not changed for a long time", "1 file", "10 B", "Review"),
     ]
@@ -160,13 +161,13 @@ def test_the_head_says_which_folders_were_scanned_and_when_with_rescan(
     assert found is not None
     assert found.roots == [zone]
     assert page.head.subtitle.text() == f"Scan of {Path('~', 'zone')}, {_moment(found.at)}"
-    write(zone / "c" / "__pycache__" / "y.pyc", b"more")
+    write(zone / "c" / "Thumbs.db", b"more")
     page.rescan_button.click()
     wait_idle(qtbot, window)
     rescanned = window.overview.scanned
     assert rescanned is not None
     assert rescanned is not found
-    assert _row(_groups(window)[0]) == ("Cache", "5 files · python-bytecode", "35 B", "Safe")
+    assert _row(_groups(window)[0]) == ("Thumbnails", "5 files · thumbs-db", "35 B", "Safe")
 
 
 def test_the_folders_of_a_scan_and_the_scanned_folder_a_file_is_in(
@@ -229,8 +230,8 @@ def test_the_search_keeps_the_paths_that_contain_the_text_ignoring_case(
     window.findings.search.setText("IMG.JPG")
     assert _shown(window) == [str(tree["backup"])]
     assert [group.isHidden() for group in _groups(window)] == [True, False, True]
-    window.findings.search.setText("x.PYC")
-    assert _shown(window) == [str(tree["kept"]), str(tree["copy"])]
+    window.findings.search.setText(os.sep + "THUMBS.DB")
+    assert _shown(window) == [str(tree["m"]), str(tree["kept"]), str(tree["copy"])]
     window.findings.filters[Level.SAFE].setChecked(False)
     assert _shown(window) == []
     window.findings.search.setText("")
@@ -266,8 +267,8 @@ def test_the_detail_shows_level_name_folder_size_time_where_found_and_every_reas
     assert detail.none.isHidden()
     assert not detail.content.isHidden()
     assert (detail.badge.text(), detail.badge.property("badge")) == ("Safe", "safe")
-    assert detail.name.text() == "x.pyc"
-    assert detail.folder.text() == str(Path("~", "zone", "b", "__pycache__"))
+    assert detail.name.text() == "Thumbs.db"
+    assert detail.folder.text() == str(Path("~", "zone", "b"))
     assert _facts(detail) == {
         "size": ("Size", "4 B"),
         "modified": ("Modified", _moment(tree["copy"].stat().st_mtime_ns / 1e9)),
@@ -275,12 +276,12 @@ def test_the_detail_shows_level_name_folder_size_time_where_found_and_every_reas
     }
     assert detail.why_title.text() == "Why"
     assert detail.why.text().splitlines() == [
-        "Cache: python-bytecode",
+        "Thumbnails: thumbs-db",
         f"Duplicate copy: {tree['kept']}",
     ]
     page.tree.setCurrentItem(page.item(tree["kept"]))
     assert detail.why.text().splitlines() == [
-        "Cache: python-bytecode",
+        "Thumbnails: thumbs-db",
         "This copy stays: the others are its duplicates.",
     ]
     page.tree.setCurrentItem(page.item(tree["backup"]))
@@ -336,7 +337,7 @@ def test_the_page_in_russian(
     scanned(qtbot, window)
     page = window.findings
     assert [_row(group) for group in _groups(window)] == [
-        ("Кэш", "4 файла · python-bytecode", "31 Б", "Безопасно"),
+        ("Миниатюры", "4 файла · thumbs-db", "31 Б", "Безопасно"),
         ("Копия дубликата", "1 файл · одна копия каждого остаётся", "10 Б", "Скорее безопасно"),
         ("Давно не изменялся", "1 файл", "10 Б", "Проверить"),
     ]
@@ -466,7 +467,7 @@ def test_the_confirmed_findings_move_and_leave_the_list(
     ]
     assert _shown(window) == [str(tree["kept"]), str(tree["backup"]), str(tree["old"])]
     assert [_row(group) for group in _groups(window)] == [
-        ("Cache", "1 file · python-bytecode", "4 B", "Safe"),
+        ("Thumbnails", "1 file · thumbs-db", "4 B", "Safe"),
         ("Duplicate copy", "1 file · one copy of each stays", "10 B", "Likely safe"),
         ("Not changed for a long time", "1 file", "10 B", "Review"),
     ]
@@ -535,7 +536,7 @@ def test_a_group_whose_findings_all_moved_leaves_the_list(
     window.findings.move_button.click()
     wait_idle(qtbot, window)
     assert [_row(group) for group in _groups(window)] == [
-        ("Cache", "4 files · python-bytecode", "31 B", "Safe"),
+        ("Thumbnails", "4 files · thumbs-db", "31 B", "Safe"),
         ("Not changed for a long time", "1 file", "10 B", "Review"),
     ]
     assert not tree["backup"].exists()
@@ -671,5 +672,5 @@ def test_what_moved_leaves_its_group_in_one_go(
     assert announced.removed == [(0, 0, 3)]
     assert announced.inserted == [(0, 0, 0)]
     assert page.tree.currentItem() is page.item(tree["kept"])
-    assert page.detail.name.text() == "x.pyc"
+    assert page.detail.name.text() == "Thumbs.db"
     assert _groups(window)[0].isExpanded()
