@@ -76,6 +76,18 @@ def cannot_list(file: Path) -> str:
     return str(listed.value.strerror)
 
 
+def cannot_look_into(tmp_path: Path) -> tuple[Path, str]:
+    """A directory under ``tmp_path`` in which the system cannot even look for a name, and words
+    of why it says, which is not that the name is missing: a regular file on POSIX (*Not a
+    directory*); on Windows a name with characters it refuses (*The filename, directory name, or
+    volume label syntax is incorrect*)."""
+    if WINDOWS:
+        return tmp_path / "no*such?name", "syntax is incorrect"
+    path = tmp_path / "a file"
+    path.write_bytes(b"")
+    return path, "Not a directory"
+
+
 def make_fifo(path: Path) -> None:
     """A FIFO at ``path``; the test is skipped on Windows, which has none."""
     mkfifo = getattr(os, "mkfifo", None)

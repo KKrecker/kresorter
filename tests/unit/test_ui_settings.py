@@ -36,7 +36,7 @@ from kresorter.ui.settings import (
 )
 from support.cli import scan_context
 from support.files import write
-from support.host import as_kept, make_fifo, posix_only, record_opens
+from support.host import as_kept, cannot_look_into, make_fifo, posix_only, record_opens
 
 
 @pytest.fixture
@@ -200,6 +200,16 @@ def test_an_unreadable_file_means_the_defaults(context: ScanContext, data_dir: P
     loaded = load(context)
     assert (loaded.settings, loaded.unused) == (DEFAULTS, Unused.UNREADABLE)
     assert loaded.detail
+
+
+def test_a_file_the_system_cannot_look_at_is_unreadable_with_its_words(
+    tmp_path: Path, zone: Path
+) -> None:
+    # [0014.36] On every system, Windows' too: what it says is the detail.
+    data_dir, words = cannot_look_into(tmp_path)
+    loaded = load(scan_context(tmp_path, zone, data_dir))
+    assert (loaded.settings, loaded.unused) == (DEFAULTS, Unused.UNREADABLE)
+    assert words in loaded.detail
 
 
 @pytest.mark.parametrize(
