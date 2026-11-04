@@ -632,7 +632,8 @@ def test_a_cell_s_tile_has_its_initial_in_the_text_s_colour_on_surface_2(look: L
     delegate = RowDelegate(look, rows(QTreeView(), look))
     hints = [delegate.sizeHint(QStyleOptionViewItem(), model.index(row, 0)) for row in range(2)]
     assert hints[1].width() == hints[0].width() + TILE + 12
-    assert hints[1].height() == hints[0].height() >= TILE
+    # As high as the two lines, or as the tile and its padding where a font's lines are lower.
+    assert hints[1].height() == max(hints[0].height(), TILE + 2 * 12)
     option = QStyleOptionViewItem()
     option.rect = QRect(0, 0, 400, ROW_HEIGHT)
     image = QImage(400, ROW_HEIGHT, QImage.Format.Format_RGB32)

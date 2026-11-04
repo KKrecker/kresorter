@@ -153,7 +153,9 @@ def test_the_current_page_is_drawn_on_surface_2_and_the_others_on_surface(
         icon = _drawn(window, row, 8, 30)
         colour = palette.text if row == current else palette.secondary
         assert drawn_in(icon, colour, ground)
-        assert drawn_in(_drawn(window, row, 40, 80), palette.text, ground)
+        # The name's strokes are thin: with subpixel antialiasing they may not reach the text's
+        # colour, which stays far from the secondary text's all the same.
+        assert drawn_in(_drawn(window, row, 40, 80), palette.text, ground, within=8)
 
 
 def test_the_current_page_has_no_focus_rectangle(qtbot: QtBot, window: Window) -> None:

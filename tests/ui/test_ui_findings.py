@@ -189,7 +189,8 @@ def test_the_folders_of_a_scan_and_the_scanned_folder_a_file_is_in(
 def test_a_chip_per_level_with_its_count_and_the_search_with_its_icon(
     qtbot: QtBot, window: Window
 ) -> None:
-    # [0014.49] The search is as wide as it may be when the chips leave it the room.
+    # [0014.49] The search is as wide as it may be when the chips leave it the room, as they
+    # do at 1600 px with any of the systems' fonts (DejaVu Sans on Ubuntu is the widest).
     page = window.findings
     assert [box.text() for box in page.filters.values()] == ["Safe 4", "Likely safe 1", "Review 1"]
     assert all(box.isCheckable() for box in page.filters.values())
@@ -198,7 +199,7 @@ def test_a_chip_per_level_with_its_count_and_the_search_with_its_icon(
     assert not page.search.mark.icon().isNull()
     assert page.search.minimumWidth() == SEARCH_WIDTHS[0] == 160
     assert page.search.maximumWidth() == SEARCH_WIDTHS[1] == 240
-    window.resize(1200, 780)
+    window.resize(1600, 780)
     window.show_page("findings")
     qtbot.waitUntil(lambda: page.search.width() == 240)
 
