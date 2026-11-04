@@ -398,3 +398,138 @@ def test_without_program_folders_only_the_data_directory_is_kresorter_s(
 ) -> None:
     # [0015.16] a policy made for another system has none
     assert linux.check_path(SITE / "kresorter" / "cli.py") == ALLOWED
+
+
+# --- a directory's files by their names (decision 0018, item 14) --------------------------------
+
+NAMES = [
+    "a.txt",
+    "Program Files",
+    "PROGRAM FILES",
+    "pagefile.sys",
+    "PAGEFILE.SYS",
+    "$Recycle.Bin",
+    "Users",
+    "Alice",
+    "alice",
+    "Bob",
+    "NTUSER.DAT",
+    "ntuser.dat.LOG1",
+    "UsrClass.dat",
+    ".ssh",
+    ".SSH",
+    ".gnupg",
+    "kresorter",
+    "KRESORTER",
+    "kresorter.exe",
+    "kresorter.AppImage",
+    "Roaming",
+    "Local",
+    "share",
+    "Downloads",
+    "usr",
+    "proc",
+    "Library",
+    "Applications",
+    "home",
+    "Windows",
+    "Temp",
+]
+
+
+def directory_cases() -> list[tuple[PathPolicy, list[PurePath]]]:
+    """Policies with a program that is a file, and folders allowed, blocked and on the way."""
+    w = PureWindowsPath
+    windows = PathPolicy.for_windows(
+        {**WIN_ENV, "LOCALAPPDATA": r"D:\Local"},
+        program_dirs=[w(r"C:\Users\Alice\Tools\kresorter.exe")],
+    )
+    windows_folders: list[PurePath] = [
+        w("C:/"),
+        w("c:/"),
+        w("D:/"),
+        w(r"C:\Users"),
+        w(r"C:\Users\Alice"),
+        w(r"C:\USERS\ALICE\Tools"),
+        w(r"C:\Users\Alice\AppData"),
+        w(r"C:\Users\Alice\AppData\Local"),
+        w(r"C:\Users\Alice\AppData\Roaming"),
+        w(r"C:\Users\Alice\Downloads"),
+        w(r"C:\Users\Bob"),
+        w(r"C:\Program Files"),
+        w(r"C:\Temp"),
+        w(r"D:\Local"),
+    ]
+    p = PurePosixPath
+    linux = PathPolicy.for_posix(
+        home=p("/home/alice"),
+        platform="linux",
+        env={"XDG_DATA_HOME": "/home/alice/data"},
+        program_dirs=[p("/home/alice/Apps/kresorter.AppImage")],
+    )
+    mac = PathPolicy.for_posix(home=p("/Users/alice"), platform="darwin")
+    linux_folders: list[PurePath] = [
+        p("/"),
+        p("/home"),
+        p("/home/alice"),
+        p("/home/alice/.local"),
+        p("/home/alice/.local/share"),
+        p("/home/alice/data"),
+        p("/home/alice/Apps"),
+        p("/home/alice/.cache"),
+        p("/home/bob"),
+        p("/usr"),
+        p("/var"),
+        p("/var/lib"),
+    ]
+    mac_folders: list[PurePath] = [
+        p("/"),
+        p("/Users"),
+        p("/users/ALICE"),
+        p("/Users/alice/Library"),
+        p("/Users/alice/Library/Application Support"),
+        p("/Users/alice/Downloads"),
+        p("/Applications"),
+    ]
+    return [(windows, windows_folders), (linux, linux_folders), (mac, mac_folders)]
+
+
+@pytest.mark.parametrize(("policy", "folders"), directory_cases())
+def test_a_file_in_a_directory_is_checked_by_its_name_as_by_its_path(
+    policy: PathPolicy, folders: list[PurePath]
+) -> None:
+    # [0018.14] The directory once, then each name alone: the answer of check_path.
+    for folder in folders:
+        names = policy.in_directory(folder)
+        assert [names.check_name(n) for n in NAMES] == [
+            policy.check_path(folder / n) for n in NAMES
+        ]
+
+
+@pytest.mark.parametrize(
+    ("windows", "name"),
+    [
+        (False, ""),
+        (False, "."),
+        (False, ".."),
+        (False, "a/b"),
+        (True, "a\\b"),
+        (True, "a/b"),
+        (True, "C:"),
+        (True, ".."),
+    ],
+)
+def test_a_name_is_one_part_of_a_path(
+    win: PathPolicy, linux: PathPolicy, windows: bool, name: str
+) -> None:
+    # [0018.14] Never a way out of its directory.
+    policy, folder = (
+        (win, PureWindowsPath(r"C:\Users\Alice")) if windows else (linux, PurePosixPath("/tmp"))
+    )
+    with pytest.raises(ValueError, match="name"):
+        policy.in_directory(folder).check_name(name)
+
+
+def test_a_relative_directory_is_rejected(linux: PathPolicy) -> None:
+    with pytest.raises(ValueError, match="absolute"):
+        linux.in_directory(PurePosixPath("home/alice"))

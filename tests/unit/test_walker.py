@@ -8,14 +8,14 @@ import contextlib
 import os
 import stat
 from collections.abc import Callable, Iterator
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 import pytest
 
 from fakes import FakeOpenFiles, make_policy
 from kresorter.core.models import FileEntry, Skipped, SkipReason
-from kresorter.core.policy import BlockReason
+from kresorter.core.policy import BlockReason, Verdict
 from kresorter.core.walker import walk
 from support.host import MTIME_STEP_NS, make_fifo
 
@@ -293,3 +293,28 @@ def test_file_vanishing_during_walk_is_reported(
         FileEntry(path=root / "b", size=7, mtime_ns=42),
         Skipped(path=root / "gone.txt", reason=SkipReason.NOT_FOUND),
     ]
+
+
+def test_a_file_is_checked_by_its_name_in_a_directory_checked_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0018.14] The policy's path check for each directory, not for each of its files; a file
+    # that the policy names is still blocked.
+    root = tmp_path / "root"
+    a, b = write(root / "a.txt"), write(root / "b.txt")
+    c, secret = write(root / "sub" / "c.txt"), write(root / "sub" / "secret.txt")
+    policy = make_policy(tmp_path, secret)
+    asked: list[PurePath] = []
+    check_path = policy.check_path
+
+    def counting(path: PurePath) -> Verdict:
+        asked.append(path)
+        return check_path(path)
+
+    monkeypatch.setattr(policy, "check_path", counting)
+    events = list(walk([root], policy, FakeOpenFiles()))
+    assert files(events) == [a, b, c]
+    assert skips(events) == [
+        Skipped(path=secret, reason=SkipReason.BLOCKED, block_reason=BlockReason.SYSTEM)
+    ]
+    assert asked == [root, root / "sub"]

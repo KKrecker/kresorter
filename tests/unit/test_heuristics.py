@@ -8,14 +8,17 @@ Rule semantics:
 * Matching is case-insensitive on Windows and macOS, case-sensitive on Linux.
 """
 
+from fnmatch import fnmatchcase
 from pathlib import PurePath, PurePosixPath, PureWindowsPath
 
 import pytest
 
+from kresorter.core import heuristics
 from kresorter.core.heuristics import (
     JunkCategory,
     JunkClassifier,
     JunkMatch,
+    JunkRule,
     Platform,
     default_rules,
     load_rules,
@@ -287,3 +290,100 @@ def test_a_browser_s_cache_is_a_category_of_its_own(
     match = JunkClassifier(default_rules(), platform=platform).classify(flavor(platform)(path))
     assert match is not None
     assert match.category == category
+
+
+# --- once per directory (decision 0018, item 13) -------------------------------------------------
+
+
+def reference(rules: tuple[JunkRule, ...], platform: Platform, path: PurePath) -> str | None:
+    """The rule every path got before: each rule's directories and files asked for each file,
+    every segment a glob."""
+    fold = str if platform == "linux" else str.casefold
+    parts = tuple(fold(p) for p in flavor(platform)(path).parts[1:])
+    if not parts:
+        return None
+    dirs, name = parts[:-1], parts[-1]
+    for rule in rules:
+        if platform not in rule.platforms:
+            continue
+        patterns = [([fold(s) for s in p.segments], p.anchored) for p in rule.dirs]
+        dirs_ok = not patterns or any(
+            any(
+                all(fnmatchcase(dirs[i + j], s) for j, s in enumerate(segments))
+                for i in (
+                    range(min(1, len(dirs) - len(segments) + 1))
+                    if anchored
+                    else range(len(dirs) - len(segments) + 1)
+                )
+            )
+            for segments, anchored in patterns
+        )
+        files_ok = not rule.files or any(fnmatchcase(name, fold(f)) for f in rule.files)
+        if dirs_ok and files_ok:
+            return rule.id
+    return None
+
+
+def sample(glob: str) -> str:
+    """A text the glob matches: ``*`` as ``x``, ``?`` as ``q`` (no default rule has a class)."""
+    assert "[" not in glob
+    return glob.replace("*", "x").replace("?", "q")
+
+
+def corpus(platform: Platform) -> list[PurePath]:
+    """Paths every default rule matches and nearly matches, in more than one case, several
+    files in each directory, as a scan meets them; an anchored rule's at the root."""
+    home = flavor(platform)(r"C:\Users\a" if platform == "windows" else "/home/a")
+    rules = default_rules()
+    folders = [home, home / "proj", home / "Downloads" / "sub"]
+    for rule in rules:
+        for pattern in rule.dirs:
+            segments = [sample(s) for s in pattern.segments]
+            base = flavor(platform)(home.anchor) if pattern.anchored else home
+            folders += [base.joinpath(*segments), base.joinpath(*segments, "deeper")]
+            folders += [base.joinpath(*segments[:-1]), base.joinpath("x", *segments)]
+            folders.append(base.joinpath(*(s.upper() for s in segments)))
+    names = ["a.txt", "report.docx", "x.QQQ"]
+    for rule in rules:
+        names += [sample(f) for f in rule.files] + [sample(f).upper() for f in rule.files]
+    return [folder / name for folder in folders for name in names]
+
+
+@pytest.mark.parametrize("platform", ["linux", "windows", "darwin"])
+def test_every_path_gets_the_rule_it_got_before(platform: Platform) -> None:
+    # [0018.13] Rules matched once per directory, a literal segment by equality: the same rule.
+    classifier = JunkClassifier(default_rules(), platform=platform)
+    paths = corpus(platform)
+    assert len(paths) > 1000
+    got = [(match.rule_id if (match := classifier.classify(p)) else None) for p in paths]
+    assert got == [reference(default_rules(), platform, p) for p in paths]
+    assert {rule for rule in got if rule} == {
+        rule.id for rule in default_rules() if platform in rule.platforms
+    }
+
+
+def test_a_directory_s_rules_are_matched_once_and_its_files_by_their_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # [0018.13] Per file only the file-name globs; a segment without *, ? or [ by equality.
+    rules = load_rules(
+        '[[rule]]\nid = "r"\ncategory = "cache"\ndescription = "d"\n'
+        'dirs = ["build/*cache*"]\nfiles = ["*.tmp"]\n'
+    )
+    globbed: list[tuple[str, str]] = []
+
+    def counting(name: str, pattern: str) -> bool:
+        globbed.append((name, pattern))
+        return fnmatchcase(name, pattern)
+
+    monkeypatch.setattr(heuristics, "fnmatchcase", counting)
+    classifier = JunkClassifier(rules, platform="linux")
+    folder = PurePosixPath("/x/build/cachedir")
+    found = [classifier.classify(folder / name) for name in ("a.tmp", "b.tmp", "c.txt")]
+    assert [match.rule_id if match else None for match in found] == ["r", "r", None]
+    assert globbed == [
+        ("cachedir", "*cache*"),
+        ("a.tmp", "*.tmp"),
+        ("b.tmp", "*.tmp"),
+        ("c.txt", "*.tmp"),
+    ]
