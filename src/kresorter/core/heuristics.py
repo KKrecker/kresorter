@@ -12,7 +12,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from fnmatch import fnmatchcase
-from functools import cache
+from functools import cache, partial
 from importlib.resources import files
 from pathlib import PurePath, PurePosixPath, PureWindowsPath
 from typing import Any, Literal, get_args
@@ -142,26 +142,42 @@ def _parse_platforms(where: str, table: Mapping[str, Any]) -> frozenset[str]:
 # --- matching ------------------------------------------------------------------------------------
 
 
+Match = Callable[[str], bool]
+
+
+def _glob(pattern: str, text: str) -> bool:
+    return fnmatchcase(text, pattern)
+
+
+def _segment(pattern: str) -> Match:
+    """A glob, or a literal compared by equality (decision 0018, item 13)."""
+    if any(special in pattern for special in "*?["):
+        return partial(_glob, pattern)
+    return pattern.__eq__
+
+
+@dataclass(frozen=True)
+class _Pattern:
+    segments: tuple[Match, ...]
+    anchored: bool
+
+
 @dataclass(frozen=True)
 class _Compiled:
     rule: JunkRule
-    dirs: tuple[DirPattern, ...]
-    files: tuple[str, ...]
+    dirs: tuple[_Pattern, ...]
+    files: tuple[Match, ...]
 
 
-def _dirs_match(dirs: tuple[str, ...], pattern: DirPattern) -> bool:
+def _dirs_match(dirs: tuple[str, ...], pattern: _Pattern) -> bool:
     size = len(pattern.segments)
     last_start = len(dirs) - size + 1
     starts = range(min(1, last_start)) if pattern.anchored else range(last_start)
-    return any(
-        all(fnmatchcase(dirs[i + j], seg) for j, seg in enumerate(pattern.segments)) for i in starts
-    )
+    return any(all(match(dirs[i + j]) for j, match in enumerate(pattern.segments)) for i in starts)
 
 
-def _matches(rule: _Compiled, dirs: tuple[str, ...], name: str) -> bool:
-    dirs_ok = not rule.dirs or any(_dirs_match(dirs, p) for p in rule.dirs)
-    files_ok = not rule.files or any(fnmatchcase(name, f) for f in rule.files)
-    return dirs_ok and files_ok
+def _dirs_ok(rule: _Compiled, dirs: tuple[str, ...]) -> bool:
+    return not rule.dirs or any(_dirs_match(dirs, p) for p in rule.dirs)
 
 
 class JunkClassifier:
@@ -175,13 +191,16 @@ class JunkClassifier:
             _Compiled(
                 rule=rule,
                 dirs=tuple(
-                    DirPattern(tuple(fold(s) for s in p.segments), p.anchored) for p in rule.dirs
+                    _Pattern(tuple(_segment(fold(s)) for s in p.segments), p.anchored)
+                    for p in rule.dirs
                 ),
-                files=tuple(fold(f) for f in rule.files),
+                files=tuple(_segment(fold(f)) for f in rule.files),
             )
             for rule in rules
             if platform in rule.platforms
         )
+        root: tuple[str, ...] = ()
+        self._last = (root, tuple(r for r in self._rules if _dirs_ok(r, root)))
 
     def classify(self, path: PurePath) -> JunkMatch | None:
         """Return the first matching rule for ``path`` (absolute), or None."""
@@ -192,11 +211,20 @@ class JunkClassifier:
         if not parts:
             return None
         dirs, name = parts[:-1], parts[-1]
-        for compiled in self._rules:
-            if _matches(compiled, dirs, name):
+        for compiled in self._candidates(dirs):
+            if not compiled.files or any(match(name) for match in compiled.files):
                 rule = compiled.rule
                 return JunkMatch(path, rule.id, rule.category, rule.description)
         return None
+
+    def _candidates(self, dirs: tuple[str, ...]) -> tuple[_Compiled, ...]:
+        """The rules ``dirs`` match by their directories, in their order: decided once for a
+        directory, the last one kept, as a scan meets its files one after another."""
+        last = self._last
+        if last[0] != dirs:
+            last = (dirs, tuple(r for r in self._rules if _dirs_ok(r, dirs)))
+            self._last = last
+        return last[1]
 
     def classify_directory(self, path: PurePath) -> JunkMatch | None:
         """Return the first rule whose directories match ``path`` (absolute) or a directory above

@@ -12,7 +12,7 @@ The policy is pure: it never touches the filesystem. Paths must already be resol
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import PurePath, PurePosixPath, PureWindowsPath
@@ -54,6 +54,36 @@ class _ProfileRules:
 
 
 APP_NAME = "kresorter"
+
+
+def check_open(path: PurePath, open_files: OpenFileChecker) -> Verdict:
+    """The open-file check of a file the blacklist allows. A failing checker counts as "open"."""
+    try:
+        is_open = open_files.is_open(path)
+    except Exception:
+        is_open = True
+    return _blocked(BlockReason.OPEN_FILE) if is_open else ALLOWED
+
+
+class DirectoryPolicy:
+    """The blacklist of one directory's files (``PathPolicy.in_directory``): its parts
+    normalized once, a name folded and added to them."""
+
+    def __init__(
+        self,
+        check: Callable[[Parts], Verdict],
+        parts: Parts,
+        fold: Callable[[str], str],
+        separators: tuple[str, ...],
+    ) -> None:
+        self._check, self._parts, self._fold, self._separators = check, parts, fold, separators
+
+    def check_name(self, name: str) -> Verdict:
+        """Raises ValueError for what is no name in a directory: empty, ``.``, ``..``, or with
+        a separator (or a drive's colon on Windows)."""
+        if name in ("", ".", "..") or any(s in name for s in self._separators):
+            raise ValueError(f"not a name in a directory: {name!r}")
+        return self._check((*self._parts, self._fold(name)))
 
 
 def _xdg_data_home(default: PurePosixPath, env: Mapping[str, str]) -> PurePosixPath:
@@ -192,24 +222,29 @@ class PathPolicy:
 
     def check_path(self, path: PurePath) -> Verdict:
         """Blacklist check only. Raises ValueError for non-absolute paths."""
-        parts = self._normalize(path)
+        return self._check_parts(self._normalize(path))
+
+    def in_directory(self, directory: PurePath) -> DirectoryPolicy:
+        """The blacklist for the files of ``directory``, checked by their names alone with the
+        answer ``check_path`` gives on their paths (decision 0018, item 14). Raises ValueError
+        for a non-absolute directory."""
+        separators = ("\\", "/", ":") if self._flavor is PureWindowsPath else ("/",)
+        return DirectoryPolicy(
+            self._check_parts, self._normalize(directory), self._fold, separators
+        )
+
+    def check_file(self, path: PurePath, open_files: OpenFileChecker) -> Verdict:
+        """Blacklist check, then open-file check. A failing checker counts as "open"."""
+        verdict = self.check_path(path)
+        return check_open(path, open_files) if verdict.allowed else verdict
+
+    def _check_parts(self, parts: Parts) -> Verdict:
         for prefix, reason in self._prefix_rules:
             if _is_under(parts, prefix):
                 return _blocked(reason)
         if len(parts) >= 2 and parts[1] in self._root_entry_names:
             return _blocked(BlockReason.SYSTEM)
         return _blocked(BlockReason.PROFILE) if self._is_protected_profile(parts) else ALLOWED
-
-    def check_file(self, path: PurePath, open_files: OpenFileChecker) -> Verdict:
-        """Blacklist check, then open-file check. A failing checker counts as "open"."""
-        verdict = self.check_path(path)
-        if not verdict.allowed:
-            return verdict
-        try:
-            is_open = open_files.is_open(path)
-        except Exception:
-            is_open = True
-        return _blocked(BlockReason.OPEN_FILE) if is_open else ALLOWED
 
     def holds_home(self, path: PurePath) -> bool:
         """True for the user's home directory and every directory above it: their top level

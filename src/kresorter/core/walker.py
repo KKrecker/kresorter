@@ -17,7 +17,7 @@ from pathlib import Path
 
 from kresorter.core.models import FileEntry, Skipped, SkipReason, skipped_from_os_error
 from kresorter.core.open_files import OpenFileChecker
-from kresorter.core.policy import PathPolicy
+from kresorter.core.policy import DirectoryPolicy, PathPolicy, Verdict, check_open
 
 Event = FileEntry | Skipped
 
@@ -49,7 +49,8 @@ class _Walker:
         if resolved.is_dir():
             yield from self._walk_dir(resolved)
         elif not self._already_walked(resolved):
-            yield self._file_event(resolved, resolved.stat)
+            check = partial(self._policy.check_file, resolved, self._open_files)
+            yield self._file_event(resolved, resolved.stat, check)
 
     def _already_walked(self, path: Path) -> bool:
         return any(parent in self._seen_dirs for parent in path.parents)
@@ -76,6 +77,7 @@ class _Walker:
         except OSError as error:
             yield skipped_from_os_error(directory, error)
             return
+        names = self._policy.in_directory(directory)  # its files by name (decision 0018, 14)
         for entry in entries:
             path = Path(entry.path)
             if _is_link(entry):
@@ -83,16 +85,25 @@ class _Walker:
             elif entry.is_dir(follow_symlinks=False):
                 subdirs.append(path)
             else:
-                yield self._file_event(path, partial(entry.stat, follow_symlinks=False))
+                get_stat = partial(entry.stat, follow_symlinks=False)
+                yield self._file_event(
+                    path, get_stat, partial(self._check, names, entry.name, path)
+                )
 
-    def _file_event(self, path: Path, get_stat: Callable[[], os.stat_result]) -> Event:
+    def _check(self, names: DirectoryPolicy, name: str, path: Path) -> Verdict:
+        verdict = names.check_name(name)
+        return check_open(path, self._open_files) if verdict.allowed else verdict
+
+    def _file_event(
+        self, path: Path, get_stat: Callable[[], os.stat_result], check: Callable[[], Verdict]
+    ) -> Event:
         try:
             info = get_stat()
         except OSError as error:
             return skipped_from_os_error(path, error)
         if not stat.S_ISREG(info.st_mode):
             return Skipped(path=path, reason=SkipReason.SPECIAL)
-        verdict = self._policy.check_file(path, self._open_files)
+        verdict = check()
         if not verdict.allowed:
             return Skipped(path=path, reason=SkipReason.BLOCKED, block_reason=verdict.reason)
         return FileEntry(path=path, size=info.st_size, mtime_ns=info.st_mtime_ns)
