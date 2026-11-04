@@ -16,20 +16,33 @@ from typing import Any, Generic, TypeVar
 
 from PySide6.QtCore import QObject, Signal
 
-__all__ = ["Task", "Tasks"]
+__all__ = ["Read", "Task", "Tasks"]
 
 T = TypeVar("T")
+
+
+class Read:
+    """The files a task's work has read so far: called in the worker, ``files`` read in the
+    window's thread (decision 0018, item 16); None before the first count."""
+
+    def __init__(self) -> None:
+        self.files: int | None = None
+
+    def __call__(self, files: int) -> None:
+        self.files = files
 
 
 @dataclass(frozen=True, eq=False)
 class Task(Generic[T]):
     """``work`` runs in the worker, ``done`` takes its result in the window's thread; ``title``
-    says what runs. ``acts``: the task opens the journal, and closing waits for it."""
+    says what runs. ``acts``: the task opens the journal, and closing waits for it. ``read``:
+    what the work counts as it reads, shown while it runs."""
 
     title: str
     work: Callable[[], T]
     done: Callable[[T], None]
     acts: bool = False
+    read: Read | None = None
 
 
 @dataclass(frozen=True)

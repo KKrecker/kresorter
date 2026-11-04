@@ -128,7 +128,7 @@ def test_partial_mismatch_skips_full_hash(tmp_path: Path, monkeypatch: pytest.Mo
     b = make(tmp_path / "b", b"BBBB-tail")
 
     assert candidates([a, b]) == []
-    assert calls == [(a.path, 4), (b.path, 4)]
+    assert sorted(calls) == [(a.path, 4), (b.path, 4)]  # side by side (decision 0018, 15)
 
 
 def test_same_prefix_different_tail_is_fully_hashed(tmp_path: Path) -> None:

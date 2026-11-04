@@ -2,7 +2,9 @@
 
 Pipeline (cheapest first): group by size -> hash a prefix -> full hash only on prefix
 collisions. Every file is re-checked against its scan record before and after reading; a file
-that changed is reported as CHANGED instead of being hashed as-is.
+that changed is reported as CHANGED instead of being hashed as-is. The prefixes, then the full
+digests, are computed side by side in up to ``HASH_THREADS`` threads; what is yielded, and its
+order, is that of one file after another (decision 0018, item 15).
 """
 
 from __future__ import annotations
@@ -10,8 +12,11 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 from hashlib import blake2b
+from itertools import chain
 from pathlib import Path
 
 from kresorter.core.models import FileEntry, Skipped, SkipReason, skipped_from_os_error
@@ -19,6 +24,7 @@ from kresorter.core.models import FileEntry, Skipped, SkipReason, skipped_from_o
 DIGEST_SIZE = 32
 DEFAULT_CHUNK = 1 << 20
 DEFAULT_PARTIAL = 64 * 1024
+HASH_THREADS = 4
 
 
 @dataclass(frozen=True)
@@ -62,16 +68,65 @@ def hash_duplicate_candidates(
 
     Files whose size or prefix is unique are dropped silently: they cannot be duplicates.
     """
-    for size, group in group_by_size(entries).items():
-        prefix_hashed: list[HashedFile] = []
-        yield from _hash_all(group, partial_bytes, prefix_hashed)
-        for collision in _collisions(prefix_hashed):
+    groups = list(group_by_size(entries).items())
+    with ThreadPoolExecutor(HASH_THREADS) as pool:
+        prefixes = _hashes(pool, [e for _, group in groups for e in group], partial_bytes)
+        stages = [_prefix_stage(group, prefixes) for _, group in groups]
+        large = [
+            hashed.entry
+            for (size, _), (_, collisions) in zip(groups, stages, strict=True)
+            if size > partial_bytes
+            for collision in collisions
+            for hashed in collision
+        ]
+        fulls = _hashes(pool, large, None)
+    for (size, _), (skipped, collisions) in zip(groups, stages, strict=True):
+        yield from skipped
+        for collision in collisions:
             if size <= partial_bytes:
                 yield from collision  # the prefix covered the whole file
             else:
-                full: list[HashedFile] = []
-                yield from _hash_all([h.entry for h in collision], None, full)
+                full_skipped, full = _split([h.entry for h in collision], fulls)
+                yield from full_skipped
                 yield from full
+
+
+def _hashes(
+    pool: ThreadPoolExecutor, entries: list[FileEntry], limit: int | None
+) -> dict[FileEntry, str | Skipped]:
+    """Each entry's digest (or why it has none), side by side: the prefixes, each as short as
+    the next, in one slice of the entries per thread, a full digest in a task of its own."""
+    size = 1 if limit is None else max(1, -(-len(entries) // HASH_THREADS))
+    batches = [entries[i : i + size] for i in range(0, len(entries), size)]
+    results = chain.from_iterable(pool.map(partial(_hash_batch, limit=limit), batches))
+    return dict(zip(entries, results, strict=True))
+
+
+def _hash_batch(entries: list[FileEntry], limit: int | None) -> list[str | Skipped]:
+    return [_stable_hash(entry, limit) for entry in entries]
+
+
+def _split(
+    group: list[FileEntry], results: dict[FileEntry, str | Skipped]
+) -> tuple[list[Skipped], list[HashedFile]]:
+    """The skipped of ``group`` and its hashed files, each in its order."""
+    skipped: list[Skipped] = []
+    hashed: list[HashedFile] = []
+    for entry in group:
+        result = results[entry]
+        if isinstance(result, Skipped):
+            skipped.append(result)
+        else:
+            hashed.append(HashedFile(entry, result))
+    return skipped, hashed
+
+
+def _prefix_stage(
+    group: list[FileEntry], prefixes: dict[FileEntry, str | Skipped]
+) -> tuple[list[Skipped], list[list[HashedFile]]]:
+    """The skipped of ``group``, and its files whose prefixes collide."""
+    skipped, hashed = _split(group, prefixes)
+    return skipped, list(_collisions(hashed))
 
 
 def _collisions(hashed: list[HashedFile]) -> Iterator[list[HashedFile]]:
@@ -79,18 +134,6 @@ def _collisions(hashed: list[HashedFile]) -> Iterator[list[HashedFile]]:
     for item in hashed:
         by_digest[item.digest].append(item)
     return (group for group in by_digest.values() if len(group) > 1)
-
-
-def _hash_all(
-    group: list[FileEntry], limit: int | None, out: list[HashedFile]
-) -> Iterator[Skipped]:
-    """Hash each entry into ``out``; yield Skipped for the ones that failed."""
-    for entry in group:
-        result = _stable_hash(entry, limit)
-        if isinstance(result, Skipped):
-            yield result
-        else:
-            out.append(HashedFile(entry, result))
 
 
 def _changed(entry: FileEntry, info: os.stat_result) -> bool:

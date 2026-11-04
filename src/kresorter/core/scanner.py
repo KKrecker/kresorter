@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -17,6 +17,9 @@ from kresorter.core.walker import walk
 
 if TYPE_CHECKING:
     from kresorter.organize.synced import SyncedFolders
+
+Progress = Callable[[int], None]  # the files read so far (decision 0018, item 16)
+PROGRESS_EVERY = 250
 
 
 @dataclass(frozen=True)
@@ -72,17 +75,31 @@ class ScanReport:
     skipped: tuple[Skipped, ...]
 
 
+def unreported(read: int) -> None:
+    """The progress of a scan no one follows."""
+
+
 def scan(
-    roots: Sequence[Path], context: ScanContext, *, hash_duplicates: bool = True
+    roots: Sequence[Path],
+    context: ScanContext,
+    *,
+    hash_duplicates: bool = True,
+    progress: Progress = unreported,
 ) -> ScanReport:
-    """Walk ``roots`` and build a report. Reads only; never modifies the filesystem."""
+    """Walk ``roots`` and build a report. Reads only; never modifies the filesystem.
+    ``progress`` is called with the files read so far, every ``PROGRESS_EVERY`` files and once
+    they are all read."""
     entries: list[FileEntry] = []
     skipped: list[Skipped] = []
     for event in walk(roots, context.policy, for_scan(context.open_files)):
         if isinstance(event, FileEntry):
             entries.append(event)
+            if len(entries) % PROGRESS_EVERY == 0:
+                progress(len(entries))
         else:
             skipped.append(event)
+    if not entries or len(entries) % PROGRESS_EVERY:
+        progress(len(entries))
     duplicates = _duplicates(entries, skipped) if hash_duplicates else ()
     return ScanReport(
         roots=tuple(roots),

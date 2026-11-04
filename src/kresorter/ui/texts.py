@@ -69,6 +69,7 @@ CATALOG: dict[str, dict[str, str]] = {
         " скопировать в отчёт.",
     },
     "task.running": {"en": "Running: {task}", "ru": "Выполняется: {task}"},
+    "task.read": {"en": "Running: {task}, {read}", "ru": "Выполняется: {task}, {read}"},
     "task.failed": {"en": "{task} failed: {message}", "ru": "Ошибка ({task}): {message}"},
     "close.wait": {
         "en": "{task} is still running; the window closes when it ends.",
@@ -618,6 +619,10 @@ DECIMAL: dict[str, str] = {"en": ".", "ru": ","}
 
 PLURALS: dict[str, dict[str, tuple[str, ...]]] = {
     "file": {"en": ("{n} file", "{n} files"), "ru": ("{n} файл", "{n} файла", "{n} файлов")},
+    "read": {
+        "en": ("{n} file read", "{n} files read"),
+        "ru": ("прочитан {n} файл", "прочитано {n} файла", "прочитано {n} файлов"),
+    },
     "folder": {
         "en": ("{n} folder", "{n} folders"),
         "ru": ("{n} папка", "{n} папки", "{n} папок"),

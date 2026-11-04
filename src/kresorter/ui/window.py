@@ -20,6 +20,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
 
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMainWindow, QStackedWidget, QWidget
 
@@ -47,6 +48,7 @@ from kresorter.ui.theme import Look
 __all__ = ["PAGES", "Window"]
 
 PAGES = ("overview", "findings", "organize", "autostart", "quarantine", "settings")
+PROGRESS_MS = 100  # the status line counts the files read at most ten times a second (0018)
 
 T = TypeVar("T")
 
@@ -78,6 +80,9 @@ class Window(QMainWindow):
 
         self.tasks = Tasks(self)
         self.tasks.busy.connect(self._busy)
+        self.progress_timer = QTimer(self)  # the files read, at most ten times a second
+        self.progress_timer.setInterval(PROGRESS_MS)
+        self.progress_timer.timeout.connect(self._show_task)
         self.tasks.failed.connect(self._failed)
         self.look = Look(self)
 
@@ -195,11 +200,27 @@ class Window(QMainWindow):
 
     def _busy(self, running: bool) -> None:
         task = self.tasks.running
-        what = "" if task is None else self.translator.text("task.running", task=task.title)
-        self.status.setText(what)
+        self._show_task()
+        if task is not None and task.read is not None:
+            self.progress_timer.start()
+        else:
+            self.progress_timer.stop()
         self.update_starters()
         if not running and self._close_when_done:
             self.close()
+
+    def _show_task(self) -> None:
+        """What runs, and the files it read so far when it counts them."""
+        task, translator = self.tasks.running, self.translator
+        files = None if task is None or task.read is None else task.read.files
+        if task is None:
+            what = ""
+        elif files is None:
+            what = translator.text("task.running", task=task.title)
+        else:
+            read = translator.count("read", files)
+            what = translator.text("task.read", task=task.title, read=read)
+        self.status.setText(what)
 
     def _failed(self, title: str, message: str) -> None:
         self.message.setText(self.translator.text("task.failed", task=title, message=message))

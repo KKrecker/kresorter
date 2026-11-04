@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,7 +28,7 @@ from kresorter.analysis.report import AnalysisReport
 from kresorter.analysis.run import analyze_paths
 from kresorter.analysis.score import Evidence, Level
 from kresorter.analysis.size_age import Thresholds
-from kresorter.core.scanner import ScanReport
+from kresorter.core.scanner import Progress, ScanReport
 from kresorter.environment import Environment
 from kresorter.organize.planner import Plan
 from kresorter.ui.i18n import Translator
@@ -49,7 +50,7 @@ from kresorter.ui.parts import (
 )
 from kresorter.ui.shown import moment, shown_path
 from kresorter.ui.sidebar import ICONS
-from kresorter.ui.tasks import Task
+from kresorter.ui.tasks import Read, Task
 from kresorter.ui.theme import Look
 
 if TYPE_CHECKING:
@@ -84,11 +85,13 @@ class Scanned:
     roots: list[Path]
 
 
-def scan(environment: Environment, roots: list[Path]) -> Scanned:
-    """In the worker: the context of the system, the scan and the rating."""
+def scan(environment: Environment, roots: list[Path], read: Progress) -> Scanned:
+    """In the worker: the context of the system, the scan and the rating; ``read`` counts the
+    files read so far."""
     at = time.time()
     context = environment.scan_context()
-    report, analysis = analyze_paths([str(root) for root in roots], context, Thresholds())
+    paths = [str(root) for root in roots]
+    report, analysis = analyze_paths(paths, context, Thresholds(), progress=read)
     return Scanned(report, analysis, context.open_files_checked, at, list(roots))
 
 
@@ -309,9 +312,10 @@ class OverviewPage(QWidget):
 
     def start_scan(self) -> None:
         """Scan the folders shown, as Scan now does."""
-        window, roots = self._window, self.roots()
+        window, roots, read = self._window, self.roots(), Read()
         title = window.translator.text("task.scan")
-        window.run(Task(title, lambda: scan(window.environment, roots), self._scanned))
+        work = partial(scan, window.environment, roots, read)
+        window.run(Task(title, work, self._scanned, read=read))
 
     def _scanned(self, scanned: Scanned) -> None:
         translator = self._window.translator

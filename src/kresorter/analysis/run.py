@@ -9,17 +9,22 @@ from pathlib import Path
 
 from kresorter.analysis.report import AnalysisReport, analyze
 from kresorter.analysis.size_age import Thresholds
-from kresorter.core.scanner import ScanContext, ScanReport, scan
+from kresorter.core.scanner import Progress, ScanContext, ScanReport, scan, unreported
 
 __all__ = ["analyze_paths"]
 
 
 def analyze_paths(
-    paths: Sequence[str], context: ScanContext, thresholds: Thresholds
+    paths: Sequence[str],
+    context: ScanContext,
+    thresholds: Thresholds,
+    *,
+    progress: Progress = unreported,
 ) -> tuple[ScanReport, AnalysisReport]:
-    """Scan ``paths`` (default: the safe zones) and rate what was found."""
+    """Scan ``paths`` (default: the safe zones) and rate what was found; ``progress``: the
+    scan's (decision 0018, item 16)."""
     roots = [Path(p) for p in paths or context.policy.default_roots()]
-    scanned = scan(roots, context, hash_duplicates=True)
+    scanned = scan(roots, context, hash_duplicates=True, progress=progress)
     analysis = analyze(
         scanned,
         classifier=context.classifier,
