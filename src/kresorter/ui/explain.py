@@ -86,12 +86,12 @@ class ExplainPanel(QFrame):
 
     def _ask(self) -> None:
         window = self._window
-        environment = window.environment
+        environment, env = window.environment, window.llm_env
         asked = self._result
         about = subjects([] if asked is None else [asked])
 
         def work() -> Explanations:
-            return explain(about, environment.llm_env, limits=environment.llm_limits)
+            return explain(about, env, limits=environment.llm_limits)
 
         def done(explained: Explanations) -> None:
             if self._result is asked:

@@ -15,12 +15,15 @@ from kresorter.autostart.registry import UserRegistry
 from kresorter.core.heuristics import Platform
 from kresorter.core.open_files import OpenFileChecker
 from kresorter.environment import Environment
+from kresorter.llm.machine import GIB, Machine
 from kresorter.llm.transport import LIMITS, Limits
 from kresorter.ui.dialogs import Confirmation, Dialogs
 from kresorter.ui.i18n import Language, Translator
 from kresorter.ui.window import Window
 from support.cli import autostart_context, scan_context
 from support.files import aged, write
+
+MACHINE = Machine(16 * GIB, 8)  # the machine of the window's tests, unless one is given
 
 
 def environment(
@@ -33,15 +36,17 @@ def environment(
     registry: UserRegistry | None = None,
     llm_env: Mapping[str, str] | None = None,
     llm_limits: Limits = LIMITS,
+    machine: Machine = MACHINE,
 ) -> Environment:
     """The window's environment for tmp_path: ``zone`` the one scan zone, ``data_dir`` the data
     directory, autostart under tmp_path (``registry`` on Windows), the local AI's settings
-    ``llm_env`` (none by default)."""
+    ``llm_env`` (none by default), ``machine`` the memory and processors (``MACHINE``)."""
     return Environment(
         scan_context=lambda: scan_context(tmp_path, zone, data_dir, open_files, platform=platform),
         autostart_context=lambda: autostart_context(platform, tmp_path, registry),
         llm_env={} if llm_env is None else llm_env,
         llm_limits=llm_limits,
+        machine=lambda: machine,
     )
 
 

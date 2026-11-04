@@ -68,11 +68,24 @@ def address_from(env: Mapping[str, str]) -> Address:
     return Address(str(ip), port)
 
 
+def is_model_name(value: str) -> bool:
+    """A name item 9 accepts: the window's choice is held to it too (decision 0018, item 32)."""
+    return _MODEL.fullmatch(value) is not None
+
+
 def model_from(env: Mapping[str, str]) -> str:
     value = env.get(MODEL_VARIABLE, DEFAULT_MODEL)
-    if _MODEL.fullmatch(value) is None:
+    if not is_model_name(value):
         raise SettingRefused(MODEL_VARIABLE, value, "not a model name")
     return value
+
+
+def with_model(env: Mapping[str, str], model: str | None) -> Mapping[str, str]:
+    """``env`` with ``model`` as its model unless it names one: ``KRESORTER_OLLAMA_MODEL``,
+    when set, wins (decision 0018, item 32). ``env`` itself is not changed."""
+    if model is None or MODEL_VARIABLE in env:
+        return env
+    return {**env, MODEL_VARIABLE: model}
 
 
 def installed(model: str, names: Iterable[str]) -> bool:

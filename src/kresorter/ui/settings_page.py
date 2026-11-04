@@ -1,19 +1,21 @@
 """The Settings page (decision 0014, items 27, 36, 37 and 55).
 
-A card each, the page scrolling under its head. The language, its choice at the right: a change
-is saved, then a restart is offered (decision 0018, item 3); declined, the new language applies
-the next time the window opens, as its note says. The theme, on the card
-Appearance, its choice at the right: a change is saved and applied at once (decision 0018,
-items 1 and 2). On Windows only, the
+A card each, the page scrolling under its head. The language, its choice at the right: a change is
+saved, then a restart is offered (decision 0018, item 3); declined, the new language applies the
+next time the window opens, as its note says. The theme, on the card Appearance, its choice at the
+right: a change is saved and applied at once (decision 0018, items 1 and 2). On Windows only, the
 machine scope of autostart: turning it on asks first, saying what is read; turning it off asks
-nothing. Each change is saved at once (``ui.settings.save``), and a change that cannot be saved
-says why and leaves the setting as it was: the file is written only when the user changes a
-setting. The page says when the settings file was not used. The local AI: its address and model
-as the environment gives them, and Check, which runs the checks of ``kresorter llm status`` off
-the window's thread and shows each, in the window's words, Ollama and the model each with a dot
-in the safe or the review colour, then how to set up what is missing; nothing else asks the
-local AI. The data directory's path (from the home folder as ``~``) is shown, read only, and
-under it the version (decision 0015, item 4).
+nothing. Each change is saved at once (``ui.settings.save``), and a change that cannot be saved says
+why and leaves the setting as it was: the file is written only when the user changes a setting. The
+page says when the settings file was not used. The local AI: its address and model as the
+environment gives them, the model chosen here unless ``KRESORTER_OLLAMA_MODEL`` names one (as a note
+says then), and Check, which runs the checks of ``kresorter llm status`` off the window's thread and
+shows each, in the window's words, Ollama and the model each with a dot in the safe or the review
+colour, then how to set up what is missing; nothing else asks the local AI. Check lists the models
+Ollama has in a choice: one chosen is saved, and Check runs again with it (decision 0018, item 32).
+The card recommends a model for the machine's memory and processors, and says how to get it (item
+33). The data directory's path (from the home folder as ``~``) is shown, read only, and under it the
+version (decision 0015, item 4).
 """
 
 from __future__ import annotations
@@ -29,12 +31,16 @@ from PySide6.QtWidgets import QFrame, QLabel, QLayout, QScrollArea, QWidget
 from kresorter import __version__
 from kresorter.llm.client import Status, status
 from kresorter.llm.failure import ExplanationUnavailable, SettingRefused, Unavailable
+from kresorter.llm.machine import Machine, recommended
 from kresorter.llm.settings import (
     DEFAULT_ADDRESS,
     DEFAULT_MODEL,
     MODEL_VARIABLE,
     URL_VARIABLE,
+    installed,
+    is_model_name,
     model_from,
+    with_model,
 )
 from kresorter.ui.dialogs import Confirmation
 from kresorter.ui.i18n import Translator
@@ -174,10 +180,17 @@ class SettingsPage(QWidget):
         self.machine.clicked.connect(self._machine)
         self.ai_card, ai_inside = card()
         env = environment.llm_env
-        address = env.get(URL_VARIABLE, DEFAULT_ADDRESS.url)
-        model = env.get(MODEL_VARIABLE, DEFAULT_MODEL)
-        shown = text("settings.address", url=address, model=model)
-        self.address = Note(self, shown, role="secondary")
+        self.address = Note(self, role="secondary")
+        self.model_title = QLabel(text("settings.model"))  # a field's label, not a card's title
+        self.model = Choice(look)
+        self.model.setAccessibleName(text("settings.model"))
+        self.model_title.setBuddy(self.model)
+        named = env.get(MODEL_VARIABLE)
+        overridden = text("settings.model_env", variable=MODEL_VARIABLE, model=named)
+        self.model_note = Note(self, "" if named is None else overridden, role="secondary")
+        self.model_note.setHidden(named is None)
+        self.recommended = Note(self, _recommendation(translator, environment.machine()))
+        self.recommended.setProperty("role", "secondary")
         self.check_button = button(look, text("settings.check"))
         self.check_button.clicked.connect(self._check)
         self.found = (Found(), Found())  # Ollama, then the model
@@ -191,6 +204,8 @@ class SettingsPage(QWidget):
         self._show()
         self.language.currentIndexChanged.connect(self._language)
         self.theme.currentIndexChanged.connect(self._theme)
+        self._list(())
+        self.model.currentIndexChanged.connect(self._model)
 
         language_inside.addLayout(_titled(language, self.language))
         language_inside.addWidget(self.language_note)
@@ -199,6 +214,9 @@ class SettingsPage(QWidget):
         machine_inside.addWidget(self.machine)
         ai_inside.addLayout(_titled(_title(text("settings.ai")), self.check_button))
         ai_inside.addWidget(self.address)
+        ai_inside.addWidget(self.model_note)
+        ai_inside.addLayout(_titled(self.model_title, self.model))
+        ai_inside.addWidget(self.recommended)
         for found in self.found:
             ai_inside.addWidget(found)
         ai_inside.addWidget(self.check)
@@ -232,17 +250,31 @@ class SettingsPage(QWidget):
         layout.addLayout(top)
         layout.addWidget(self.area, 1)
         window.add_starter(self.check_button)
+        window.add_starter(self.model, lambda: MODEL_VARIABLE not in env)
 
     @property
     def current(self) -> Settings:
         """The settings as they are remembered."""
         return self._settings
 
+    @property
+    def llm_env(self) -> Mapping[str, str]:
+        """The local AI's settings: the environment's, with the model chosen here unless it
+        names one (decision 0018, item 32)."""
+        return with_model(self._window.environment.llm_env, self._settings.model)
+
     def _show(self) -> None:
         """The controls as the settings are remembered."""
+        env = self.llm_env
+        model = env.get(MODEL_VARIABLE, DEFAULT_MODEL)
+        url = env.get(URL_VARIABLE, DEFAULT_ADDRESS.url)
+        self.address.setText(self._window.translator.text("settings.address", url=url, model=model))
+        names = [self.model.itemText(index) for index in range(self.model.count())]
+        in_use = next((n for n, name in enumerate(names) if installed(model, (name,))), -1)
         for choice, index in (
             (self.language, LANGUAGE_SETTINGS.index(self._settings.language)),
             (self.theme, THEME_SETTINGS.index(self._settings.theme)),
+            (self.model, in_use),
         ):
             choice.blockSignals(True)
             choice.setCurrentIndex(index)
@@ -273,6 +305,26 @@ class SettingsPage(QWidget):
         """Saved, then applied at once; a theme that cannot be saved is not applied."""
         self._save(replace(self._settings, theme=THEME_SETTINGS[index]))
         self._window.look.choose(self._settings.theme)
+        self._show()
+
+    def _model(self, index: int) -> None:
+        """Saved, then checked again; a model that cannot be saved is not used."""
+        model = self.model.itemText(index)
+        self._save(replace(self._settings, model=model))
+        self._show()
+        if self._settings.model == model:
+            self._window.show_ai(None)
+            self._check()
+
+    def _list(self, models: tuple[str, ...]) -> None:
+        """The models Ollama listed, those a model may be named; none, no choice."""
+        names = [name for name in models if is_model_name(name)]
+        self.model.blockSignals(True)
+        self.model.clear()
+        self.model.addItems(names)
+        self.model.blockSignals(False)
+        self.model.setHidden(not names)
+        self.model_title.setHidden(not names)
         self._show()
 
     def _machine(self, checked: bool) -> None:
@@ -306,19 +358,37 @@ class SettingsPage(QWidget):
 
     def _check(self) -> None:
         window = self._window
-        environment = window.environment
+        env, limits = self.llm_env, window.environment.llm_limits
 
         def work() -> Status:
-            return status(environment.llm_env, limits=environment.llm_limits)
+            return status(env, limits=limits)
 
         def done(found: Status) -> None:
-            ollama, model, *rest = check_lines(window.translator, found, environment.llm_env)
+            ollama, model, *rest = check_lines(window.translator, found, env)
             self.found[0].show_found(ollama, passed=found.version is not None)
             self.found[1].show_found(model, passed=found.installed is True)
             self.check.setText("\n".join(rest))
+            self._list(found.models)
             window.show_ai(found.failure is None)
 
         window.run(Task(window.translator.text("task.check"), work, done))
+
+
+def _recommendation(translator: Translator, machine: Machine) -> str:
+    """The model recommended for ``machine``, what that comes from, and how to get it."""
+    text = translator.text
+    memory = (
+        text("settings.memory_unknown")
+        if machine.memory is None
+        else text("settings.memory", size=translator.size(machine.memory))
+    )
+    processors = (
+        text("settings.processors_unknown")
+        if machine.processors is None
+        else translator.count("processor", machine.processors)
+    )
+    model = recommended(machine)
+    return text("settings.recommended", memory=memory, processors=processors, model=model)
 
 
 def _title(text: str) -> QLabel:

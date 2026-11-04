@@ -1,15 +1,15 @@
 """The window's settings (decision 0014, items 35-36).
 
-The window remembers only ``settings.json`` in the data directory: a JSON object with
-``language`` (``system``, ``en`` or ``ru``), ``include_machine`` (a boolean),
-``skipped_zones``, the names of the safe zones left out of the scan (each a zone's last part,
-once; decision 0018, item 17) and ``theme`` (``system``, ``light`` or ``dark``; item 1). ``save``
-alone
-writes it, after the data directory is checked (0009), through one temporary file renamed over
-it, private (``0600`` on POSIX); a temporary file a crash left behind is written over. ``load``
-writes nothing. A missing file means the defaults; an unreadable file, invalid JSON, something
-other than an object, or a value of the wrong type or unknown means the defaults too, with why
-the file was not used. A key left out takes its default; unknown keys are ignored.
+The window remembers only ``settings.json`` in the data directory: a JSON object with ``language``
+(``system``, ``en`` or ``ru``), ``include_machine`` (a boolean), ``skipped_zones``, the names of the
+safe zones left out of the scan (each a zone's last part, once; decision 0018, item 17), ``theme``
+(``system``, ``light`` or ``dark``; item 1) and ``model``, the local AI's model chosen (a name
+decision 0013's item 9 accepts; left out, and not written, when none is chosen; 0018 item 32).
+``save`` alone writes it, after the data directory is checked (0009), through one temporary file
+renamed over it, private (``0600`` on POSIX); a temporary file a crash left behind is written over.
+``load`` writes nothing. A missing file means the defaults; an unreadable file, invalid JSON,
+something other than an object, or a value of the wrong type or unknown means the defaults too, with
+why the file was not used. A key left out takes its default; unknown keys are ignored.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from pathlib import Path, PurePath
 from typing import Literal
 
 from kresorter.core.scanner import ScanContext
+from kresorter.llm.settings import is_model_name
 from kresorter.storage.data_dir import PRIVATE, DataDirError, check_data_dir
 from kresorter.storage.lock import PRIVATE_FILE
 from kresorter.storage.session import SessionFailed, SessionFailure
@@ -61,6 +62,7 @@ class Settings:
     include_machine: bool = False
     skipped_zones: tuple[str, ...] = ()  # in the order of the zones
     theme: ThemeSetting = "system"
+    model: str | None = None  # None: the local AI's default, or KRESORTER_OLLAMA_MODEL's
 
 
 DEFAULTS = Settings()
@@ -130,7 +132,12 @@ def _settings(found: dict[str, object], zones: tuple[str, ...]) -> Loaded:
     themed = _THEMES.get(theme) if isinstance(theme, str) else None
     if themed is None:
         return Loaded(DEFAULTS, Unused.WRONG_VALUE, f"theme={json.dumps(theme)}")
-    return Loaded(Settings(chosen, include_machine, skipped_zones, themed))
+    if "model" not in found:
+        return Loaded(Settings(chosen, include_machine, skipped_zones, themed))
+    model = found["model"]
+    if not isinstance(model, str) or not is_model_name(model):
+        return Loaded(DEFAULTS, Unused.WRONG_VALUE, f"model={json.dumps(model)}")
+    return Loaded(Settings(chosen, include_machine, skipped_zones, themed, model))
 
 
 def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
@@ -139,12 +146,14 @@ def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
         data_dir = check_data_dir(context.policy, context.classifier)
     except DataDirError as error:
         return SessionFailed(SessionFailure.DATA_DIR, str(error))
-    content = {
+    content: dict[str, object] = {
         "language": settings.language,
         "include_machine": settings.include_machine,
         "skipped_zones": list(settings.skipped_zones),
         "theme": settings.theme,
     }
+    if settings.model is not None:
+        content["model"] = settings.model
     try:
         data_dir.mkdir(mode=PRIVATE, parents=True, exist_ok=True)
         _replace(data_dir, (json.dumps(content, indent=2) + "\n").encode("utf-8"))

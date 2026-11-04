@@ -104,7 +104,7 @@ def test_status_when_everything_is_in_place() -> None:
     # [0013.14]
     with ScriptedOllama(VERSION, TAGS) as ollama:
         result = status(env_for(ollama.address))
-    assert result == Status(ollama.address, "llama3.2", "0.6.2", True, None)
+    assert result == Status(ollama.address, "llama3.2", "0.6.2", True, None, ("llama3.2:latest",))
     assert ollama.paths() == ASKED_BOTH
 
 

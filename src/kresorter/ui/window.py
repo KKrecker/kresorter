@@ -16,7 +16,7 @@ settings of the data directory (``ui.settings``); the Settings page keeps them a
 from __future__ import annotations
 
 import functools
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TypeVar
 
@@ -144,11 +144,17 @@ class Window(QMainWindow):
         self.sidebar.show_open_files(text(key), reliable=reliable)
         self.show_ai(None)
 
+    @property
+    def llm_env(self) -> Mapping[str, str]:
+        """The local AI's settings: the environment's, with the model chosen in Settings unless
+        it names one (decision 0018, item 32)."""
+        return self.settings.llm_env
+
     def show_ai(self, checked: bool | None) -> None:
         """The local AI's line: its model; ``checked`` as the Settings page last found it."""
         text = self.translator.text
         try:
-            line = text("sidebar.ai", model=model_from(self.environment.llm_env))
+            line = text("sidebar.ai", model=model_from(self.llm_env))
         except SettingRefused as refused:
             line = text("sidebar.ai_refused", name=refused.name)
         self.sidebar.show_ai(line, checked=checked)

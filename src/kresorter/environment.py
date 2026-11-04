@@ -18,6 +18,7 @@ from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
 from kresorter.core.open_files import NoOpenFileCheck, OpenFileChecker, checker_for_platform
 from kresorter.core.policy import PathPolicy
 from kresorter.core.scanner import ScanContext
+from kresorter.llm.machine import Machine, this_machine
 from kresorter.llm.transport import LIMITS, Limits
 from kresorter.organize.synced import NoSyncedFolders, SyncedFolders, WindowsSyncedFolders
 
@@ -90,13 +91,19 @@ def _process_env() -> Mapping[str, str]:
     return os.environ
 
 
+def _machine() -> Machine:
+    return this_machine(detect_platform())
+
+
 @dataclass(frozen=True)
 class Environment:
     """``scan_context`` and ``autostart_context`` build the contexts of the running system;
     ``llm_env`` is read only by ``llm status`` and ``--explain``, ``llm_limits`` bounds their
-    requests (pre-step-5 audit, B8)."""
+    requests (pre-step-5 audit, B8); ``machine`` is the memory and the processors the window
+    recommends a model for (decision 0018, item 33)."""
 
     scan_context: Callable[[], ScanContext] = _scan_context
     autostart_context: Callable[[], AutostartContext] = _autostart_context
     llm_env: Mapping[str, str] = field(default_factory=_process_env)
     llm_limits: Limits = LIMITS
+    machine: Callable[[], Machine] = _machine

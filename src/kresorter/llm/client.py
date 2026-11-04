@@ -35,6 +35,7 @@ class Status:
     version: str | None
     installed: bool | None
     failure: ExplanationUnavailable | None
+    models: tuple[str, ...] = ()  # those Ollama listed, for the window's choice (0018 item 32)
 
 
 def status(env: Mapping[str, str], *, limits: Limits = LIMITS) -> Status:
@@ -59,8 +60,8 @@ def status(env: Mapping[str, str], *, limits: Limits = LIMITS) -> Status:
         missing = ExplanationUnavailable(
             Unavailable.MODEL_MISSING, f"{model!r} is not among the {len(names)} models listed"
         )
-        return Status(address, model, version, False, missing)
-    return Status(address, model, version, True, None)
+        return Status(address, model, version, False, missing, tuple(names))
+    return Status(address, model, version, True, None, tuple(names))
 
 
 def generate(address: Address, model: str, subject: Facts, *, limits: Limits = LIMITS) -> str:

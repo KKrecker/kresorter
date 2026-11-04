@@ -577,6 +577,26 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "settings.ai": {"en": "Local AI (Ollama)", "ru": "Локальный ИИ (Ollama)"},
     "settings.check": {"en": "Check", "ru": "Проверить"},
+    "settings.model": {"en": "Model", "ru": "Модель"},
+    "settings.model_env": {
+        "en": "{variable} sets the model: {model}. The model chosen here applies once it is unset.",
+        "ru": "{variable} задаёт модель: {model}. Модель, выбранная здесь, применится, когда"
+        " переменная не задана.",
+    },
+    "settings.recommended": {
+        "en": "Recommended for this computer ({memory}, {processors}): {model}; Qwen 2.5 writes"
+        " Russian as well as English. To get it: ollama pull {model} (kresorter installs nothing"
+        " itself).",
+        "ru": "Рекомендуется для этого компьютера ({memory}, {processors}): {model}; Qwen 2.5"
+        " пишет и по-русски, и по-английски. Чтобы получить её: ollama pull {model} (kresorter"
+        " сам ничего не устанавливает).",
+    },
+    "settings.memory": {"en": "{size} of memory", "ru": "{size} памяти"},
+    "settings.memory_unknown": {"en": "memory unknown", "ru": "память неизвестна"},
+    "settings.processors_unknown": {
+        "en": "number of processors unknown",
+        "ru": "число процессоров неизвестно",
+    },
     "task.check": {"en": "Checking the local AI", "ru": "Проверка локального ИИ"},
     "check.ollama": {"en": "Ollama: {state}", "ru": "Ollama: {state}"},
     "check.model": {"en": "Model: {state}", "ru": "Модель: {state}"},
@@ -658,6 +678,10 @@ PLURALS: dict[str, dict[str, tuple[str, ...]]] = {
         "ru": ("{n} группа", "{n} группы", "{n} групп"),
     },
     "path": {"en": ("{n} path", "{n} paths"), "ru": ("{n} путь", "{n} пути", "{n} путей")},
+    "processor": {
+        "en": ("{n} processor", "{n} processors"),
+        "ru": ("{n} процессор", "{n} процессора", "{n} процессоров"),
+    },
     "folders.into": {
         "en": ("into {n} folder", "into {n} folders"),
         "ru": ("по {n} папке", "по {n} папкам", "по {n} папкам"),

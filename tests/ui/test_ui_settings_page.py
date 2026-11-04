@@ -227,7 +227,7 @@ def _models(page: SettingsPage) -> list[str]:
     return [page.model.itemText(index) for index in range(page.model.count())]
 
 
-def _checked(qtbot: QtBot, window: Window) -> SettingsPage:
+def _after_check(qtbot: QtBot, window: Window) -> SettingsPage:
     page = window.settings
     page.check_button.click()
     wait_idle(qtbot, window)
@@ -242,7 +242,7 @@ def test_check_lists_the_models_ollama_has_in_a_choice(
         env = {URL_VARIABLE: ollama.address.url}
         window = _window(qtbot, tmp_path, zone, data_dir, llm_env=env)
         assert window.settings.model.isHidden()
-        page = _checked(qtbot, window)
+        page = _after_check(qtbot, window)
 
     assert not page.model.isHidden()
     assert _models(page) == ["llama3.2:latest", "qwen2.5:3b"]
@@ -260,7 +260,7 @@ def test_a_model_chosen_is_saved_and_used_by_the_check_and_named_in_the_sidebar(
     with ScriptedOllama(VERSION, LISTED, VERSION, LISTED) as ollama:
         url = ollama.address.url
         window = _window(qtbot, tmp_path, zone, data_dir, llm_env={URL_VARIABLE: url})
-        page = _checked(qtbot, window)
+        page = _after_check(qtbot, window)
         page.model.setCurrentIndex(1)
         wait_idle(qtbot, window)
         asked = ollama.paths()
@@ -306,13 +306,42 @@ def test_the_environment_s_model_wins_and_the_card_says_so(
             " once it is unset."
         )
         assert not note.isHidden()
-        page = _checked(qtbot, window)
+        page = _after_check(qtbot, window)
 
     assert page.address.text() == f"Address: {url} · Model: llama3.2"
     assert _lines(page)[1] == "Model: llama3.2: installed"
     assert window.sidebar.ai.text() == "AI explanations: llama3.2"
     assert page.model.currentIndex() == 0
     assert not page.model.isEnabled()
+
+
+def test_a_model_in_use_that_ollama_has_not_is_not_shown_as_chosen(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.32] The choice offers what Ollama has; the line says the model is missing.
+    tags = as_json({"models": [{"name": "qwen2.5:3b"}]})
+    with ScriptedOllama(VERSION, tags) as ollama:
+        env = {URL_VARIABLE: ollama.address.url}
+        page = _after_check(qtbot, _window(qtbot, tmp_path, zone, data_dir, llm_env=env))
+
+    assert _models(page) == ["qwen2.5:3b"]
+    assert page.model.currentIndex() == -1
+    assert _lines(page)[1] == "Model: llama3.2: not installed"
+
+
+def test_a_check_that_lists_no_model_leaves_no_choice(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.32] Ollama listed some, then none could be read.
+    with ScriptedOllama(VERSION, LISTED, VERSION, as_json({}, status=500)) as ollama:
+        env = {URL_VARIABLE: ollama.address.url}
+        window = _window(qtbot, tmp_path, zone, data_dir, llm_env=env)
+        _after_check(qtbot, window)
+        page = _after_check(qtbot, window)
+
+    assert page.model.isHidden()
+    assert page.model.count() == 0
+    assert page.model_title.isHidden()
 
 
 def test_a_model_that_cannot_be_saved_is_not_used(
@@ -324,7 +353,7 @@ def test_a_model_that_cannot_be_saved_is_not_used(
     with ScriptedOllama(VERSION, LISTED, VERSION, LISTED) as ollama:
         env = {URL_VARIABLE: ollama.address.url}
         window = _window(qtbot, tmp_path, zone, data_dir, llm_env=env)
-        page = _checked(qtbot, window)
+        page = _after_check(qtbot, window)
         page.model.setCurrentIndex(1)
         wait_idle(qtbot, window)
         asked = ollama.paths()
