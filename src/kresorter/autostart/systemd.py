@@ -104,7 +104,11 @@ def _item(unit_dir: Path, link: Path) -> AutostartItem:
 
 
 def _is_masked(path: Path) -> bool:
-    return path.is_symlink() and path.resolve() == Path(os.devnull).resolve()
+    """A link to ``/dev/null`` as ``systemctl mask`` writes it, which reads so wherever the files
+    are read (on Windows it would lead to ``C:\\dev\\null``), or one leading to the null device."""
+    if not path.is_symlink():
+        return False
+    return path.readlink().as_posix() == "/dev/null" or path.resolve() == Path(os.devnull).resolve()
 
 
 def _parse(text: str) -> dict[str, dict[str, list[str]]]:
