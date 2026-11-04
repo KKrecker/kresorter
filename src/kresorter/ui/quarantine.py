@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
 from PySide6.QtCore import QSignalBlocker, Qt
-from PySide6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 
 from kresorter.quarantine.journal import QuarantinedItem
 from kresorter.quarantine.service import (
@@ -38,6 +38,7 @@ from kresorter.ui.parts import (
     QUIET,
     SECONDARY,
     Head,
+    Label,
     Note,
     badge,
     bar,
@@ -90,9 +91,9 @@ class QuarantinePage(QWidget):
         self.purge_button.clicked.connect(self._purge)
         self.permanent = badge(text("quarantine.permanent"), "danger")
         self.result = Note(self)
-        self.chosen = QLabel()
+        self.chosen = Label()
         self.chosen.setProperty("role", "strong")
-        self.chosen_size = QLabel()
+        self.chosen_size = Label()
         self.chosen_size.setProperty("role", "secondary")
         self.select_all_button = link(text("quarantine.select_all"))
         self.select_all_button.clicked.connect(lambda _=False: self._set_all(_CHECKED))

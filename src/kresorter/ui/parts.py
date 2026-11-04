@@ -2,13 +2,15 @@
 
 ``head`` starts a page: its title, one line of secondary text, and the page's own controls at
 the right. ``page`` lays a page out with the margins of item 46; ``vbox`` and ``hbox`` are
-layouts whose margins and spacing are always given. A ``Note`` takes no room while it has
-nothing to say. Cards, chips, links, badges, dots and dividers carry the property their rule
-of ``ui.theme`` selects. Lists are drawn by ``RowDelegate``: rows at least 44 px high, a name
-and under it, when the row has one, a line of secondary text (``SECONDARY``), a divider in the
-border colour, the selection on the accent's tint, and check boxes drawn on the accent when
-checked (``paint_check``, which ``CheckBox`` shares). Every colour comes from the window's
-palette, read from its ``Look`` when a part is drawn.
+layouts whose margins and spacing are always given. A ``Label`` shows its text as plain text,
+whatever it holds (decision 0018, item 37), and ``tooltip`` escapes a tooltip Qt would take
+for rich text; a ``Note`` is a label that takes no room while it has nothing to say. Cards,
+chips, links, badges, dots and dividers carry the property their rule of ``ui.theme`` selects.
+Lists are drawn by ``RowDelegate``: rows at least 44 px high, a name and under it, when the
+row has one, a line of secondary text (``SECONDARY``), a divider in the border colour, the
+selection on the accent's tint, and check boxes drawn on the accent when checked
+(``paint_check``, which ``CheckBox`` shares). Every colour comes from the window's palette,
+read from its ``Look`` when a part is drawn.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 
+from PySide6 import QtGui
 from PySide6.QtCore import (
     QAbstractItemModel,
     QEvent,
@@ -153,12 +156,30 @@ def hbox(
     return layout
 
 
-class Note(QLabel):
+class Label(QLabel):
+    """A label whose text is plain text: a name ``<b>x</b>`` is those characters, never a
+    tag drawn or an image looked for."""
+
+    def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setTextFormat(Qt.TextFormat.PlainText)
+        self.setText(text)
+
+
+def tooltip(text: str) -> str:
+    """``text`` as a tooltip shows it: as it is, unless Qt would take it for rich text; then
+    escaped, its spaces and lines kept."""
+    if QtGui.Qt.mightBeRichText(text):
+        return QtGui.Qt.convertFromPlainText(text, Qt.WhiteSpaceMode.WhiteSpacePre)
+    return text
+
+
+class Note(Label):
     """A label that takes no room while it has nothing to say: hidden while its text is empty.
     It is made with its parent, so that showing it never opens a window of its own."""
 
     def __init__(self, parent: QWidget, text: str = "", *, role: str = "") -> None:
-        super().__init__(parent)
+        super().__init__(parent=parent)
         self.setWordWrap(True)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         if role:
@@ -179,9 +200,9 @@ class Head(QWidget):
     def __init__(self, title: str, subtitle: str, *controls: QWidget) -> None:
         super().__init__()
         self.setObjectName("head")
-        self.title = QLabel(title)
+        self.title = Label(title)
         self.title.setObjectName("title")
-        self.subtitle = QLabel(subtitle)
+        self.subtitle = Label(subtitle)
         self.subtitle.setObjectName("subtitle")
         self.subtitle.setWordWrap(True)
         self.controls = controls
@@ -262,9 +283,9 @@ def mark(shown: QFrame, kind: str) -> None:
     style.polish(shown)
 
 
-def badge(text: str, kind: str) -> QLabel:
+def badge(text: str, kind: str) -> Label:
     """A pill: a level's value, ``advisory`` or ``danger``."""
-    label = QLabel(text)
+    label = Label(text)
     label.setProperty("badge", kind)
     label.setFixedHeight(BADGE_HEIGHT)
     return label

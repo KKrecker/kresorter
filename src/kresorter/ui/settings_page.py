@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QLabel, QLayout, QScrollArea, QWidget
+from PySide6.QtWidgets import QFrame, QLayout, QScrollArea, QWidget
 
 from kresorter import __version__
 from kresorter.llm.client import Status, status
@@ -44,7 +44,20 @@ from kresorter.llm.settings import (
 )
 from kresorter.ui.dialogs import Confirmation
 from kresorter.ui.i18n import Translator
-from kresorter.ui.parts import CheckBox, Choice, Head, Note, button, card, dot, hbox, mark, vbox
+from kresorter.ui.parts import (
+    CheckBox,
+    Choice,
+    Head,
+    Label,
+    Note,
+    button,
+    card,
+    dot,
+    hbox,
+    mark,
+    tooltip,
+    vbox,
+)
 from kresorter.ui.settings import LANGUAGE_SETTINGS, THEME_SETTINGS, Loaded, Settings, save
 from kresorter.ui.shown import shown_path
 from kresorter.ui.tasks import Task
@@ -181,7 +194,7 @@ class SettingsPage(QWidget):
         self.ai_card, ai_inside = card()
         env = environment.llm_env
         self.address = Note(self, role="secondary")
-        self.model_title = QLabel(text("settings.model"))  # a field's label, not a card's title
+        self.model_title = Label(text("settings.model"))  # a field's label, not a card's title
         self.model = Choice(look)
         self.model.setAccessibleName(text("settings.model"))
         self.model_title.setBuddy(self.model)
@@ -198,7 +211,7 @@ class SettingsPage(QWidget):
         self.data_card, data_inside = card()
         data_dir = environment.scan_context().policy.app_data_dir
         self.data_dir = Note(self, shown_path(Path(data_dir), Path.home()), role="secondary")
-        self.data_dir.setToolTip(str(data_dir))
+        self.data_dir.setToolTip(tooltip(str(data_dir)))
         self.version = Note(self, text("settings.version", version=__version__), role="secondary")
         self.result = Note(self.controls)
         self._show()
@@ -391,14 +404,14 @@ def _recommendation(translator: Translator, machine: Machine) -> str:
     return text("settings.recommended", memory=memory, processors=processors, model=model)
 
 
-def _title(text: str) -> QLabel:
+def _title(text: str) -> Label:
     """A card's title, in semibold."""
-    title = QLabel(text)
+    title = Label(text)
     title.setProperty("role", "card-title")
     return title
 
 
-def _titled(title: QLabel, control: QWidget) -> QLayout:
+def _titled(title: Label, control: QWidget) -> QLayout:
     """A card's title, and its control at the right."""
     row = hbox(spacing=12)
     row.addWidget(title)

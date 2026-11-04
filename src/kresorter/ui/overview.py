@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent, QMouseEvent
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QFrame, QPushButton, QWidget
 
 from kresorter.analysis.report import AnalysisReport
 from kresorter.analysis.run import analyze_paths
@@ -38,6 +38,7 @@ from kresorter.ui.motion import Bar
 from kresorter.ui.parts import (
     Head,
     Icon,
+    Label,
     Note,
     button,
     card,
@@ -49,6 +50,7 @@ from kresorter.ui.parts import (
     shares,
     surface2_tile,
     text_ink,
+    tooltip,
     vbox,
 )
 from kresorter.ui.shown import moment, shown_path
@@ -115,17 +117,17 @@ class FolderChip(QFrame):
         self.path = path
         self.setProperty("role", "chip")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover)  # its border shows the pointer over it
-        self.setToolTip(str(path))
+        self.setToolTip(tooltip(str(path)))
         self.setFixedHeight(36)
         self.icon = Icon(look, "folder", text_ink, size=16)
-        self.label = QLabel(shown)
+        self.label = Label(shown)
         layout = hbox(self, margins=(12, 0, 8, 0), spacing=8)
         layout.addWidget(self.icon)
         layout.addWidget(self.label)
         self.remove = button(look, "", role="icon", icon="x")
         self.remove.setFixedSize(20, 20)
         self.remove.setAccessibleName(removal)
-        self.remove.setToolTip(removal)
+        self.remove.setToolTip(tooltip(removal))
         layout.addWidget(self.remove)
 
 
@@ -138,9 +140,9 @@ class LevelCard(QFrame):
         self.setProperty("role", "card")
         shares(self)
         self.dot = dot(level.value)
-        self.name = QLabel(translator.label(level))
+        self.name = Label(translator.label(level))
         self.name.setProperty("role", "strong")
-        self.amount = QLabel()
+        self.amount = Label()
         self.amount.setProperty("role", "figure")
         self.files = Note(self, role="secondary")
         key = "overview.open_review" if level is Level.REVIEW else "overview.open_level"
@@ -172,9 +174,9 @@ class ServiceCard(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAccessibleName(name)
         self.icon = Icon(look, icon, text_ink, size=18, tile=surface2_tile, side=32)
-        self.name = QLabel(name)
+        self.name = Label(name)
         self.name.setProperty("role", "caption")
-        self.main = QLabel()
+        self.main = Label()
         self.main.setProperty("role", "strong")
         self.main.setWordWrap(True)
         self.note = Note(self, role="secondary")
@@ -228,9 +230,9 @@ class OverviewPage(QWidget):
         self.scanned: Scanned | None = None
 
         self.scan_card, inside = card(surface=True)
-        self.scan_title = QLabel(text("overview.scan_title"))
+        self.scan_title = Label(text("overview.scan_title"))
         self.scan_title.setProperty("role", "card-title")
-        self.scan_text = QLabel(text("overview.read_only"))
+        self.scan_text = Label(text("overview.read_only"))
         self.scan_text.setProperty("role", "secondary")
         self.scan_text.setWordWrap(True)
         self.scan_button = button(look, text("overview.scan"), role="primary", icon="refresh-cw")
@@ -264,7 +266,7 @@ class OverviewPage(QWidget):
             else:
                 self._chip(zone, zone=True)
 
-        self.unreliable = QLabel(text("overview.unreliable"))
+        self.unreliable = Label(text("overview.unreliable"))
         self.unreliable.setWordWrap(True)
         self.unreliable.setProperty("role", "accent")
         self.unreliable.hide()
@@ -332,7 +334,7 @@ class OverviewPage(QWidget):
         shown = shown_path(zone, Path.home())
         text = self._window.translator.text
         made = link(text("overview.zone_link", folder=shown))
-        made.setToolTip(text("overview.put_back", folder=shown))
+        made.setToolTip(tooltip(text("overview.put_back", folder=shown)))
         made.setAccessibleName(made.toolTip())
         made.clicked.connect(lambda _=False: self._put_back(zone))
         self._zone_links[zone] = made

@@ -15,12 +15,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QLabel
+from PySide6.QtWidgets import QFrame
 
 from kresorter.llm.explain import Explanations, explain
 from kresorter.llm.subjects import Result, subjects
 from kresorter.ui.i18n import Translator
-from kresorter.ui.parts import Icon, Note, badge, button, hbox, vbox
+from kresorter.ui.parts import Icon, Label, Note, badge, button, hbox, vbox
 from kresorter.ui.tasks import Task
 from kresorter.ui.theme import Palette
 
@@ -58,7 +58,7 @@ class ExplainPanel(QFrame):
         self.setProperty("role", "card")
         self.setProperty("tone", "surface")
         self.icon = Icon(look, "sparkles", _accent)
-        self.title = QLabel(text("explain.title"))
+        self.title = Label(text("explain.title"))
         self.title.setProperty("role", "strong")
         self.advisory = badge(text("explain.advisory"), "advisory")
         self.button = button(look, text("explain.button"), icon="sparkles")

@@ -16,7 +16,6 @@ from PySide6.QtGui import QColor, QFont, QKeyEvent, QPainter
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
-    QLabel,
     QListWidget,
     QListWidgetItem,
     QStyle,
@@ -26,7 +25,7 @@ from PySide6.QtWidgets import (
 
 from kresorter.ui import icons
 from kresorter.ui.i18n import Translator
-from kresorter.ui.parts import Icon, Note, divider, dot, hbox, mark, vbox
+from kresorter.ui.parts import Icon, Label, Note, divider, dot, hbox, mark, vbox
 from kresorter.ui.theme import Look, Palette
 
 __all__ = ["ICONS", "NAV_ROW", "WIDTH", "NavDelegate", "Sidebar", "nav_style"]
@@ -129,7 +128,7 @@ class Sidebar(QFrame):
         self._row = -1
         text = translator.text
         self.mark = Icon(look, "shield-check", _primary_text, size=16, tile=_accent, side=28)
-        brand = QLabel(text("app.title"))
+        brand = Label(text("app.title"))
         brand.setObjectName("brand")
         self.lists = (_Pages(self, look), _Pages(self, look))
         self.lists[0].setAccessibleName(text("sidebar.pages"))

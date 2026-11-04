@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHeaderView, QLabel, QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtWidgets import QHeaderView, QTreeWidget, QTreeWidgetItem, QWidget
 
 from kresorter.autostart.journal import ChangeResult, ChangeState
 from kresorter.autostart.listing import AutostartContext, list_autostart
@@ -44,6 +44,7 @@ from kresorter.ui.parts import (
     Field,
     Head,
     Icon,
+    Label,
     Note,
     Switch,
     button,
@@ -51,6 +52,7 @@ from kresorter.ui.parts import (
     page,
     rows,
     secondary_ink,
+    tooltip,
 )
 from kresorter.ui.recovery import autostart_lines
 from kresorter.ui.sessions import (
@@ -106,7 +108,7 @@ class AutostartPage(QWidget):
         header.resizeSection(_SWITCH, SWITCH_COLUMN)
         self.entries.itemSelectionChanged.connect(self._selected)
         self.total = Note(self, role="secondary")
-        self.machine = QLabel(text("autostart.machine"))
+        self.machine = Label(text("autostart.machine"))
         self.machine.setWordWrap(True)
         self.machine.setHidden(True)
         self.skipped = Note(self, role="secondary")
@@ -185,7 +187,7 @@ class AutostartPage(QWidget):
             row.setData(_ENTRY, EMPHASIS, True)
             row.setData(_ENTRY, SECONDARY, shown_path(Path(item.location), Path.home()))
             row.setData(_ENTRY, INITIAL, item.name[:1].upper())
-            row.setToolTip(_ENTRY, item.location)
+            row.setToolTip(_ENTRY, tooltip(item.location))
             row.setData(_SCOPE, BADGE, "advisory")
             self.entries.setItemWidget(row, _SWITCH, self._switch(item, row))
             self._rows.append(row)
@@ -224,11 +226,11 @@ class AutostartPage(QWidget):
         layout.addStretch(1)
         if not item.disableable:
             lock = Icon(window.look, "lock", secondary_ink)
-            lock.setToolTip(text("autostart.locked"))
+            lock.setToolTip(tooltip(text("autostart.locked")))
             layout.addWidget(lock)
         made = Switch(window.look, item.name)
         made.setChecked(item.enabled)
-        made.setToolTip(text("entry.enabled" if item.enabled else "entry.disabled"))
+        made.setToolTip(tooltip(text("entry.enabled" if item.enabled else "entry.disabled")))
         made.setEnabled(item.disableable and window.tasks.running is None)
         made.clicked.connect(lambda _=False: self._turn(row))
         layout.addWidget(made)

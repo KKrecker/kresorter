@@ -38,7 +38,6 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHeaderView,
-    QLabel,
     QScrollArea,
     QSizePolicy,
     QTreeWidget,
@@ -63,6 +62,7 @@ from kresorter.ui.parts import (
     Field,
     Head,
     Icon,
+    Label,
     Note,
     bar,
     button,
@@ -72,6 +72,7 @@ from kresorter.ui.parts import (
     shares,
     surface2_tile,
     text_ink,
+    tooltip,
     vbox,
 )
 from kresorter.ui.recovery import organize_lines
@@ -139,13 +140,13 @@ class CategoryCard(QFrame):
         self.icon = Icon(look, icon, text_ink, size=18, tile=surface2_tile, side=32)
         files = translator.count("file", len(moves))
         size = translator.size(sum(move.size for move in moves))
-        self.amount = QLabel(translator.text("organize.amount", files=files, size=size))
+        self.amount = Label(translator.text("organize.amount", files=files, size=size))
         self.amount.setProperty("role", "secondary")
         label = translator.category(category)
         named = translator.text("organize.named", label=label, category=category)
-        self.name = QLabel(label if label == category else named)
+        self.name = Label(label if label == category else named)
         self.name.setProperty("role", "card-title")
-        self.names = QLabel(", ".join(move.source.name for move in moves[:_NAMES]))
+        self.names = Label(", ".join(move.source.name for move in moves[:_NAMES]))
         self.names.setProperty("role", "secondary")
         top = hbox(spacing=8)
         top.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignTop)
@@ -175,7 +176,7 @@ class OrganizePage(QWidget):
 
         look = window.look
         why = [translator.label(blocker) for blocker in found]
-        self.blocked = QLabel("\n".join([text("organize.blocked"), *why]))
+        self.blocked = Label("\n".join([text("organize.blocked"), *why]))
         self.blocked.setWordWrap(True)
         self.blocked.setHidden(not found)
         self.controls = QWidget()
@@ -204,7 +205,7 @@ class OrganizePage(QWidget):
         self._fillers: list[QWidget] = []
 
         self.staying = QWidget()
-        self.stays_title = QLabel(text("organize.stays_title"))
+        self.stays_title = Label(text("organize.stays_title"))
         self.stays_title.setProperty("role", "strong")
         self.stays_note = Note(self.staying, role="secondary")
         self.stays_note.setWordWrap(False)
@@ -224,7 +225,7 @@ class OrganizePage(QWidget):
 
         self.recent, recent = card()
         self.recent.setFixedWidth(BATCHES_WIDTH)
-        self.recent_title = QLabel(text("batches.title"))
+        self.recent_title = Label(text("batches.title"))
         self.recent_title.setProperty("role", "caption")
         self.undo_button = button(look, text("organize.undo"), icon="undo-2")
         self.undo_button.clicked.connect(self._undo)
@@ -237,9 +238,9 @@ class OrganizePage(QWidget):
         self.no_batches = Note(self.recent, role="secondary")
         self.result = Note(self.controls)
 
-        self.will = QLabel()
+        self.will = Label()
         self.will.setProperty("role", "strong")
-        self.safe = QLabel(text("organize.safe"))
+        self.safe = Label(text("organize.safe"))
         self.safe.setProperty("role", "secondary")
         self.safe.setWordWrap(True)
         self.move_button = button(look, text("organize.sort"), role="primary")
@@ -359,7 +360,7 @@ class OrganizePage(QWidget):
             note = text("organize.batch_note", files=files, kind=kind, state=state)
             row.setData(0, SECONDARY, note)
             row.setData(0, _BATCH, batch.batch_id)
-            row.setToolTip(0, shown_path(batch.folder, Path.home()))
+            row.setToolTip(0, tooltip(shown_path(batch.folder, Path.home())))
             self._rows[batch.batch_id] = row
         self.batches.setHidden(not batches)
         self.no_batches.setText("" if batches else text("organize.no_batches"))

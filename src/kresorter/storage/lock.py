@@ -2,7 +2,9 @@
 
 An OS advisory lock on one file: ``flock`` on Linux/macOS, ``msvcrt.locking`` on Windows. It is
 tied to the open file, so the kernel releases it when the holder exits or crashes: no stale
-locks, no pid files. The lock file is created 0600 and never deleted (decision 0001).
+locks, no pid files. The lock file is created 0600 and never deleted (decision 0001). A link in
+its place is refused, never followed (``O_NOFOLLOW`` on POSIX; the security audit of decision
+0018): its target is neither opened nor made private.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from typing import Protocol, cast
 from kresorter.storage.transactions import StorageError
 
 PRIVATE_FILE = 0o600
+_NO_FOLLOW = getattr(os, "O_NOFOLLOW", 0)
 
 
 class LockedError(StorageError):
@@ -107,7 +110,7 @@ class InstanceLock:
         self._fd = -1
 
     def __enter__(self) -> InstanceLock:
-        fd = os.open(self.path, os.O_RDWR | os.O_CREAT, PRIVATE_FILE)
+        fd = os.open(self.path, os.O_RDWR | os.O_CREAT | _NO_FOLLOW, PRIVATE_FILE)
         self.path.chmod(PRIVATE_FILE)  # also when it existed with looser permissions
         if not self._backend.try_lock(fd):
             os.close(fd)

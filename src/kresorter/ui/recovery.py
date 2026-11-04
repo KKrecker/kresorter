@@ -15,7 +15,7 @@ from collections.abc import Collection
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton
+from PySide6.QtWidgets import QFrame, QPushButton
 
 from kresorter.autostart.journal import ChangeRecovery, ChangeState
 from kresorter.organize import recovery as organize_recovery
@@ -25,7 +25,7 @@ from kresorter.storage.pending import Domain
 from kresorter.storage.session import SessionFailed
 from kresorter.ui.dialogs import Confirmation
 from kresorter.ui.i18n import Translator
-from kresorter.ui.parts import hbox
+from kresorter.ui.parts import Label, hbox
 from kresorter.ui.sessions import (
     ORDER,
     Recovered,
@@ -109,7 +109,7 @@ class RecoveryBanner(QFrame):
         self._offered: frozenset[Domain] = frozenset()
         text = window.translator.text
         self.setProperty("role", "banner")
-        self.text = QLabel()
+        self.text = Label()
         self.text.setWordWrap(True)
         self.text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.recover_button = QPushButton(text("recover.button"))

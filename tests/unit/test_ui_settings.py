@@ -479,7 +479,7 @@ def test_a_fifo_in_place_of_the_file_is_unreadable_without_waiting(
     reader.join(5)
     waited = reader.is_alive()
     with contextlib.suppress(OSError):  # a reader still waiting is let go by a writer
-        os.close(os.open(fifo, os.O_WRONLY | os.O_NONBLOCK))
+        os.close(os.open(fifo, os.O_WRONLY | getattr(os, "O_NONBLOCK", 0)))
     reader.join(5)
     assert not waited
     assert loaded == [Loaded(DEFAULTS, Unused.UNREADABLE, "not a regular file")]

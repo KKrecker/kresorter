@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSignalBlocker, Qt
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QTreeWidget, QTreeWidgetItem, QWidget
+from PySide6.QtWidgets import QFrame, QGridLayout, QTreeWidget, QTreeWidgetItem, QWidget
 
 from kresorter.analysis.report import AnalysisReport, Finding
 from kresorter.analysis.score import Evidence, Level
@@ -39,6 +39,7 @@ from kresorter.ui.parts import (
     SECONDARY,
     Field,
     Head,
+    Label,
     Note,
     badge,
     bar,
@@ -117,12 +118,12 @@ class FindingDetail(QFrame):
         self.none = Note(self, text("detail.none"), role="secondary")
         self.content = QWidget()
         self.badge = badge("", Level.SAFE.value)
-        self.name = QLabel()
+        self.name = Label()
         self.name.setProperty("role", "card-title")
         self.name.setWordWrap(True)
         self.name.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.folder = Note(self, role="secondary")
-        self.labels = {fact: QLabel(text(f"detail.{fact}")) for fact in _FACTS}
+        self.labels = {fact: Label(text(f"detail.{fact}")) for fact in _FACTS}
         self.facts = {fact: Note(self) for fact in _FACTS}
         grid = QGridLayout()
         grid.setContentsMargins(0, 0, 0, 0)
@@ -133,7 +134,7 @@ class FindingDetail(QFrame):
             grid.addWidget(self.labels[fact], row, 0, Qt.AlignmentFlag.AlignTop)
             grid.addWidget(self.facts[fact], row, 1)
         grid.setColumnStretch(1, 1)
-        self.why_title = QLabel(text("detail.why"))
+        self.why_title = Label(text("detail.why"))
         self.why_title.setProperty("role", "caption")
         self.why = Note(self)
         self.explain = ExplainPanel(window)
@@ -222,9 +223,9 @@ class FindingsPage(QWidget):
         self.detail = FindingDetail(window)
         self.explain = self.detail.explain
         self.result = Note(self)
-        self.chosen = QLabel()
+        self.chosen = Label()
         self.chosen.setProperty("role", "strong")
-        self.chosen_size = QLabel()
+        self.chosen_size = Label()
         self.chosen_size.setProperty("role", "secondary")
         self.select_buttons = {
             level: link(text("findings.select", level=translator.label(level)))

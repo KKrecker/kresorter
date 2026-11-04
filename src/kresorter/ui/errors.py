@@ -17,10 +17,10 @@ from types import TracebackType
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import QDialog, QFrame, QLabel, QPlainTextEdit, QPushButton, QWidget
+from PySide6.QtWidgets import QDialog, QFrame, QPlainTextEdit, QPushButton, QWidget
 
 from kresorter.ui.i18n import Translator
-from kresorter.ui.parts import Note, hbox, vbox
+from kresorter.ui.parts import Label, Note, hbox, vbox
 
 __all__ = ["ErrorDialog", "ErrorHook", "Failure", "failure", "show_error"]
 
@@ -67,10 +67,10 @@ class ErrorDialog(QDialog):
         title = translator.text("error.title")
         self.setWindowTitle(title)
         self.setFixedWidth(WIDTH)
-        self.question = QLabel(title)
+        self.question = Label(title)
         self.question.setProperty("role", "question")
         self.text = Note(self, translator.text("error.text"), role="secondary")
-        self.what = QLabel(f"{found.kind}: {found.message}" if found.message else found.kind)
+        self.what = Label(f"{found.kind}: {found.message}" if found.message else found.kind)
         self.what.setWordWrap(True)
         self.what.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.details = QPlainTextEdit()

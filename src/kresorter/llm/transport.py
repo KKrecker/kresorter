@@ -3,7 +3,8 @@
 ``http.client`` without ``urllib``: no proxy setting is read and no redirect is followed. The
 socket is made from the address itself, so no resolver is asked. One deadline covers
 connecting, sending and every read: before each, the socket waits at most what remains
-(item 12).
+(item 12). An address off loopback is refused before anything is made, whatever made it
+(decision 0018, item 40).
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import socket
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from ipaddress import ip_address
 from typing import TYPE_CHECKING, Literal
 
 from kresorter import __version__
@@ -99,6 +101,8 @@ def request(
     """One request, one answer of at most ``limits.answer_bytes``, all within ``seconds``."""
     if body is not None and len(body) > limits.request_bytes:
         raise ValueError(f"a request body of {len(body)} bytes is over {limits.request_bytes}")
+    if not _loopback(address.host):
+        raise ValueError(f"{address.host!r} is not a loopback address")
     deadline = clock() + seconds
     connection = _Connection(address, deadline, clock)
     headers = {
@@ -116,6 +120,13 @@ def request(
         raise _failure(error, deadline, clock) from error
     finally:
         connection.close()
+
+
+def _loopback(host: str) -> bool:
+    try:
+        return ip_address(host).is_loopback
+    except ValueError:  # a name: never asked of a resolver
+        return False
 
 
 def _read(response: http.client.HTTPResponse, limits: Limits) -> Answer:

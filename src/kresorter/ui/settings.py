@@ -10,12 +10,18 @@ renamed over it, private (``0600`` on POSIX); a temporary file a crash left behi
 ``load`` writes nothing. A missing file means the defaults; an unreadable file, invalid JSON,
 something other than an object, or a value of the wrong type or unknown means the defaults too, with
 why the file was not used. A key left out takes its default; unknown keys are ignored.
+
+The file is not a door (decision 0018, item 39): it is read with at most ``SETTINGS_BYTES`` (64
+KiB) and refused beyond, as ``unreadable``; so is anything but a regular file in its place, a FIFO
+without waiting for a writer. A link in its place is never followed: ``O_NOFOLLOW`` when it is
+read and when the temporary file is written (POSIX), and the rename replaces a link, not its target.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import stat
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePath
@@ -51,9 +57,12 @@ _LANGUAGES: dict[str, LanguageSetting] = {setting: setting for setting in LANGUA
 ThemeSetting = Literal["system", "light", "dark"]
 THEME_SETTINGS: tuple[ThemeSetting, ...] = ("system", "light", "dark")
 _THEMES: dict[str, ThemeSetting] = {setting: setting for setting in THEME_SETTINGS}
-_NO_FOLLOW = getattr(os, "O_NOFOLLOW", 0)  # POSIX: never write through a link
+SETTINGS_BYTES = 64 * 1024  # the most read of the file; a larger one is refused
+_NO_FOLLOW = getattr(os, "O_NOFOLLOW", 0)  # POSIX: never read or write through a link
 # With O_BINARY on Windows, where os.open is otherwise in text mode: each \n would be \r\n.
 _FLAGS = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _NO_FOLLOW
+# O_NONBLOCK: a FIFO in its place is opened without waiting for a writer, then refused.
+_READ_FLAGS = os.O_RDONLY | _NO_FOLLOW | getattr(os, "O_NONBLOCK", 0)
 
 
 @dataclass(frozen=True)
@@ -91,11 +100,15 @@ def _path(context: ScanContext) -> Path:
 def load(context: ScanContext) -> Loaded:
     """The settings, or the defaults and why the file was not used."""
     try:
-        raw = _path(context).read_bytes()
+        raw = _read(_path(context))
     except FileNotFoundError:
         return Loaded(DEFAULTS)
     except OSError as error:
         return Loaded(DEFAULTS, Unused.UNREADABLE, str(error))
+    if raw is None:
+        return Loaded(DEFAULTS, Unused.UNREADABLE, "not a regular file")
+    if len(raw) > SETTINGS_BYTES:
+        return Loaded(DEFAULTS, Unused.UNREADABLE, f"larger than {SETTINGS_BYTES} bytes")
     try:
         found = json.loads(raw.decode("utf-8"))
     except (ValueError, RecursionError) as error:  # not UTF-8, not JSON, or nested too deep
@@ -103,6 +116,15 @@ def load(context: ScanContext) -> Loaded:
     if not isinstance(found, dict):
         return Loaded(DEFAULTS, Unused.NOT_AN_OBJECT)
     return _settings(found, tuple(PurePath(z).name for z in context.policy.default_roots()))
+
+
+def _read(path: Path) -> bytes | None:
+    """At most one byte more than ``SETTINGS_BYTES`` of the regular file at ``path``; ``None``
+    for anything else there."""
+    with os.fdopen(os.open(path, _READ_FLAGS | getattr(os, "O_BINARY", 0)), "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            return None
+        return stream.read(SETTINGS_BYTES + 1)
 
 
 def _zones(value: object, zones: tuple[str, ...]) -> tuple[str, ...] | None:

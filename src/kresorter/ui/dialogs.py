@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QFileSystemModel,
     QFrame,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QPlainTextEdit,
     QPushButton,
@@ -33,7 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from kresorter.ui.i18n import Translator
-from kresorter.ui.parts import Note, hbox, vbox
+from kresorter.ui.parts import Label, Note, hbox, vbox
 
 __all__ = ["ConfirmDialog", "Confirmation", "Dialogs", "FolderDialog", "choose_folder", "confirm"]
 
@@ -72,7 +71,7 @@ class ConfirmDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(confirmation.title)
         self.setFixedWidth(WIDTH)
-        self.question = QLabel(confirmation.title)
+        self.question = Label(confirmation.title)
         self.question.setProperty("role", "question")
         self.question.setWordWrap(True)
         self.text = Note(self, confirmation.text, role="secondary")
