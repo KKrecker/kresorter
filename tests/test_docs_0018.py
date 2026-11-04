@@ -29,8 +29,8 @@ def _read(name: str) -> str:
 
 
 def _said(name: str, title: str) -> str:
-    """A section's text, its lines joined by spaces."""
-    return " ".join(section(_read(name), title))
+    """A section's text, its lines joined and each run of spaces one."""
+    return " ".join(" ".join(section(_read(name), title)).split())
 
 
 def _en(key: str) -> str:
@@ -159,7 +159,9 @@ def test_the_roadmap_records_the_work_and_the_accepted_limitations() -> None:
 
 def test_the_layout_names_every_module_of_llm() -> None:
     # [0018.43] machine and group came with this decision.
-    layout = _read("docs/roadmap.md").split("## Target package layout", 1)[1]
-    [line] = [line for line in layout.splitlines() if "── llm/" in line]
+    layout = _read("docs/roadmap.md").split("## Target package layout", 1)[1].splitlines()
+    [start] = [index for index, line in enumerate(layout) if "── llm/" in line]
+    end = next(index for index in range(start + 1, len(layout)) if "──" in layout[index])
+    line = " ".join(layout[start:end])  # its comment, and the comment lines that continue it
     found = sorted(path.stem for path in (ROOT / "src" / "kresorter" / "llm").glob("*.py"))
     assert [name for name in found if not name.startswith("__") and name not in line] == []

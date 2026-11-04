@@ -317,6 +317,43 @@ Scanner core and `kresorter scan` (read-only report).
   quarantine does not ask the synced folders: a junk file in one goes to the vault, which the
   client syncs as a deletion until it is restored.
 
+### Decision 0018: done (the owner's requests)
+- [Decision 0018](decisions/0018-owners-requests.md): the owner's thirteen requests after
+  step 8, by its plan of sixteen steps, each a test and then its fix.
+- The window: a theme, System, Light or Dark, applied at once; a new language offers a restart
+  in the same process, on the same page; Select all and Clear in the quarantine; motion (a page
+  fades in, a switch slides, hover, a scan's bar and progress), none when its duration is 0; a
+  list ringed only when the keyboard focused it; a safe zone left out and put back,
+  remembered in `settings.json`.
+- What a cache is: a cache likely safe, a browser's cache for review in a category of its own,
+  `browser_cache`, named in both languages.
+- Speed: one look at `/proc` per scan, the rules matched and the policy asked once per
+  directory, Windows' share-mode checks and the hashing side by side, and the scan's
+  progress; a scan of 20 000 files on Linux went from 6.1 s to about 1.5 s.
+- The local AI: the model chosen in Settings among those Ollama has, one recommended for the
+  machine's memory and processors (`llm.machine`), named in the sidebar and on the Overview's
+  Local AI card; grouping by meaning on the Organize page (`llm.group`): the names only, one
+  bounded answer checked as untrusted input, a plan made by the planner, By kind to go back,
+  Sort without asking again.
+- The security audit, [`reviews/security-audit.md`](reviews/security-audit.md): every label
+  plain text and every tooltip escaped; nothing in `src` runs text; `settings.json` read with at
+  most 64 KiB, never through a link, a FIFO refused without waiting; the lock refuses a link;
+  the transport refuses an address off loopback.
+- 3396 tests, 100 % line and branch coverage.
+
+### Accepted limitations of decision 0018
+- Everything carried after step 8 still holds.
+- **The scan's look at `/proc` is a moment**: a file opened during a long scan is reported as
+  not open; preflight checks it again before anything acts.
+- **A browser's cache is never proposed**, though the browsers say it holds no sign-ins: the
+  owner's choice, for the time and traffic it costs.
+- **The model can be wrong**: a group may not fit its files; the plan is shown before anything
+  moves, and every batch can be undone.
+- **The names leave kresorter for the model**, on loopback only, when the user asks: the model
+  and Ollama are the user's own.
+- **The recommendation is a rule of thumb** for memory and processors; it reads no graphics
+  card.
+
 ### Left for later
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
 - B11: CI on macOS, and live `WinRegistry` tests.
@@ -333,7 +370,8 @@ src/kresorter/
 ├── analysis/     # step 3: duplicates, size_age, score, report
 ├── autostart/    # step 4: readers, listing, XDG and HKCU Run changes, recover
 ├── organize/     # step 5: categories, planner, mover, journal, recovery, undo (decision 0012)
-├── llm/          # step 6: settings, transport, client, prompt, clean, subjects, explain (0013)
+├── llm/          # step 6: settings, transport, client, prompt, clean, subjects, explain,
+                  #   failure (0013); machine, group (0018)
 └── ui/           # step 7: launch, app, window, sidebar, tasks, i18n, texts, labels, theme,
                   #   icons (and icons/, Lucide's), parts, shown, settings, dialogs, sessions,
                   #   overview, findings, organize, autostart, quarantine, recovery, explain,

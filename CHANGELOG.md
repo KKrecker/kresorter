@@ -18,9 +18,10 @@ The first release, an alpha: the console commands and the window, on Windows and
   skipped, with the reason; the safe zones `~/.cache` and `~/Downloads` when no folder is
   named. It only reads.
 - `kresorter analyze [paths] [--json] [--large MIB] [--older-than DAYS] [--explain]`: a safety
-  level for each finding, `safe`, `likely_safe` or `review`, with every reason; the copy of a
-  duplicate group that stays is chosen for you and never proposed, and large and old files are
-  listed for review only. It only reads.
+  level for each finding, `safe`, `likely_safe` or `review`, with every reason; a cache is
+  `likely_safe` and a browser's cache `review`, never proposed; the copy of a duplicate group
+  that stays is chosen for you and never proposed, and large and old files are listed for
+  review only. It only reads.
 - `kresorter quarantine add|list|restore|purge`: files moved aside into a private vault in the
   data directory, each checked again right before it moves (the policy, the disk, open files),
   or the findings of an analysis with `--from-analysis --level safe|likely_safe`; `restore`
@@ -53,22 +54,28 @@ The first release, an alpha: the console commands and the window, on Windows and
   (`~/.ssh`, `~/.gnupg`, `AppData\Roaming`), open files, Kresorter's data directory and the
   folder it runs from; links are never followed.
 - The window, `kresorter-ui` (or `python -m kresorter.ui`) with the extra `ui`: a sidebar of
-  six pages, in English or Russian, light or dark as the system is, running what the commands
-  run on the same journal and lock; every action opens a dialog first, with Cancel as its
-  default button.
-- The **Overview** page: the folders to scan and Scan now, which only reads; a card per safety
-  level with its files, size and strongest reasons, and a card each for Quarantine, Organize
-  and Autostart.
+  six pages, in English or Russian, light or dark as the system is or as chosen, running what
+  the commands run on the same journal and lock; every action opens a dialog first, with
+  Cancel as its default button. A name is shown as it is written, never as formatting.
+- The **Overview** page: the folders to scan, a safe zone left out and put back as you choose,
+  and Scan now, which only reads and shows its progress; a card per safety level with its
+  files, size and strongest reasons, and a card each for Quarantine, Organize, Autostart and
+  Local AI, the model in use and whether the last Check found it.
 - The **Findings** page: the findings grouped by their strongest reason, with a chip per level,
   a search and the detail of the file chosen; only the Safe ones are selected at first, and
   Move to quarantine moves the selection.
 - The **Organize** page: a folder's plan as a card per category and the files that stay, with
-  their reasons; Sort moves it as one batch, and the recent batches can be undone.
+  their reasons; Group by meaning (local AI) groups the files by what their names say, sending
+  the local model their names only, and By kind goes back; Sort moves the plan shown as one
+  batch, and the recent batches can be undone.
 - The **Autostart** page: the entries by source, each with its location, its scope and a
   switch that disables or enables it where it can change, and a lock where it cannot.
-- The **Quarantine** page: the quarantined files, with Restore, and Delete permanently.
-- The **Settings** page: the language, on Windows the machine-wide autostart entries, the local
-  AI with its Check, the data folder and the version.
+- The **Quarantine** page: the quarantined files, with Select all and Clear selection, Restore,
+  and Delete permanently.
+- The **Settings** page: the language, applied at once with Restart now; Appearance, System,
+  Light or Dark; on Windows the machine-wide autostart entries; the local AI with its Check,
+  the model chosen among those Ollama has and the one recommended for the computer; the data
+  folder and the version.
 - `kresorter-ui --self-test REPORT`: opens the window, shows each page, closes it and writes a
   line per page to `REPORT`, changing nothing; on a failure, the error and exit code 1.
 - For Windows, `Kresorter-0.1.0-setup.exe`, for the current user with no administrator rights,

@@ -95,6 +95,13 @@ duplicate groups and everything it skipped, with the reason. `analyze` rates eac
 decided for you and that copy is never proposed. Large (`--large`, MiB) and old (`--older-than`,
 days unmodified) files are listed for review only.
 
+A cache is `likely_safe`: proposed, but never chosen for you, since the program that made it
+has to make it again; thumbnails and the systems' folder metadata stay `safe`. But a browser's
+cache is `review` (Chrome, Chromium, Firefox, Edge, Brave, Opera, Vivaldi, Yandex), never
+proposed: the browsers say it holds no sign-ins, which they keep in their cookies, outside it,
+yet making it again costs the time and the traffic of every page, so the choice is yours
+([decision 0018](docs/decisions/0018-owners-requests.md)).
+
 ### Quarantine
 
 ```bash
@@ -216,7 +223,9 @@ Both settings are environment variables. `KRESORTER_OLLAMA_URL`, by default
 `http://127.0.0.1:11434`, is `http://HOST[:PORT]` where HOST is `localhost`, an address in
 `127.0.0.0/8` or `[::1]` (an Ollama listening only on `::1` needs `http://[::1]:11434`);
 anything else is refused, proxy settings are ignored and redirects are not followed.
-`KRESORTER_OLLAMA_MODEL`, by default `llama3.2`, names a model you pulled.
+`KRESORTER_OLLAMA_MODEL`, by default `llama3.2`, names a model you pulled. In the window, the
+Settings page can choose the model among those Ollama has (see
+[Desktop app](#desktop-app-optional)); the commands use `KRESORTER_OLLAMA_MODEL` only.
 
 Each explanation is about one subject, and its facts are all that is sent; the explanation is
 labelled with them as `name=value`:
@@ -267,8 +276,11 @@ load one of these libraries, it names the error and the libraries, and exits wit
 The sidebar opens six pages, with the open-file check and the local AI's model under them:
 
 - **Overview**: the folders to scan (the safe zones, and folders you add) and Scan now, which
-  only reads; then a card per level with its files, size and strongest reasons, which opens
-  Findings with that level only, and a card each for Quarantine, Organize and Autostart.
+  only reads, with a moving bar and the files read so far while it runs. A safe zone can be
+  left out with its remove button and put back with its own link (`+ ~/.cache`); the window
+  remembers it. Then a card per level with its files, size and strongest reasons, which opens
+  Findings with that level only, and a card each for Quarantine, Organize, Autostart and Local
+  AI: the model in use and whether the last Check found it available, which opens Settings.
 - **Findings**: grouped by their strongest reason, with a chip per level and a search, and at
   the right the detail of the file chosen, with why it was found. Only what is proposed at the
   Safe level is selected at first; a Review finding is selected only by its own check box, the
@@ -279,13 +291,28 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
   `organize` refuses (macOS, or no reliable open-file check), the page says why. The
   Russian window names the categories in Russian, but the directories keep their English names
   (`Images`, `Documents`, ...) in every language, so `organize undo` moves back what the window
-  sorted, and the window what the command sorted.
+  sorted, and the window what the command sorted. Once a plan is shown, Group by meaning
+  (local AI) asks the local model to group the files by what their names say (a trip, taxes):
+  it sends the names only, of the files the plan moves or keeps for no kind, sorted, at most
+  100 of at most 100 characters each, with no path, folder, size, time or content. The groups
+  it answers, at most 12 of two files or more into folders whose names are names, make a new
+  plan through the same planner, checked as any; the page says they come from the local AI and
+  may be wrong, and By kind goes back. Sort then moves the plan shown without asking the model
+  again, as one batch that can be undone.
 - **Autostart**: the entries by source, each with its location, its scope and a switch that is
   on while it starts, and a search over names and locations; the switch of an entry that can
   change disables or enables it, and an entry that cannot has a lock.
-- **Quarantine**: the quarantined files; Restore, or Delete permanently, the one red button.
-- **Settings**: a card each for the language, on Windows the machine-wide autostart entries
-  (off until you turn them on), the local AI with its Check, and the data folder.
+- **Quarantine**: the quarantined files, with Select all and Clear selection; Restore, or
+  Delete permanently, the one red button, acts on the files checked.
+- **Settings**: a card each for the language (once a new one is saved, Restart now reopens the
+  window in it, on the same page), Appearance (System, Light or Dark), applied at once, on
+  Windows the machine-wide autostart entries (off until you turn them on), the local AI with
+  its Check, and the data folder. The Check lists the models Ollama has, to choose the one
+  every explanation and grouping uses; `KRESORTER_OLLAMA_MODEL`, when set, wins, and the card
+  says so. The card recommends a model for the computer's memory and processors, Qwen 2.5 for
+  its Russian: `qwen2.5:1.5b` under 8 GiB, `qwen2.5:3b` under 16 GiB, `qwen2.5:7b` under
+  32 GiB, `qwen2.5:14b` otherwise, one size smaller with fewer than four processors; you get it
+  with `ollama pull` and the name, kresorter installs nothing.
 
 ![Findings: the Safe files chosen, grouped by their strongest reason, and the detail of one at the right with why it was found](docs/screenshots/findings.png)
 
@@ -295,10 +322,10 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
 
 ![Autostart: the programs that start at sign-in, each with its location, its scope and its switch](docs/screenshots/autostart.png)
 
-The window follows the system's light or dark scheme; its icons are
-[Lucide](https://lucide.dev)'s, shipped with it under their ISC licence. It needs a screen at
-least 1056 px wide in English and 1183 px in Russian, for Findings' bar and the detail beside
-it (a 1366 x 768 screen at 125 % is 1093 px wide).
+The window follows the system's light or dark scheme, or the one Appearance chooses; its
+icons are [Lucide](https://lucide.dev)'s, shipped with it under their ISC licence. It needs a
+screen at least 1056 px wide in English and 1183 px in Russian, for Findings' bar and the
+detail beside it (a 1366 x 768 screen at 125 % is 1093 px wide).
 
 ![Findings in the dark scheme](docs/screenshots/findings-dark.png)
 
@@ -311,11 +338,13 @@ finding, an autostart entry or a file that stays in place, asks Ollama about tha
 only when you press it (see [AI explanations](#ai-explanations-optional)).
 
 The window is in English or Russian: the system's language by default (Russian when it is
-Russian, English otherwise), or the one chosen on the Settings page, from the next time it
-opens. It keeps one file, `settings.json` in the data directory (see
-[Recovery](#recovery)), by default `{"language": "system", "include_machine": false}`; it is
-written only when you change a setting, and a broken file is not used, as the Settings page
-says. No finding, path, plan or explanation is kept.
+Russian, English otherwise), or the one chosen on the Settings page, at once with Restart now
+or from the next time it opens. It keeps one file, `settings.json` in the data directory (see
+[Recovery](#recovery)), by default
+`{"language": "system", "include_machine": false, "skipped_zones": [], "theme": "system"}`,
+with `model` once a model is chosen; it is written only when you change a setting, and a
+broken file, one over 64 KiB or a link in its place is not used, as the Settings page says.
+No finding, path, plan, group or explanation is kept.
 
 ## Uninstalling
 

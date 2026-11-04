@@ -83,7 +83,12 @@ def test_the_section_names_both_languages_and_the_one_file_kept() -> None:
     assert "English" in text
     assert "Russian" in text
     assert f"`{SETTINGS_NAME}`" in text
-    defaults = {"language": DEFAULTS.language, "include_machine": DEFAULTS.include_machine}
+    defaults = {
+        "language": DEFAULTS.language,
+        "include_machine": DEFAULTS.include_machine,
+        "skipped_zones": list(DEFAULTS.skipped_zones),
+        "theme": DEFAULTS.theme,
+    }
     assert f"`{json.dumps(defaults)}`" in text
 
 
