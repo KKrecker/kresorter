@@ -128,6 +128,21 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "Отключение можно отменить",
     },
     "overview.autostart_off": {"en": "{n} turned off", "ru": "отключено: {n}"},
+    "overview.ai_title": {"en": "Local AI", "ru": "Локальный ИИ"},
+    "overview.ai": {"en": "Model: {model}", "ru": "Модель: {model}"},
+    "overview.ai_refused": {"en": "{name} is refused", "ru": "Значение {name} отклонено"},
+    "overview.ai_not_checked": {
+        "en": "Not checked yet; Check is in Settings",
+        "ru": "Ещё не проверялась; проверка — в настройках",
+    },
+    "overview.ai_available": {
+        "en": "Available at the last check",
+        "ru": "Доступна по последней проверке",
+    },
+    "overview.ai_unavailable": {
+        "en": "Unavailable at the last check",
+        "ru": "Недоступна по последней проверке",
+    },
     "overview.unreliable": {
         "en": "Files in use cannot be recognized on this system, so nothing can be moved to the"
         " quarantine.",

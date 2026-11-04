@@ -151,13 +151,18 @@ class Window(QMainWindow):
         return self.settings.llm_env
 
     def show_ai(self, checked: bool | None) -> None:
-        """The local AI's line: its model; ``checked`` as the Settings page last found it."""
+        """The local AI's line, and its card on the Overview: its model; ``checked`` as the
+        Settings page last found it (decision 0018, items 34 and 35)."""
         text = self.translator.text
         try:
-            line = text("sidebar.ai", model=model_from(self.llm_env))
+            model = model_from(self.llm_env)
         except SettingRefused as refused:
             line = text("sidebar.ai_refused", name=refused.name)
+            card = text("overview.ai_refused", name=refused.name)
+        else:
+            line, card = text("sidebar.ai", model=model), text("overview.ai", model=model)
         self.sidebar.show_ai(line, checked=checked)
+        self.overview.show_ai(card, checked)
 
     def page(self, name: str) -> QWidget:
         return self._pages[PAGES.index(name)]

@@ -1,5 +1,5 @@
 """The Overview page: the scan card, what the last scan found, and a card each for Quarantine,
-Organize and Autostart (decision 0014, items 19 and 48).
+Organize, Autostart and the local AI (decision 0014, items 19 and 48; 0018, item 35).
 
 The folders are the safe zones at first, each a chip with its path from the home folder (``~``);
 the user adds folders of their own, and removes them again with their chip's remove button,
@@ -9,7 +9,9 @@ the duplicate groups and the paths skipped, and the page says when files in use 
 recognized on this system. A card per level shows its size, its files and their strongest
 reasons, and opens Findings with that level only; the findings go to the Findings page. The
 cards of Quarantine, Organize and Autostart say what the window last read there, or what the
-page does, and open their page on a click, Enter or Space.
+page does, and open their page on a click, Enter or Space. The local AI's names the model in use
+and says whether the last Check found it available, unavailable, or that none ran yet; it opens
+Settings, and asks nothing of Ollama (0013 item 1).
 """
 
 from __future__ import annotations
@@ -66,7 +68,15 @@ __all__ = [
     "scan",
 ]
 
-SERVICES = ("quarantine", "organize", "autostart")
+SERVICES = {  # a card, and the page it opens
+    "quarantine": "quarantine",
+    "organize": "organize",
+    "autostart": "autostart",
+    "ai": "settings",
+}
+_TITLES = {"ai": "overview.ai_title"}  # otherwise the page's name
+_ICONS = {**ICONS, "ai": "sparkles"}
+_CHECKED = {None: "overview.ai_not_checked", True: "overview.ai_available"}
 _OPENS = (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space)
 
 
@@ -268,11 +278,12 @@ class OverviewPage(QWidget):
         self.level_cards.hide()
 
         self.services = {
-            name: ServiceCard(look, text(f"page.{name}"), ICONS[name]) for name in SERVICES
+            name: ServiceCard(look, text(_TITLES.get(name, f"page.{name}")), _ICONS[name])
+            for name in SERVICES
         }
         services = hbox(spacing=16)
         for name, service in self.services.items():
-            service.opened.connect(lambda name=name: window.show_page(name))
+            service.opened.connect(lambda opens=SERVICES[name]: window.show_page(opens))
             services.addWidget(service, 1)
         self.show_quarantine(None)
         self.show_plan(None)
@@ -461,6 +472,12 @@ class OverviewPage(QWidget):
             return
         entries, off = read
         shown.say(translator.count("entry", entries), text("overview.autostart_off", n=off))
+
+    def show_ai(self, model: str, checked: bool | None) -> None:
+        """``model``: the model in use as the window says it; ``checked`` as the last Check
+        found the local AI, ``None`` before any."""
+        key = _CHECKED.get(checked, "overview.ai_unavailable")
+        self.services["ai"].say(model, self._window.translator.text(key))
 
 
 def _head(translator: Translator) -> Head:
