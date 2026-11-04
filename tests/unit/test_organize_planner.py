@@ -387,3 +387,66 @@ def test_an_office_lock_file_is_found_across_normalizations(zone: Path, scan: Sc
     # [0012.11] [0012.20] the lock of a document named in decomposed form
     result = plan(downloads(zone, f"~${NFD}.DOCX"), scan)
     assert stayed(result) == {f"~${NFD}.DOCX": StayReason.IN_PROGRESS}
+
+
+# --- groups by meaning (decision 0018, item 28) --------------------------------------------------
+
+
+def test_a_grouped_file_goes_to_its_group_by_kind_or_of_no_kind(
+    zone: Path, scan: ScanContext
+) -> None:
+    # [0018.28] The groups after the table's categories, by their folder, then by name.
+    names = ("rome.jpg", "report.pdf", "notes.xyz", "song.mp3", "tax.pdf", "2023.pdf")
+    folder = downloads(zone, *names)
+    groups = {"rome.jpg": "Trip", "notes.xyz": "Trip", "tax.pdf": "Taxes", "2023.pdf": "Taxes"}
+    result = plan(folder, scan, groups)
+    assert [(m.source.name, m.category) for m in result.moves] == [
+        ("song.mp3", "Audio"),
+        ("report.pdf", "Documents"),
+        ("2023.pdf", "Taxes"),
+        ("tax.pdf", "Taxes"),
+        ("notes.xyz", "Trip"),
+        ("rome.jpg", "Trip"),
+    ]
+    assert result.stays == ()
+    assert plan(folder, scan) == plan(folder, scan, {})
+    assert stayed(plan(folder, scan)) == {"notes.xyz": StayReason.UNKNOWN_KIND}
+
+
+def test_every_reason_to_stay_holds_for_a_grouped_file(zone: Path, scan: ScanContext) -> None:
+    # [0018.28] [0012.9-0012.15] Junk, metadata, in progress, a program next to its libraries.
+    folder = downloads(zone, "x.tmp", "desktop.ini", "y.part", "game.exe", "engine.dll", "a.pdf")
+    groups = dict.fromkeys(["x.tmp", "desktop.ini", "y.part", "game.exe", "a.pdf"], "Stuff")
+    result = plan(folder, scan, groups)
+    assert stayed(result) == {
+        "desktop.ini": StayReason.FOLDER_METADATA,
+        "y.part": StayReason.IN_PROGRESS,
+        "x.tmp": StayReason.JUNK,
+        "engine.dll": StayReason.UNKNOWN_KIND,
+        "game.exe": StayReason.PROGRAM,
+    }
+    assert moved(result) == {"a.pdf": "Stuff"}
+
+
+def test_a_group_s_destination_is_checked_as_any(zone: Path, scan: ScanContext) -> None:
+    # [0018.28] A companion, a conflict, a category blocked.
+    folder = downloads(zone, "a.jpg", "a.xmp", "b.pdf", "Taxes/b.pdf", "c.pdf", "d.pdf", "Notes")
+    groups = {"a.jpg": "Trip", "b.pdf": "Taxes", "c.pdf": "Notes", "d.pdf": "Notes"}
+    result = plan(folder, scan, groups)
+    assert stayed(result) == {
+        "Taxes": StayReason.NOT_REGULAR,
+        "Notes": StayReason.UNKNOWN_KIND,
+        "a.xmp": StayReason.UNKNOWN_KIND,
+        "a.jpg": StayReason.COMPANION,
+        "b.pdf": StayReason.CONFLICT,
+        "c.pdf": StayReason.CATEGORY_BLOCKED,
+        "d.pdf": StayReason.CATEGORY_BLOCKED,
+    }
+    assert moved(result) == {}
+
+
+def test_a_companion_in_the_same_group_moves_with_it(zone: Path, scan: ScanContext) -> None:
+    # [0018.28] Its stem's entries all go to one directory.
+    folder = downloads(zone, "a.jpg", "a.xmp")
+    result = plan(folder, scan, {"a.jpg": "Trip", "a.xmp": "Trip"})
+    assert moved(result) == {"a.jpg": "Trip", "a.xmp": "Trip"}
