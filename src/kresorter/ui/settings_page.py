@@ -1,7 +1,8 @@
 """The Settings page (decision 0014, items 27, 36, 37 and 55).
 
 A card each, the page scrolling under its head. The language, its choice at the right: a change
-is saved and applies the next time the window opens, as its note says. The theme, on the card
+is saved, then a restart is offered (decision 0018, item 3); declined, the new language applies
+the next time the window opens, as its note says. The theme, on the card
 Appearance, its choice at the right: a change is saved and applied at once (decision 0018,
 items 1 and 2). On Windows only, the
 machine scope of autostart: turning it on asks first, saying what is read; turning it off asks
@@ -249,8 +250,24 @@ class SettingsPage(QWidget):
         self.machine.setChecked(self._settings.include_machine)
 
     def _language(self, index: int) -> None:
-        self._save(replace(self._settings, language=LANGUAGE_SETTINGS[index]))
+        """Saved, then a restart offered (decision 0018, item 3); declined, the new language
+        applies the next time the window opens."""
+        language = LANGUAGE_SETTINGS[index]
+        self._save(replace(self._settings, language=language))
         self._show()
+        if self._settings.language == language:
+            self._offer_restart()
+
+    def _offer_restart(self) -> None:
+        window, text = self._window, self._window.translator.text
+        asked = Confirmation(
+            title=text("settings.restart_title"),
+            text=text("settings.restart_text"),
+            details=(),
+            action=text("settings.restart_action"),
+        )
+        if window.dialogs.confirm(asked):
+            window.restart()
 
     def _theme(self, index: int) -> None:
         """Saved, then applied at once; a theme that cannot be saved is not applied."""

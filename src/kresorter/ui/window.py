@@ -77,6 +77,7 @@ class Window(QMainWindow):
         self.setWindowTitle(translator.text("app.title"))
         self._starters: list[tuple[QWidget, Callable[[], bool]]] = []
         self._close_when_done = False
+        self.restart_page: str | None = None  # the page to open again once a restart closed it
 
         self.tasks = Tasks(self)
         self.tasks.busy.connect(self._busy)
@@ -225,6 +226,12 @@ class Window(QMainWindow):
 
     def _failed(self, title: str, message: str) -> None:
         self.message.setText(self.translator.text("task.failed", task=title, message=message))
+
+    def restart(self) -> None:
+        """Close as closing does (once a task that acts ended); ``ui.app.run`` then opens the
+        window again on this page (decision 0018, item 4)."""
+        self.restart_page = PAGES[self.sidebar.currentRow()]
+        self.close()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         holding = self.tasks.holding()

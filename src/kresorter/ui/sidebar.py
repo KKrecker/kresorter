@@ -218,7 +218,9 @@ class Sidebar(QFrame):
             return
         for other in self.lists:
             if other is not listed:
-                other.setCurrentRow(-1)
+                # No current row, set as the view's own: its focus then takes none, the first
+                # row least of all (Qt does that for a current row never set).
+                other.setCurrentIndex(QModelIndex())
                 other.clearSelection()
         self._row = local if listed is self.lists[0] else self.lists[0].count() + local
         self.currentRowChanged.emit(self._row)

@@ -528,6 +528,18 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "A new language applies the next time the window opens.",
         "ru": "Новый язык применится при следующем открытии окна.",
     },
+    "settings.restart_title": {"en": "Restart the window?", "ru": "Перезапустить окно?"},
+    "settings.restart_text": {
+        "en": (
+            "The window opens again in the new language, on this page. A task that changes files"
+            " ends first."
+        ),
+        "ru": (
+            "Окно откроется снова на новом языке, на этой же странице. Задача, которая меняет"
+            " файлы, сначала завершится."
+        ),
+    },
+    "settings.restart_action": {"en": "Restart now", "ru": "Перезапустить сейчас"},
     "settings.appearance": {"en": "Appearance", "ru": "Оформление"},
     "settings.theme_system": {"en": "System", "ru": "Как в системе"},
     "settings.theme_light": {"en": "Light", "ru": "Светлая"},
