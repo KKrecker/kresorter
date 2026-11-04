@@ -6,7 +6,8 @@ pages only read: nothing is changed. A failure is its traceback in ``REPORT`` an
 error raised while the window opens or reaching the event loop (caught by an ``ErrorHook``,
 or raised where the events are processed, as Qt may do), a page whose task ends with an error
 (the window's message), or a page still working after ``LIMIT`` seconds, whose task is left
-behind. With a standard error, the traceback is written there too, once.
+behind. With a standard error, the traceback is written there too, once. As it always does, the
+window closes once a task that acts has ended, which the self-test waits for, up to ``LIMIT``.
 """
 
 from __future__ import annotations
@@ -81,6 +82,16 @@ def _pages(
         return lines
     finally:
         window.close()
+        _closed(application, window)
+
+
+def _closed(application: QCoreApplication, window: Window) -> None:
+    """The window does not close while a task that acts runs, but once it ends: events
+    processed until then, up to ``LIMIT`` seconds."""
+    deadline = time.monotonic() + LIMIT
+    while window.isVisible() and time.monotonic() <= deadline:
+        application.processEvents()
+        time.sleep(PAUSE)
 
 
 def _settle(
