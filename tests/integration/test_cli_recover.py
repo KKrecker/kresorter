@@ -65,8 +65,13 @@ def no_space(*args: object, **kwargs: object) -> None:
     raise OSError(errno.ENOSPC, "No space left on device")
 
 
+def denial(source: object, target: object) -> PermissionError:
+    """A rename refused: ``[Errno 13]`` on POSIX, ``[WinError None]`` on Windows."""
+    return PermissionError(errno.EACCES, "Permission denied", str(source), None, str(target))
+
+
 def denied_rename(source: object, target: object, **kwargs: object) -> None:
-    raise PermissionError(errno.EACCES, "Permission denied", str(source), None, str(target))
+    raise denial(source, target)
 
 
 def failed_partial_stub(tmp_path: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -430,9 +435,8 @@ def test_a_partial_stub_that_cannot_be_moved_stops_with_the_reason(
     slot = data_dir / "autostart" / "1"
     assert (code, out) == (3, "")
     assert err == (
-        "kresorter: an unfinished autostart change cannot be closed: [Errno 13] Permission"
-        f" denied: '{stub}' -> '{slot}'; fix or move what is there, then run"
-        " 'kresorter autostart recover' again\n"
+        f"kresorter: an unfinished autostart change cannot be closed: {denial(stub, slot)};"
+        " fix or move what is there, then run 'kresorter autostart recover' again\n"
     )
     assert query(data_dir, "SELECT state, error FROM autostart_changes") == before
     assert stub.read_bytes() == b""  # still in place, never deleted

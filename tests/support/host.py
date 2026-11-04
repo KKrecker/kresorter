@@ -68,6 +68,14 @@ def native(relative: str) -> str:
     return str(PurePath(relative))
 
 
+def cannot_list(file: Path) -> str:
+    """What the system says of listing ``file``, a file: ``Not a directory`` on POSIX, ``The
+    directory name is invalid`` on Windows."""
+    with pytest.raises(NotADirectoryError) as listed:
+        list(file.iterdir())
+    return str(listed.value.strerror)
+
+
 def make_fifo(path: Path) -> None:
     """A FIFO at ``path``; the test is skipped on Windows, which has none."""
     mkfifo = getattr(os, "mkfifo", None)

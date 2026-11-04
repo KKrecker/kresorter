@@ -336,7 +336,7 @@ def test_a_check_before_acting_that_fails_stops_with_the_reason(
     monkeypatch.undo()
     assert (code, out) == (3, "")
     assert err == (
-        f"kresorter: cannot disable app: [Errno 13] Permission denied: '{user}';"
+        f"kresorter: cannot disable app: [Errno 13] Permission denied: {str(user)!r};"
         " nothing was changed\n"
     )
     assert rows(data_dir) == []

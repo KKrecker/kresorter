@@ -22,7 +22,7 @@ from kresorter.quarantine.journal import OperationState
 from kresorter.quarantine.service import QuarantineError, QuarantineService, RestoreRefusal
 from kresorter.storage.db import connect
 from support.files import write
-from support.host import as_kept, host_classifier
+from support.host import MTIME_STEP_NS, as_kept, host_classifier
 from support.journal import rows
 
 NO_RULES = host_classifier([])
@@ -135,11 +135,12 @@ def test_legacy_item_without_atime_keeps_the_vault_atime(
 ) -> None:
     item = quarantined(service, zone / "a.bin")
     conn.execute("UPDATE items SET atime_ns = NULL WHERE id = ?", (item,))
-    os.utime(slot_of(conn, item), ns=(7, MTIME_NS))
+    atime_ns = 7 * MTIME_STEP_NS  # a time the system keeps
+    os.utime(slot_of(conn, item), ns=(atime_ns, MTIME_NS))
 
     service.restore([item])
 
-    assert (zone / "a.bin").lstat().st_atime_ns == 7
+    assert (zone / "a.bin").lstat().st_atime_ns == atime_ns
     assert (zone / "a.bin").lstat().st_mtime_ns == MTIME_NS
 
 

@@ -22,7 +22,7 @@ from kresorter.autostart.models import (
     Source,
     entry_digest,
 )
-from support.host import make_fifo
+from support.host import cannot_list, make_fifo
 
 Dirs = tuple[Path, Path, Path]
 Content = dict[str, object] | list[object] | bytes  # a property list to write, or raw bytes
@@ -241,7 +241,7 @@ def test_a_directory_that_cannot_be_listed_is_skipped_and_the_others_are_read(di
 
     assert [i.name for i in listing.items] == ["com.example.sync", "daemon"]
     assert listing.skipped == (
-        AutostartSkipped(Source.LAUNCH_AGENT, str(agents), "cannot read: Not a directory"),
+        AutostartSkipped(Source.LAUNCH_AGENT, str(agents), f"cannot read: {cannot_list(agents)}"),
     )
 
 

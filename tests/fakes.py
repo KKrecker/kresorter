@@ -141,17 +141,7 @@ def other_device(monkeypatch: pytest.MonkeyPatch, moved: Path) -> None:
         monkeypatch.setattr(os, name, elsewhere)
 
 
-_NOT_IN_SEQUENCE = (
-    "st_atime",
-    "st_mtime",
-    "st_ctime",
-    "st_atime_ns",
-    "st_mtime_ns",
-    "st_ctime_ns",
-    "st_blksize",
-    "st_blocks",
-    "st_rdev",
-)
+_IN_SEQUENCE = ("st_mode", "st_ino", "st_dev", "st_nlink", "st_uid", "st_gid", "st_size")
 
 
 def _elsewhere(
@@ -160,7 +150,9 @@ def _elsewhere(
     info = real(path, *args, **kwargs)
     if str(path) != moved:
         return info
-    rest = {name: getattr(info, name) for name in _NOT_IN_SEQUENCE}
+    # what each system has beyond the sequence: st_blksize on POSIX, st_file_attributes on Windows
+    names = [name for name in dir(info) if name.startswith("st_") and name not in _IN_SEQUENCE]
+    rest = {name: getattr(info, name) for name in names}
     return os.stat_result((*info[:2], info.st_dev + 1, *info[3:10]), rest)
 
 

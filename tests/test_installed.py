@@ -148,7 +148,8 @@ def snapshot(folder: Path) -> dict[str, str]:
 
 
 def site_packages(root: Path) -> Path:
-    (found,) = root.glob("lib/python3.*/site-packages") or root.glob("Lib/site-packages")
+    # a list, not glob's iterator, which is true even when it finds nothing (on Windows)
+    (found,) = [*root.glob("lib/python3.*/site-packages")] or [*root.glob("Lib/site-packages")]
     return found
 
 

@@ -21,12 +21,14 @@ from kresorter.autostart.models import (
     entry_digest,
 )
 from kresorter.autostart.tasks import read_tasks, tasks_dir
-from support.host import make_fifo
+from support.host import cannot_list, make_fifo
 
 NS = "http://schemas.microsoft.com/windows/2004/02/mit/task"
 LOGON = "<LogonTrigger><Enabled>true</Enabled></LogonTrigger>"
 BOOT = "<BootTrigger/>"
 EXEC = r"<Exec><Command>C:\Sync\sync.exe</Command><Arguments>/tray</Arguments></Exec>"
+W = str(Path("/w").resolve())  # absolute on every system: C:\w on Windows
+OTHER = str(Path("/other").resolve())
 
 
 def definition(
@@ -262,7 +264,7 @@ def test_a_tasks_folder_that_cannot_be_listed_is_one_skip(tmp_path: Path) -> Non
     not_a_folder = tmp_path / "Tasks"
     not_a_folder.write_bytes(b"")
 
-    assert read(not_a_folder) == skip(not_a_folder, "cannot read: Not a directory")
+    assert read(not_a_folder) == skip(not_a_folder, f"cannot read: {cannot_list(not_a_folder)}")
 
 
 def test_a_sub_folder_that_cannot_be_listed_is_skipped_and_the_others_are_read(
@@ -295,9 +297,9 @@ def test_a_missing_or_unknown_tasks_folder_gives_an_empty_listing(root: Path) ->
 @pytest.mark.parametrize(
     ("env", "expected"),
     [
-        ({"SystemRoot": "/w", "windir": "/other"}, Path("/w", "System32", "Tasks")),
-        ({"windir": "/w"}, Path("/w", "System32", "Tasks")),
-        ({"SystemRoot": "relative", "windir": "/w"}, Path("/w", "System32", "Tasks")),
+        ({"SystemRoot": W, "windir": OTHER}, Path(W, "System32", "Tasks")),
+        ({"windir": W}, Path(W, "System32", "Tasks")),
+        ({"SystemRoot": "relative", "windir": W}, Path(W, "System32", "Tasks")),
         ({"SystemRoot": ""}, None),
         ({}, None),
     ],

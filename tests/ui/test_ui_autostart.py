@@ -569,7 +569,7 @@ def test_a_check_before_the_change_that_fails_changes_nothing(
     wait_idle(qtbot, window)
     monkeypatch.undo()
     assert window.autostart.result.text() == (
-        f"Cannot change app: [Errno 13] Permission denied: '{user}'; nothing was changed."
+        f"Cannot change app: [Errno 13] Permission denied: {str(user)!r}; nothing was changed."
     )
     assert list(user.iterdir()) == []
     assert _changes(data_dir) == []

@@ -362,7 +362,7 @@ def test_a_batch_that_stopped_exits_3(
 
     assert (code, out) == (
         3,
-        f"Stopped: [Errno 18] on another device than the folder: '{folder / 'Images'}'\n"
+        f"Stopped: [Errno 18] on another device than the folder: {str(folder / 'Images')!r}\n"
         "  [1] rolled_back\n",
     )
     assert tree(folder) == {**content(SOURCES), "Images": "dir"}
@@ -385,7 +385,7 @@ def test_a_batch_that_stopped_names_the_files_still_sorted(
 
     assert (code, out) == (
         3,
-        f"Stopped: [Errno 13] refused before the move: '{folder / C}'\n"
+        f"Stopped: [Errno 13] refused before the move: {str(folder / C)!r}\n"
         "  [1] failed: 1 file still sorted; 'kresorter organize undo 1' moves it back\n"
         f"    {folder / MOVED[A]}\n",
     )
@@ -428,7 +428,7 @@ def test_a_move_back_held_through_every_try_is_left_for_undo(
 
     assert (code, out) == (
         3,
-        f"Stopped: [Errno 13] used by another process: '{folder / C}'\n"
+        f"Stopped: [Errno 13] used by another process: {str(folder / C)!r}\n"
         "  [1] failed: 1 file still sorted; 'kresorter organize undo 1' moves it back\n"
         f"    {folder / MOVED[A]}\n",
     )
@@ -634,7 +634,7 @@ def test_an_undo_that_stopped_names_the_batch_it_undoes(
 
     assert (code, out) == (
         3,
-        f"Stopped: [Errno 13] refused before the move: '{folder / MOVED[A]}'\n"
+        f"Stopped: [Errno 13] refused before the move: {str(folder / MOVED[A])!r}\n"
         "  [2] rolled_back: the undo of batch 1 stopped;"
         " 'kresorter organize undo 1' moves back the files still sorted\n",
     )

@@ -264,7 +264,8 @@ def test_default_directory(tmp_path: Path) -> None:
 
 
 def test_directory_from_xdg_config_home(tmp_path: Path) -> None:
-    assert systemd_user_dir({"XDG_CONFIG_HOME": "/cfg"}, tmp_path) == Path("/cfg/systemd/user")
+    cfg = Path("/cfg").resolve()  # absolute on every system: C:\\cfg on Windows
+    assert systemd_user_dir({"XDG_CONFIG_HOME": str(cfg)}, tmp_path) == cfg / "systemd" / "user"
 
 
 def test_a_relative_xdg_config_home_is_ignored(tmp_path: Path) -> None:

@@ -220,11 +220,13 @@ def test_unopenable_journal_exits_3(context: ScanContext, data_dir: Path) -> Non
 
 def test_a_vault_that_cannot_be_created_is_named(context: ScanContext, data_dir: Path) -> None:
     vault = write(data_dir / "quarantine")  # a file where the vault should be
+    with pytest.raises(FileExistsError) as exists:  # as the system says it: WinError 183 there
+        vault.mkdir()
 
     code, out, err = run(["quarantine", "list"], context)
 
     assert (code, out) == (3, "")
-    assert err == f"kresorter: cannot use the vault: [Errno 17] File exists: '{vault}'\n"
+    assert err == f"kresorter: cannot use the vault: {exists.value}\n"
 
 
 def test_a_journal_failure_stops_and_names_kresorter_recover(

@@ -99,7 +99,7 @@ def test_windows_raises_any_other_error_at_once(folder: Path, sleeps: Sleeps) ->
     held = HeldRename({})
     with pytest.raises(FileNotFoundError):
         windows(held, sleeps)(folder / "missing.jpg", folder / "moved.jpg")
-    with pytest.raises(NotADirectoryError):
+    with pytest.raises(OSError, match=r"^\[(Errno 20|WinError 87)\] "):  # not a directory
         windows(held, sleeps)(folder / A, folder / B / "moved.jpg")
     assert (len(held.calls), sleeps.delays) == (2, [])
 

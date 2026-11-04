@@ -439,7 +439,7 @@ def test_a_batch_that_stops_says_what_is_still_sorted(
     window.organize.move_button.click()
     wait_idle(qtbot, window)
     assert _lines(window) == [
-        f"Stopped: [Errno 13] refused before the move: '{folder / C}'. Batch 1: Failed.",
+        f"Stopped: [Errno 13] refused before the move: {str(folder / C)!r}. Batch 1: Failed.",
         f"Still sorted: {folder / 'Images' / A}",
         "Undo batch 1 moves them back.",
     ]
@@ -457,7 +457,7 @@ def test_a_batch_rolled_back_has_nothing_still_sorted(
     window.organize.move_button.click()
     wait_idle(qtbot, window)
     assert _lines(window) == [
-        f"Stopped: [Errno 13] refused before the move: '{folder / C}'. Batch 1: Rolled back.",
+        f"Stopped: [Errno 13] refused before the move: {str(folder / C)!r}. Batch 1: Rolled back.",
     ]
     assert files(folder) == {**UNSORTED, **STAYING}
 
@@ -636,7 +636,7 @@ def test_an_undo_that_stops_names_what_takes_the_rest(
     monkeypatch.setattr(sessions, "renamer", renaming(faults))
     _undo(qtbot, window, 1)
     assert _lines(window) == [
-        f"Stopped: [Errno 13] refused before the move: '{source}'. Batch 2: Rolled back.",
+        f"Stopped: [Errno 13] refused before the move: {str(source)!r}. Batch 2: Rolled back.",
         "Undo batch 1 again to move back the files still sorted.",
     ]
     assert files(folder) == {**SORTED, **STAYING}

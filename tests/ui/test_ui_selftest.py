@@ -155,8 +155,9 @@ def test_a_page_whose_task_fails_is_a_failure(
 def test_a_page_still_working_after_the_limit_is_a_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
-    # [0015.17] 60 seconds, made shorter here; what still runs is left behind
-    monkeypatch.setattr(selftest, "LIMIT", 0.05)
+    # [0015.17] 60 seconds, made shorter here, long enough for the other pages on a slow runner;
+    # what still runs is left behind
+    monkeypatch.setattr(selftest, "LIMIT", 1.5)
     release = threading.Event()
 
     def slow(context: AutostartContext, *, include_machine: bool) -> AutostartListing:
@@ -171,7 +172,7 @@ def test_a_page_still_working_after_the_limit_is_a_failure(
         release.set()
 
     last = report.read_text(encoding="utf-8").splitlines()[-1]
-    assert last == "TimeoutError: autostart: a task still runs after 0.05 s"
+    assert last == "TimeoutError: autostart: a task still runs after 1.5 s"
     assert visible() == []
 
 

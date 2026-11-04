@@ -496,7 +496,9 @@ def test_without_ollama_nothing_changes(case: Case, reason: str) -> None:
             "timeout": env_for(ollama.address),
             "config": {"KRESORTER_OLLAMA_URL": "http://192.0.2.1:11434"},
         }[reason]
-        code, out, err = case.run("--explain", env=env, limits=QUICK)
+        # Windows refuses a closed port of its loopback after about two seconds, not at once
+        limits = LIMITS if reason == "unreachable" else QUICK
+        code, out, err = case.run("--explain", env=env, limits=limits)
     assert (code, out) == without[:2]
     assert err.startswith(without[2])
     line = UNAVAILABLE.fullmatch(err[len(without[2]) :])

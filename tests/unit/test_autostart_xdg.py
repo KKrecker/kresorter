@@ -20,7 +20,7 @@ from kresorter.autostart.models import (
     entry_digest,
 )
 from kresorter.autostart.xdg import MAX_ENTRY_BYTES, autostart_dirs, read_xdg
-from support.host import make_fifo
+from support.host import cannot_list, make_fifo
 
 APP = "[Desktop Entry]\nType=Application\nName=App\nExec=/usr/bin/app --tray\n"
 
@@ -103,7 +103,7 @@ def not_a_directory(path: Path) -> Path:
 
 
 def unreadable(path: Path) -> AutostartSkipped:
-    return AutostartSkipped(Source.XDG_AUTOSTART, str(path), "cannot read: Not a directory")
+    return AutostartSkipped(Source.XDG_AUTOSTART, str(path), f"cannot read: {cannot_list(path)}")
 
 
 def test_a_user_directory_that_cannot_be_listed_hides_every_entry(user: Path, system: Path) -> None:

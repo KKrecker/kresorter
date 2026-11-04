@@ -174,7 +174,7 @@ def test_files_are_moved_into_the_vault_and_journaled(
     expected_slot = data_dir / "quarantine" / str(result.operation_id) / str(first.item_id)
     assert first.vault_path == expected_slot
     assert first.vault_path.read_bytes() == b"aaa"
-    assert mode_bits(first.vault_path.parent) == 0o700
+    assert mode_bits(first.vault_path.parent) == as_kept(0o700, directory=True)
     assert rows(conn, "SELECT kind, state FROM operations") == [("quarantine", "done")]
     assert rows(conn, "SELECT finished_at_ns IS NOT NULL FROM operations") == [(1,)]
     assert rows(
