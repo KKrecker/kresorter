@@ -330,11 +330,15 @@ def _service(window: Window, name: str) -> tuple[str, str, str]:
     return card.name.text(), card.main.text(), card.note.text()
 
 
+OPENS = {"quarantine": "quarantine", "organize": "organize", "autostart": "autostart"}
+
+
 def test_before_the_window_read_them_the_cards_say_what_the_pages_do(window_en: Window) -> None:
-    # [0014.48]
+    # [0014.48] The local AI's card the fourth [0018.35].
     services = window_en.overview.services
-    assert list(services) == ["quarantine", "organize", "autostart"]
-    assert [card.icon.name for card in services.values()] == ["archive", "folder", "power"]
+    assert list(services) == ["quarantine", "organize", "autostart", "ai"]
+    icons = [card.icon.name for card in services.values()]
+    assert icons == ["archive", "folder", "power", "sparkles"]
     assert _service(window_en, "quarantine") == (
         "Quarantine",
         "Moved files wait here",
@@ -397,11 +401,12 @@ def test_the_cards_say_what_the_window_last_read(
 
 
 def test_a_click_on_a_card_opens_its_page(window_en: Window) -> None:
-    # [0014.48]
+    # [0014.48] The local AI's opens Settings [0018.35].
     for name, card in window_en.overview.services.items():
         window_en.show_page("overview")
         QTest.mouseClick(card, Qt.MouseButton.LeftButton, pos=card.rect().center())
-        assert window_en.pages.currentWidget() is window_en.page(name)
+        opened = OPENS.get(name, "settings")
+        assert window_en.pages.currentWidget() is window_en.page(opened)
 
 
 def test_a_card_opens_its_page_from_the_keyboard_too(qtbot: QtBot, window_en: Window) -> None:
