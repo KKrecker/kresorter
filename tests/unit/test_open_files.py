@@ -16,9 +16,10 @@ from kresorter.core.open_files import (
     OpenFileCheckError,
     ProcFdChecker,
     checker_for_platform,
+    for_scan,
 )
 from kresorter.core.open_files.windows import ShareModeChecker
-from support.kernel import FakeCtypes
+from support.kernel import FakeCtypes, FakeKernel
 
 # --- fake /proc helpers ------------------------------------------------------------------------
 
@@ -140,6 +141,81 @@ def test_missing_target_fails_closed(proc: Path, tmp_path: Path) -> None:
 def test_check_error_is_an_oserror() -> None:
     # PathPolicy.check_file already treats any OSError from the checker as "open" (fail closed).
     assert issubclass(OpenFileCheckError, OSError)
+
+
+# --- one look per scan (decision 0018, item 11) ------------------------------------------------
+
+
+def test_a_snapshot_sees_what_every_process_held_when_it_was_taken(
+    proc: Path, target: Path, tmp_path: Path
+) -> None:
+    # [0018.11] Listed once: a file is open when its (st_dev, st_ino) is among them, through
+    # every hard link; pseudo fds and a process gone meanwhile are no answer.
+    link = tmp_path / "data" / "link.bin"
+    os.link(target, link)
+    other = tmp_path / "data" / "other.bin"
+    other.write_bytes(b"y")
+    (proc / "99").mkdir()  # its fd directory already gone
+    add_fd(proc, "123", 0, "socket:[42]")
+    add_fd(proc, "123", 3, target)
+    (proc / "self").mkdir()  # not a process
+    snapshot = ProcFdChecker(proc_root=proc).snapshot()
+    assert snapshot.reliable is True
+    assert [snapshot.is_open(p) for p in (target, link, other)] == [True, True, False]
+
+
+def test_a_file_opened_after_the_snapshot_is_not_seen_by_it_but_by_the_checker(
+    proc: Path, target: Path
+) -> None:
+    # [0018.11] The scan's look is not asked again; preflight asks /proc afresh (0004 item 5).
+    checker = ProcFdChecker(proc_root=proc)
+    snapshot = checker.snapshot()
+    add_fd(proc, "123", 3, target)
+    assert snapshot.is_open(target) is False
+    assert checker.is_open(target) is True
+
+
+def test_a_snapshot_lists_proc_once(
+    proc: Path, target: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0018.11] However many files it is asked about.
+    add_fd(proc, "123", 3, target)
+    listed: list[Path] = []
+    real_scandir = os.scandir
+
+    def scandir(path: str | Path) -> object:
+        listed.append(Path(path))
+        return real_scandir(path)
+
+    snapshot = ProcFdChecker(proc_root=proc).snapshot()
+    monkeypatch.setattr(os, "scandir", scandir)
+    assert [snapshot.is_open(target) for _ in range(3)] == [True, True, True]
+    assert listed == []
+
+
+def test_a_proc_that_cannot_be_listed_makes_every_file_open(tmp_path: Path, target: Path) -> None:
+    # [0018.11] Fail closed: an error, which the policy takes for "open".
+    snapshot = ProcFdChecker(proc_root=tmp_path / "no-proc").snapshot()
+    with pytest.raises(OpenFileCheckError, match="no-proc"):
+        snapshot.is_open(target)
+
+
+def test_a_snapshot_cannot_check_a_missing_file(proc: Path, tmp_path: Path) -> None:
+    with pytest.raises(OpenFileCheckError, match=r"missing\.bin"):
+        ProcFdChecker(proc_root=proc).snapshot().is_open(tmp_path / "missing.bin")
+
+
+def test_a_scan_asks_the_snapshot_of_proc_and_any_other_checker_itself(
+    proc: Path, target: Path
+) -> None:
+    # [0018.11] Only the /proc backend lists every process; the others answer per file.
+    add_fd(proc, "123", 3, target)
+    checker = ProcFdChecker(proc_root=proc)
+    scanned = for_scan(checker)
+    assert scanned is not checker
+    assert scanned.is_open(target) is True
+    others: list[OpenFileChecker] = [NoOpenFileCheck(), ShareModeChecker(FakeKernel())]
+    assert [for_scan(other) for other in others] == others
 
 
 # --- live /proc --------------------------------------------------------------------------------

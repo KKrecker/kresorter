@@ -1,6 +1,7 @@
 """Scanner: wires policy + walker + heuristics + hashing into a report. Read-only."""
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ from fakes import FakeOpenFiles, make_policy
 from kresorter.core import hashing
 from kresorter.core.heuristics import JunkCategory, load_rules
 from kresorter.core.models import FileEntry, Skipped, SkipReason
+from kresorter.core.open_files import ProcFdChecker
 from kresorter.core.policy import BlockReason
 from kresorter.core.scanner import DuplicateGroup, ScanContext, scan
 from kresorter.organize.synced import NoSyncedFolders
@@ -153,3 +155,41 @@ def test_hashing_failures_are_reported_as_skipped(
         Skipped(path=a, reason=SkipReason.PERMISSION_DENIED),
         Skipped(path=b, reason=SkipReason.PERMISSION_DENIED),
     )
+
+
+def test_a_scan_lists_the_open_files_of_every_process_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0018.11] At its start, not per file: the file held then is open for the scan.
+    root = tmp_path / "root"
+    held = write(root / "held.bin", b"h")
+    files = [write(root / f"f{n}.bin", bytes([n])) for n in range(5)]
+    proc = tmp_path / "proc"
+    (proc / "123" / "fd").mkdir(parents=True)
+    (proc / "123" / "fd" / "3").symlink_to(held)
+    listed: list[Path] = []
+    real_scandir = os.scandir
+
+    def scandir(path: str | Path) -> object:
+        listed.append(Path(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    report = scan([root], replace(context(tmp_path), open_files=ProcFdChecker(proc)))
+    assert [e.path for e in report.entries] == files
+    assert report.skipped == (
+        Skipped(path=held, reason=SkipReason.BLOCKED, block_reason=BlockReason.OPEN_FILE),
+    )
+    assert listed.count(proc) == 1
+
+
+def test_a_scan_without_a_list_of_processes_finds_every_file_open(tmp_path: Path) -> None:
+    # [0018.11] Fail closed.
+    root = tmp_path / "root"
+    files = [write(root / f"f{n}.bin", bytes([n])) for n in range(2)]
+    checker = ProcFdChecker(tmp_path / "no-proc")
+    report = scan([root], replace(context(tmp_path), open_files=checker))
+    assert report.entries == ()
+    assert [(s.path, s.block_reason) for s in report.skipped] == [
+        (path, BlockReason.OPEN_FILE) for path in files
+    ]
