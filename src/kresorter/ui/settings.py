@@ -12,9 +12,11 @@ something other than an object, or a value of the wrong type or unknown means th
 why the file was not used. A key left out takes its default; unknown keys are ignored.
 
 The file is not a door (decision 0018, item 39): it is read with at most ``SETTINGS_BYTES`` (64
-KiB) and refused beyond, as ``unreadable``; so is anything but a regular file in its place, a FIFO
-without waiting for a writer. A link in its place is never followed: ``O_NOFOLLOW`` when it is
-read and when the temporary file is written (POSIX), and the rename replaces a link, not its target.
+KiB) and refused beyond, as ``unreadable``; so is anything but a regular file in its place, a
+directory, a link or a FIFO, on every system and before it is opened. What is put there after that
+look is opened without waiting for a writer, never through a link (``O_NOFOLLOW``, POSIX) and read
+up to the bound. The temporary file is written with ``O_NOFOLLOW`` too, and the rename replaces a
+link in place of the file, not its target.
 """
 
 from __future__ import annotations
@@ -61,7 +63,7 @@ SETTINGS_BYTES = 64 * 1024  # the most read of the file; a larger one is refused
 _NO_FOLLOW = getattr(os, "O_NOFOLLOW", 0)  # POSIX: never read or write through a link
 # With O_BINARY on Windows, where os.open is otherwise in text mode: each \n would be \r\n.
 _FLAGS = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _NO_FOLLOW
-# O_NONBLOCK: a FIFO in its place is opened without waiting for a writer, then refused.
+# O_NONBLOCK: a FIFO put in its place after it was looked at is opened without waiting for a writer.
 _READ_FLAGS = os.O_RDONLY | _NO_FOLLOW | getattr(os, "O_NONBLOCK", 0)
 
 
@@ -120,10 +122,10 @@ def load(context: ScanContext) -> Loaded:
 
 def _read(path: Path) -> bytes | None:
     """At most one byte more than ``SETTINGS_BYTES`` of the regular file at ``path``; ``None``
-    for anything else there."""
+    for anything else there, looked at and never opened (Windows opens no directory)."""
+    if not stat.S_ISREG(os.lstat(path).st_mode):
+        return None
     with os.fdopen(os.open(path, _READ_FLAGS | getattr(os, "O_BINARY", 0)), "rb") as stream:
-        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
-            return None
         return stream.read(SETTINGS_BYTES + 1)
 
 

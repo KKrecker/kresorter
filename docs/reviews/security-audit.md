@@ -78,10 +78,12 @@ replaces a link in place of the file, never its target.
 
 ### F5. A FIFO in place of the settings file kept the window from opening
 
-Opening a FIFO waits for a writer: the window never opened. The file is now opened without
-waiting (`O_NONBLOCK`) and anything but a regular file is refused as `unreadable`.
+Opening a FIFO waits for a writer: the window never opened. Anything but a regular file in its
+place (a directory, a link, a FIFO) is now refused as `unreadable` before it is opened, on every
+system; what is put there after that look is opened without waiting (`O_NONBLOCK`).
 
 - Test: `tests/unit/test_ui_settings.py::test_a_fifo_in_place_of_the_file_is_unreadable_without_waiting`
+- Test: `tests/unit/test_ui_settings.py::test_anything_but_a_regular_file_is_refused_before_it_is_opened`
 
 ### F6. The transport trusted the address it was given
 
@@ -105,8 +107,9 @@ its model list, an explanation and the grouping.
 
 ## 5. Left as they are
 
-- **A link on Windows.** `O_NOFOLLOW` is POSIX's. On Windows, making a link needs a right
-  the user does not have by default; the data directory is the user's own.
+- **A link on Windows.** `O_NOFOLLOW` is POSIX's: on Windows the settings file is refused a
+  link only by the look before it is opened, and the lock follows one. Making a link there
+  needs a right the user does not have by default; the data directory is the user's own.
 - **What runs as the user.** A program running as the user can change the data directory and
   kresorter's own files; the audit hardens what kresorter reads there, it cannot stop that
   program.

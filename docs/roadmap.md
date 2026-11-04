@@ -339,7 +339,7 @@ Scanner core and `kresorter scan` (read-only report).
   plain text and every tooltip escaped; nothing in `src` runs text; `settings.json` read with at
   most 64 KiB, never through a link, a FIFO refused without waiting; the lock refuses a link;
   the transport refuses an address off loopback.
-- 3396 tests, 100 % line and branch coverage.
+- 3399 tests, 100 % line and branch coverage.
 
 ### Accepted limitations of decision 0018
 - Everything carried after step 8 still holds.
