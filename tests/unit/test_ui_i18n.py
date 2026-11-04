@@ -25,6 +25,7 @@ from kresorter.ui.i18n import (
     LABELS,
     LANGUAGES,
     PLURALS,
+    Language,
     Translator,
     catalog_problems,
     label_problems,
@@ -228,3 +229,9 @@ def test_sizes_in_each_language(n: int, english: str, russian: str) -> None:
     # [0014.28] English as the CLI writes them; Russian with its units and decimal comma.
     assert Translator("en").size(n) == english == format_size(n)
     assert Translator("ru").size(n) == russian
+
+
+@pytest.mark.parametrize(("language", "label"), [("en", "Browser cache"), ("ru", "Кэш браузера")])
+def test_a_browser_s_cache_is_named_in_both_languages(language: Language, label: str) -> None:
+    # [0018.21]
+    assert Translator(language).label(Evidence.JUNK_BROWSER_CACHE) == label

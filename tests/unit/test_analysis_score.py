@@ -36,12 +36,13 @@ MIB = 1024**2
 @pytest.mark.parametrize(
     ("evidence", "level"),
     [
-        (Evidence.JUNK_CACHE, Level.SAFE),
+        (Evidence.JUNK_CACHE, Level.LIKELY_SAFE),  # [0018.19] rebuilt, by another program
         (Evidence.JUNK_THUMBNAILS, Level.SAFE),
         (Evidence.JUNK_OS_METADATA, Level.SAFE),
         (Evidence.JUNK_TEMP, Level.LIKELY_SAFE),
         (Evidence.JUNK_CRASH_DUMP, Level.LIKELY_SAFE),
         (Evidence.DUPLICATE_COPY, Level.LIKELY_SAFE),
+        (Evidence.JUNK_BROWSER_CACHE, Level.REVIEW),  # [0018.20] the owner's choice
         (Evidence.LARGE, Level.REVIEW),
         (Evidence.OLD, Level.REVIEW),
     ],
@@ -59,6 +60,7 @@ def test_the_evidence_set_is_pinned() -> None:
         "junk_temp",
         "junk_crash_dump",
         "duplicate_copy",
+        "junk_browser_cache",
         "large",
         "old",
     ]
@@ -150,3 +152,20 @@ def test_the_same_reason_twice_is_kept_once() -> None:
 def test_an_assessment_needs_evidence() -> None:
     with pytest.raises(ValueError, match="evidence"):
         assess([])
+
+
+def test_a_cache_is_proposed_but_a_browser_s_cache_is_not(tmp_path: Path) -> None:
+    # [0018.19] [0018.20] A cache likely safe, still proposed; a browser's for review, never.
+    cache = JunkMatch(tmp_path / "x", "user-cache-dir", JunkCategory.CACHE, "")
+    browser = JunkMatch(tmp_path / "y", "chromium-cache", JunkCategory.BROWSER_CACHE, "")
+    assert assess([junk_reason(cache)]).level is Level.LIKELY_SAFE
+    assert assess([junk_reason(cache)]).proposed
+    assert junk_reason(browser) == Reason(Evidence.JUNK_BROWSER_CACHE, "chromium-cache")
+    assert assess([junk_reason(browser)]).level is Level.REVIEW
+    assert not assess([junk_reason(browser)]).proposed
+
+
+def test_thumbnails_and_the_folder_metadata_stay_safe() -> None:
+    # [0018.19]
+    assert level_of(Evidence.JUNK_THUMBNAILS) is Level.SAFE
+    assert level_of(Evidence.JUNK_OS_METADATA) is Level.SAFE

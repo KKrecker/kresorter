@@ -176,6 +176,20 @@ DEFAULT_EXAMPLES: list[tuple[Platform, str, str | None]] = [
     ("windows", LOCAL + r"\Microsoft\Edge\User Data\Profile 1\Code Cache\js\x", "chromium-cache"),
     ("windows", LOCAL + r"\Mozilla\Firefox\Profiles\x.default\cache2\entries\A", "firefox-cache"),
     ("windows", LOCAL + r"\Microsoft\Windows\INetCache\IE\x.htm", "inet-cache"),
+    # [0018.20] A browser's cache, on Linux under ~/.cache, Opera's on Windows.
+    ("linux", "/home/a/.cache/google-chrome/Default/Cache/Cache_Data/f_1", "browser-caches"),
+    ("linux", "/home/a/.cache/chromium/Default/Code Cache/js/x", "browser-caches"),
+    ("linux", "/home/a/.cache/mozilla/firefox/x.default/cache2/entries/A", "browser-caches"),
+    ("linux", "/home/a/.cache/BraveSoftware/Brave-Browser/Default/Cache/x", "browser-caches"),
+    ("linux", "/home/a/.cache/microsoft-edge/Default/Cache/x", "browser-caches"),
+    ("linux", "/home/a/.cache/opera/Cache/x", "browser-caches"),
+    ("linux", "/home/a/.cache/vivaldi/Default/Cache/x", "browser-caches"),
+    ("linux", "/home/a/.cache/yandex-browser/Default/Cache/x", "browser-caches"),
+    ("linux", "/home/a/snap/firefox/common/.cache/mozilla/firefox/x/cache2/A", "browser-caches"),
+    ("windows", LOCAL + r"\Opera Software\Opera Stable\Cache\Cache_Data\f_1", "opera-cache"),
+    ("windows", LOCAL + r"\Opera Software\Opera GX Stable\Cache\x", "opera-cache"),
+    # The freedesktop thumbnails under ~/.cache are thumbnails, not a cache of a program.
+    ("linux", "/home/a/.cache/thumbnails/large/0a1b.png", "xdg-thumbnails"),
     ("windows", LOCAL + r"\Temp\x.log", "windows-user-temp"),
     ("linux", "/tmp/x.bin", "posix-temp"),
     ("linux", "/var/tmp/x.bin", "posix-temp"),
@@ -191,6 +205,12 @@ DEFAULT_EXAMPLES: list[tuple[Platform, str, str | None]] = [
     ("windows", r"C:\Users\a\Documents\~$report.docx", None),
     ("linux", "/home/a/proj/node_modules/x/index.js", None),
     ("windows", LOCAL + r"\Google\Chrome\User Data\Default\Network\Cookies", None),
+    # [0018.20] A browser's site data is never junk: a web app's offline data, its storage.
+    ("windows", LOCAL + r"\Google\Chrome\User Data\Default\Service Worker\CacheStorage\x", None),
+    ("windows", LOCAL + r"\Google\Chrome\User Data\Default\IndexedDB\x\000003.log", None),
+    ("windows", LOCAL + r"\Google\Chrome\User Data\Default\Local Storage\leveldb\x", None),
+    ("linux", "/home/a/.config/google-chrome/Default/Service Worker/CacheStorage/x", None),
+    ("linux", "/home/a/.mozilla/firefox/x.default/storage/default/x/idb/1.sqlite", None),
     ("linux", "/home/a/Downloads/movie.part", None),
 ]
 
@@ -245,3 +265,24 @@ def test_a_relative_directory_is_rejected() -> None:
     classifier = JunkClassifier(default_rules(), platform="linux")
     with pytest.raises(ValueError, match="absolute"):
         classifier.classify_directory(PurePosixPath("proj/__pycache__"))
+
+
+@pytest.mark.parametrize(
+    ("platform", "path", "category"),
+    [
+        ("windows", LOCAL + r"\Google\Chrome\User Data\Default\Cache\f_1", "browser_cache"),
+        ("windows", LOCAL + r"\Mozilla\Firefox\Profiles\x\cache2\entries\A", "browser_cache"),
+        ("windows", LOCAL + r"\Microsoft\Windows\INetCache\IE\x.htm", "browser_cache"),
+        ("windows", LOCAL + r"\Opera Software\Opera Stable\Cache\x", "browser_cache"),
+        ("linux", "/home/a/.cache/google-chrome/Default/Cache/x", "browser_cache"),
+        ("linux", "/home/a/.cache/pip/http/abc", "cache"),
+        ("linux", "/home/a/.cache/thumbnails/normal/x.png", "thumbnails"),
+    ],
+)
+def test_a_browser_s_cache_is_a_category_of_its_own(
+    platform: Platform, path: str, category: str
+) -> None:
+    # [0018.20] The rules of a browser's cache come before the others.
+    match = JunkClassifier(default_rules(), platform=platform).classify(flavor(platform)(path))
+    assert match is not None
+    assert match.category == category

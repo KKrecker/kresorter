@@ -15,7 +15,7 @@ from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from kresorter.organize.synced import NoSyncedFolders
 from support.files import snapshot
-from support.host import host_classifier, host_rules
+from support.host import WINDOWS, host_classifier, host_rules
 
 DAY_NS = 86_400 * 10**9
 MIB = 1024**2
@@ -88,6 +88,27 @@ def test_text_report_groups_findings_by_level(tmp_path: Path, tree: Path) -> Non
     assert section(out, "Review (never proposed):") == ["Review (never proposed): 0 files, 0 B"]
     assert "Proposed for quarantine: 2 files, 18 B" in out
     assert f"blocked (system): {tree / 'blocked'}" in out
+
+
+def test_a_browser_s_cache_is_for_review_and_named(tmp_path: Path, tree: Path) -> None:
+    # [0018.20] [0018.21] Never proposed; its evidence named in the report. Chrome's cache
+    # as the running system keeps it: under ~/.cache on Linux, in its profile on Windows.
+    folder, rule = (
+        (("Chrome", "User Data"), "chromium-cache")
+        if WINDOWS
+        else (
+            (".cache", "google-chrome"),
+            "browser-caches",
+        )
+    )
+    cached = write(tree.joinpath(*folder, "Default", "Cache", "f_1"), b"page")
+    _, out = run(["analyze", str(tree)], ctx(tmp_path, tree))
+    assert section(out, "Review (never proposed):") == [
+        "Review (never proposed): 1 file, 4 B",
+        f"  {cached}  4 B",
+        f"    junk_browser_cache: {rule}",
+    ]
+    assert "Proposed for quarantine: 2 files, 18 B" in out
 
 
 def test_thresholds_from_the_command_line(tmp_path: Path, tree: Path) -> None:
