@@ -485,6 +485,31 @@ def test_a_fifo_in_place_of_the_file_is_unreadable_without_waiting(
     assert loaded == [Loaded(DEFAULTS, Unused.UNREADABLE, "not a regular file")]
 
 
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "a directory",
+        pytest.param("a link", marks=posix_only("making a link needs a right on Windows")),
+        "a FIFO",
+    ],
+)
+def test_anything_but_a_regular_file_is_refused_before_it_is_opened(
+    context: ScanContext, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    # [0018.39] On every system, Windows' too: it is looked at, never opened, never waited for.
+    path = data_dir / SETTINGS_NAME
+    data_dir.mkdir(parents=True)
+    if kind == "a directory":
+        path.mkdir()
+    elif kind == "a link":
+        path.symlink_to(write(tmp_path / "elsewhere.json", RUSSIAN))
+    else:
+        make_fifo(path)
+    opens = record_opens(monkeypatch)
+    assert load(context) == Loaded(DEFAULTS, Unused.UNREADABLE, "not a regular file")
+    assert SETTINGS_NAME not in opens.flags
+
+
 @posix_only("a link is not followed when written on POSIX")
 def test_a_link_in_place_of_the_temporary_file_is_not_written_through(
     context: ScanContext, data_dir: Path, tmp_path: Path
