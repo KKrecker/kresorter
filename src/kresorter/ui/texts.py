@@ -202,6 +202,8 @@ CATALOG: dict[str, dict[str, str]] = {
     "quarantine.restore": {"en": "Restore", "ru": "Восстановить"},
     "quarantine.purge": {"en": "Delete permanently", "ru": "Удалить навсегда"},
     "quarantine.permanent": {"en": "Cannot be undone", "ru": "Необратимо"},
+    "quarantine.select_all": {"en": "Select all", "ru": "Выбрать все"},
+    "quarantine.clear": {"en": "Clear selection", "ru": "Снять выбор"},
     "quarantine.no_check": {
         "en": "No reliable open-file check on this system: the quarantine cannot be used.",
         "ru": "На этой системе нет надёжной проверки открытых файлов: карантином нельзя"

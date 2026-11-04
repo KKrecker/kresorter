@@ -3,7 +3,8 @@
 
 A row per file: its name and under it its original folder, its size and its id; with no file,
 that the quarantine is empty. The bar at the bottom says how many files are checked and their
-size, beside Restore and Delete permanently. The list is read from the journal each time the
+size, with Select all and Clear selection (decision 0018, item 5), beside Restore and Delete
+permanently. The list is read from the journal each time the
 page opens, and on Refresh, in a session of its own (``ui.sessions``), as ``quarantine list``
 reads it; every session ends with the list as it is then. Restore and Delete permanently act on
 the files checked, after a confirmation: a deletion's plan, with its total size, is made first
@@ -18,7 +19,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtWidgets import QLabel, QTreeWidget, QTreeWidgetItem, QWidget
 
 from kresorter.quarantine.journal import QuarantinedItem
@@ -33,7 +34,19 @@ from kresorter.quarantine.service import (
 from kresorter.storage.pending import Domain
 from kresorter.storage.session import SessionFailed
 from kresorter.ui.dialogs import Confirmation
-from kresorter.ui.parts import QUIET, SECONDARY, Head, Note, badge, bar, button, hbox, rows, vbox
+from kresorter.ui.parts import (
+    QUIET,
+    SECONDARY,
+    Head,
+    Note,
+    badge,
+    bar,
+    button,
+    hbox,
+    link,
+    rows,
+    vbox,
+)
 from kresorter.ui.recovery import quarantine_lines
 from kresorter.ui.sessions import Done, NoReliableCheck, Unfinished, in_quarantine
 from kresorter.ui.shown import shown_path
@@ -81,12 +94,19 @@ class QuarantinePage(QWidget):
         self.chosen.setProperty("role", "strong")
         self.chosen_size = QLabel()
         self.chosen_size.setProperty("role", "secondary")
+        self.select_all_button = link(text("quarantine.select_all"))
+        self.select_all_button.clicked.connect(lambda _=False: self._set_all(_CHECKED))
+        self.clear_button = link(text("quarantine.clear"))
+        self.clear_button.clicked.connect(lambda _=False: self._set_all(_UNCHECKED))
 
         amount = hbox(spacing=4)
         amount.addWidget(self.chosen)
         amount.addWidget(self.chosen_size)
         self.bar, buttons = bar()
         buttons.addLayout(amount)
+        buttons.addSpacing(8)
+        buttons.addWidget(self.select_all_button)
+        buttons.addWidget(self.clear_button)
         buttons.addStretch(1)
         buttons.addWidget(self.restore_button)
         buttons.addWidget(self.permanent, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -113,6 +133,14 @@ class QuarantinePage(QWidget):
     def selected(self) -> list[int]:
         """The ids checked, in order."""
         return [item_id for item_id, row in self._rows.items() if row.checkState(_NAME) == _CHECKED]
+
+    def _set_all(self, state: Qt.CheckState) -> None:
+        """Every row checked, or none: not announced row by row, the bar said once."""
+        with QSignalBlocker(self.items.model()):
+            for row in self._rows.values():
+                row.setCheckState(_NAME, state)
+        self.items.viewport().update()
+        self._chosen()
 
     def _chosen(self) -> None:
         """The files checked, and their size."""
