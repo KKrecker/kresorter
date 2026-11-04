@@ -1,9 +1,10 @@
 """The window's settings (decision 0014, items 35-36).
 
 The window remembers only ``settings.json`` in the data directory: a JSON object with
-``language`` (``system``, ``en`` or ``ru``), ``include_machine`` (a boolean) and
+``language`` (``system``, ``en`` or ``ru``), ``include_machine`` (a boolean),
 ``skipped_zones``, the names of the safe zones left out of the scan (each a zone's last part,
-once; decision 0018, item 17). ``save`` alone
+once; decision 0018, item 17) and ``theme`` (``system``, ``light`` or ``dark``; item 1). ``save``
+alone
 writes it, after the data directory is checked (0009), through one temporary file renamed over
 it, private (``0600`` on POSIX); a temporary file a crash left behind is written over. ``load``
 writes nothing. A missing file means the defaults; an unreadable file, invalid JSON, something
@@ -30,9 +31,11 @@ __all__ = [
     "LANGUAGE_SETTINGS",
     "SETTINGS_NAME",
     "TEMP_NAME",
+    "THEME_SETTINGS",
     "LanguageSetting",
     "Loaded",
     "Settings",
+    "ThemeSetting",
     "Unused",
     "load",
     "save",
@@ -44,6 +47,9 @@ TEMP_NAME = "settings.json.tmp"
 LanguageSetting = Literal["system", "en", "ru"]
 LANGUAGE_SETTINGS: tuple[LanguageSetting, ...] = ("system", "en", "ru")
 _LANGUAGES: dict[str, LanguageSetting] = {setting: setting for setting in LANGUAGE_SETTINGS}
+ThemeSetting = Literal["system", "light", "dark"]
+THEME_SETTINGS: tuple[ThemeSetting, ...] = ("system", "light", "dark")
+_THEMES: dict[str, ThemeSetting] = {setting: setting for setting in THEME_SETTINGS}
 _NO_FOLLOW = getattr(os, "O_NOFOLLOW", 0)  # POSIX: never write through a link
 # With O_BINARY on Windows, where os.open is otherwise in text mode: each \n would be \r\n.
 _FLAGS = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _NO_FOLLOW
@@ -54,6 +60,7 @@ class Settings:
     language: LanguageSetting = "system"
     include_machine: bool = False
     skipped_zones: tuple[str, ...] = ()  # in the order of the zones
+    theme: ThemeSetting = "system"
 
 
 DEFAULTS = Settings()
@@ -119,7 +126,11 @@ def _settings(found: dict[str, object], zones: tuple[str, ...]) -> Loaded:
     skipped_zones = _zones(skipped, zones)
     if skipped_zones is None:
         return Loaded(DEFAULTS, Unused.WRONG_VALUE, f"skipped_zones={json.dumps(skipped)}")
-    return Loaded(Settings(chosen, include_machine, skipped_zones))
+    theme = found.get("theme", DEFAULTS.theme)
+    themed = _THEMES.get(theme) if isinstance(theme, str) else None
+    if themed is None:
+        return Loaded(DEFAULTS, Unused.WRONG_VALUE, f"theme={json.dumps(theme)}")
+    return Loaded(Settings(chosen, include_machine, skipped_zones, themed))
 
 
 def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
@@ -132,6 +143,7 @@ def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
         "language": settings.language,
         "include_machine": settings.include_machine,
         "skipped_zones": list(settings.skipped_zones),
+        "theme": settings.theme,
     }
     try:
         data_dir.mkdir(mode=PRIVATE, parents=True, exist_ok=True)

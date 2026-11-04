@@ -528,6 +528,10 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "A new language applies the next time the window opens.",
         "ru": "Новый язык применится при следующем открытии окна.",
     },
+    "settings.appearance": {"en": "Appearance", "ru": "Оформление"},
+    "settings.theme_system": {"en": "System", "ru": "Как в системе"},
+    "settings.theme_light": {"en": "Light", "ru": "Светлая"},
+    "settings.theme_dark": {"en": "Dark", "ru": "Тёмная"},
     "settings.machine": {
         "en": "Read machine-wide autostart entries",
         "ru": "Читать общесистемные записи автозагрузки",

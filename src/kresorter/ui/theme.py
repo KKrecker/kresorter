@@ -7,7 +7,9 @@ the accent); accented text and the primary button use ``accent text``; a level's
 text on its background and its dot the level's colour; ``danger`` is the purge's alone. The
 parts of item 47 (cards, chips, fields, buttons, links, badges, lists, dots) have their rules
 here; a list is ringed only while ``KEYBOARD_FOCUS`` is true on it (decision 0018, item 23).
-``Look`` follows the colour scheme Qt reports, dark or not, and applies a change at once.
+``Look`` follows the colour scheme Qt reports, dark or not, and applies a change at once, while
+the theme is the system's; a theme chosen light or dark is its palette whatever the system says,
+and a choice applies at once (decision 0018, item 2).
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QWidget
 
 from kresorter.analysis.score import Level
+from kresorter.ui.settings import ThemeSetting
 
 __all__ = [
     "DARK",
@@ -449,21 +452,37 @@ def style_sheet(palette: Palette) -> str:
 
 
 class Look(QObject):
-    """One window's palette: dark when Qt reports a dark colour scheme, light otherwise, and a
-    change of the system's scheme applied at once; ``changed`` then says which. It lives as long
-    as its window."""
+    """One window's palette in its theme: for the system's, dark when Qt reports a dark colour
+    scheme, light otherwise, and a change of the system's scheme applied at once; for a theme
+    chosen light or dark, that palette, whatever the system says. ``changed`` says which palette
+    applies now. It lives as long as its window."""
 
     changed = Signal(object)
 
-    def __init__(self, window: QWidget) -> None:
+    def __init__(self, window: QWidget, theme: ThemeSetting = "system") -> None:
         super().__init__(window)
         self._window = window
+        self.theme: ThemeSetting = theme
         self.palette: Palette = LIGHT
         hints = QGuiApplication.styleHints()
+        self._scheme = hints.colorScheme()
         hints.colorSchemeChanged.connect(self._follow)
-        self._follow(hints.colorScheme())
+        self._apply()
+
+    def choose(self, theme: ThemeSetting) -> None:
+        """The theme from now on, applied at once."""
+        self.theme = theme
+        self._apply()
 
     def _follow(self, scheme: Qt.ColorScheme) -> None:
-        self.palette = palette_for(dark=scheme == Qt.ColorScheme.Dark)
+        self._scheme = scheme  # the system's theme follows it when it is chosen again
+        if self.theme == "system":
+            self._apply()
+
+    def _apply(self) -> None:
+        dark = (
+            self._scheme == Qt.ColorScheme.Dark if self.theme == "system" else self.theme == "dark"
+        )
+        self.palette = palette_for(dark=dark)
         self._window.setStyleSheet(style_sheet(self.palette))
         self.changed.emit(self.palette)

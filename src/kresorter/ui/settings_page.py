@@ -1,7 +1,9 @@
 """The Settings page (decision 0014, items 27, 36, 37 and 55).
 
 A card each, the page scrolling under its head. The language, its choice at the right: a change
-is saved and applies the next time the window opens, as its note says. On Windows only, the
+is saved and applies the next time the window opens, as its note says. The theme, on the card
+Appearance, its choice at the right: a change is saved and applied at once (decision 0018,
+items 1 and 2). On Windows only, the
 machine scope of autostart: turning it on asks first, saying what is read; turning it off asks
 nothing. Each change is saved at once (``ui.settings.save``), and a change that cannot be saved
 says why and leaves the setting as it was: the file is written only when the user changes a
@@ -36,7 +38,7 @@ from kresorter.llm.settings import (
 from kresorter.ui.dialogs import Confirmation
 from kresorter.ui.i18n import Translator
 from kresorter.ui.parts import CheckBox, Choice, Head, Note, button, card, dot, hbox, mark, vbox
-from kresorter.ui.settings import LANGUAGE_SETTINGS, Loaded, Settings, save
+from kresorter.ui.settings import LANGUAGE_SETTINGS, THEME_SETTINGS, Loaded, Settings, save
 from kresorter.ui.shown import shown_path
 from kresorter.ui.tasks import Task
 
@@ -157,6 +159,13 @@ class SettingsPage(QWidget):
             self.language.addItem(text(f"settings.{setting}"))
         language.setBuddy(self.language)
         self.language_note = Note(self, text("settings.language_note"), role="secondary")
+        self.appearance_card, appearance_inside = card()
+        appearance = _title(text("settings.appearance"))
+        self.theme = Choice(look)
+        self.theme.setAccessibleName(text("settings.appearance"))
+        for theme in THEME_SETTINGS:
+            self.theme.addItem(text(f"settings.theme_{theme}"))
+        appearance.setBuddy(self.theme)
         self.machine_card, machine_inside = card()
         self.machine_card.setHidden(environment.autostart_context().platform != "windows")
         self.machine = CheckBox(look, text("settings.machine"))
@@ -180,9 +189,11 @@ class SettingsPage(QWidget):
         self.result = Note(self.controls)
         self._show()
         self.language.currentIndexChanged.connect(self._language)
+        self.theme.currentIndexChanged.connect(self._theme)
 
         language_inside.addLayout(_titled(language, self.language))
         language_inside.addWidget(self.language_note)
+        appearance_inside.addLayout(_titled(appearance, self.theme))
         machine_inside.addWidget(_title(text("page.autostart")))
         machine_inside.addWidget(self.machine)
         ai_inside.addLayout(_titled(_title(text("settings.ai")), self.check_button))
@@ -197,6 +208,7 @@ class SettingsPage(QWidget):
         for part in (
             self.unused,
             self.language_card,
+            self.appearance_card,
             self.machine_card,
             self.ai_card,
             self.data_card,
@@ -227,13 +239,23 @@ class SettingsPage(QWidget):
 
     def _show(self) -> None:
         """The controls as the settings are remembered."""
-        self.language.blockSignals(True)
-        self.language.setCurrentIndex(LANGUAGE_SETTINGS.index(self._settings.language))
-        self.language.blockSignals(False)
+        for choice, index in (
+            (self.language, LANGUAGE_SETTINGS.index(self._settings.language)),
+            (self.theme, THEME_SETTINGS.index(self._settings.theme)),
+        ):
+            choice.blockSignals(True)
+            choice.setCurrentIndex(index)
+            choice.blockSignals(False)
         self.machine.setChecked(self._settings.include_machine)
 
     def _language(self, index: int) -> None:
         self._save(replace(self._settings, language=LANGUAGE_SETTINGS[index]))
+        self._show()
+
+    def _theme(self, index: int) -> None:
+        """Saved, then applied at once; a theme that cannot be saved is not applied."""
+        self._save(replace(self._settings, theme=THEME_SETTINGS[index]))
+        self._window.look.choose(self._settings.theme)
         self._show()
 
     def _machine(self, checked: bool) -> None:
