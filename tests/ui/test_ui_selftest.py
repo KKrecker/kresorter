@@ -10,18 +10,22 @@ a page still working after the limit.
 
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
 import pytest
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QWidget
+from pytestqt.qtbot import QtBot
 
 from kresorter.autostart.listing import AutostartContext, list_autostart
 from kresorter.autostart.models import AutostartListing
 from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
-from kresorter.ui import autostart, launch, selftest
+from kresorter.storage.pending import Domain
+from kresorter.ui import autostart, launch, recovery, selftest
+from kresorter.ui.sessions import unfinished_work
 from kresorter.ui.window import PAGES, Window
 from support.cli import autostart_context, scan_context
 from support.files import snapshot
@@ -127,6 +131,61 @@ def test_an_error_in_a_slot_is_its_traceback(
     assert capsys.readouterr().err == text  # once, by the hook or by the self-test
     assert visible() == []
     assert sys.excepthook is hook
+
+
+def test_a_failure_while_a_task_that_acts_runs_closes_the_window_once_it_ends(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0015.17] the window does not close while the journal is looked at (0014): the self-test
+    # waits for it, as the window would, up to the limit
+    release = threading.Event()
+
+    def slow(context: ScanContext) -> frozenset[Domain]:
+        release.wait(10)
+        return unfinished_work(context)
+
+    def boom() -> None:
+        raise RuntimeError("a slot failed")
+
+    monkeypatch.setattr(recovery, "unfinished_work", slow)
+    monkeypatch.setattr(sys, "stderr", None)
+    QTimer.singleShot(0, boom)
+    QTimer.singleShot(200, release.set)
+    report = tmp_path / "report.txt"
+    try:
+        assert self_test(report, made(tmp_path, zone, data_dir)) == 1
+        assert visible() == []
+    finally:
+        release.set()
+    assert report.read_text(encoding="utf-8").endswith("RuntimeError: a slot failed\n")
+
+
+def test_a_task_that_acts_past_the_limit_is_not_waited_for_longer(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0015.17] the self-test ends; the window closes once the task has
+    release = threading.Event()
+
+    def slow(context: ScanContext) -> frozenset[Domain]:
+        release.wait(10)
+        return unfinished_work(context)
+
+    def boom() -> None:
+        raise RuntimeError("a slot failed")
+
+    monkeypatch.setattr(recovery, "unfinished_work", slow)
+    monkeypatch.setattr(selftest, "LIMIT", 0.3)
+    monkeypatch.setattr(sys, "stderr", None)
+    QTimer.singleShot(0, boom)
+    report = tmp_path / "report.txt"
+    try:
+        started = time.monotonic()
+        assert self_test(report, made(tmp_path, zone, data_dir)) == 1
+        assert 0.3 <= time.monotonic() - started < 5
+        (window,) = visible()
+    finally:
+        release.set()
+    qtbot.waitUntil(lambda: not window.isVisible())
 
 
 def test_a_page_whose_task_fails_is_a_failure(
