@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from kresorter.core import hashing
 from kresorter.core.heuristics import JunkClassifier, JunkMatch, Platform
 from kresorter.core.models import FileEntry, Skipped
-from kresorter.core.open_files import OpenFileChecker
+from kresorter.core.open_files import OpenFileChecker, for_scan
 from kresorter.core.policy import PathPolicy
 from kresorter.core.walker import walk
 
@@ -78,7 +78,7 @@ def scan(
     """Walk ``roots`` and build a report. Reads only; never modifies the filesystem."""
     entries: list[FileEntry] = []
     skipped: list[Skipped] = []
-    for event in walk(roots, context.policy, context.open_files):
+    for event in walk(roots, context.policy, for_scan(context.open_files)):
         if isinstance(event, FileEntry):
             entries.append(event)
         else:
