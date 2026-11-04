@@ -10,8 +10,10 @@ import os
 from pathlib import Path
 
 import pytest
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 
+from kresorter.ui import motion
 from support import screenshots
 from support.png import png_size
 
@@ -65,3 +67,23 @@ def test_a_screen_the_prototype_has_not_is_refused(qapp: QApplication, tmp_path:
     with pytest.raises(ValueError, match=r"no screen 'settings': the screens are overview, "):
         screenshots.shoot(tmp_path / "out", ["settings"])
     assert not (tmp_path / "out").exists()
+
+
+def test_the_screenshots_are_drawn_with_no_motion(
+    qapp: QApplication, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0018.10] Each screen as it ends, whatever the motion; the motion as it was after.
+    monkeypatch.setattr(motion, "DURATION_MS", 150)
+    grabbed: list[tuple[int, object]] = []
+    grab = screenshots.Shots.grab
+
+    def recorded(shots: screenshots.Shots, name: str) -> QPixmap:
+        grabbed.append((motion.DURATION_MS, shots.window.pages.currentWidget().graphicsEffect()))
+        return grab(shots, name)
+
+    monkeypatch.setattr(screenshots.Shots, "grab", recorded)
+
+    screenshots.shoot(tmp_path / "out", ["organize"])
+
+    assert grabbed == [(0, None)]
+    assert motion.DURATION_MS == 150
