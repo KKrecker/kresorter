@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 
 from kresorter.core.scanner import ScanContext
-from support.annotations import commands, failures
+from support.annotations import commands, failures, uncovered
 from support.artifacts import Built, Installed, built_for_the_run, install, lend_qt
 from support.cli import scan_context
 from support.kernel import FakeCtypes
@@ -217,5 +217,8 @@ def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
     if os.environ.get("GITHUB_ACTIONS") != "true":
         return
     found = failures(terminalreporter.stats, str(terminalreporter.config.rootpath))
-    for line in commands(found):
+    cov = terminalreporter.config.pluginmanager.getplugin("_cov")  # pytest-cov's, its report
+    report = getattr(cov, "cov_report", None)
+    short = uncovered(report.getvalue()) if report is not None else []
+    for line in commands(found, short):
         terminalreporter.write_line(line)

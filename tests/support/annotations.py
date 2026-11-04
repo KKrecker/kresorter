@@ -5,7 +5,8 @@ those who are (decision 0015, item 20).
 A failure's place is where its error was raised, so the tests that one fault fails are one
 block: how many, the first test's traceback, a line a frame, and its error, then the tests.
 The blocks, the place most tests fail at first, fill the ten annotations GitHub keeps for a
-step, each as long as it shows; what does not fit is counted at the end of the last.
+step, each as long as it shows; what does not fit is counted at the end of the last. When the
+coverage is under 100 %, the first annotation says where: the rows of its report under it.
 """
 
 from __future__ import annotations
@@ -71,6 +72,18 @@ def failures(stats: Mapping[str, Sequence[Any]], root: str) -> list[Failure]:
     return [failure(report.nodeid, report.longrepr, root) for report in reports]
 
 
+def uncovered(report: str) -> list[str]:
+    """The rows of a coverage report ``term-missing`` under 100 %: ``name cover missing``."""
+    rows: list[str] = []
+    for line in report.splitlines():
+        words = line.split()
+        covers = [index for index, word in enumerate(words) if word.endswith("%")]
+        if covers and words[covers[0]] != "100%":
+            name, (cover, *missing) = words[0].replace("\\", "/"), words[covers[0] :]
+            rows.append(_cut(" ".join([name, cover, *missing]), SIZE // 4))
+    return rows
+
+
 def _data(text: str) -> str:
     return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
 
@@ -93,8 +106,11 @@ def _block(place: str, theirs: Sequence[Failure]) -> str:
     return _cut("\n".join(lines), BLOCK)
 
 
-def commands(failures: Sequence[Failure]) -> list[str]:
-    """The workflow commands ``::error`` of ``failures``, the place most fail at first."""
+def commands(failures: Sequence[Failure], short: Sequence[str] = ()) -> list[str]:
+    """The workflow commands ``::error`` of ``failures``, the place most fail at first, after
+    the rows ``short`` of the coverage report under 100 %."""
+    coverage = [(f"coverage under 100 % in {len(short)} rows", [*short])] if short else []
+    limit = LIMIT - len(coverage)
     places: dict[str, list[Failure]] = {}
     for one in failures:
         places.setdefault(one.place, []).append(one)
@@ -105,11 +121,11 @@ def commands(failures: Sequence[Failure]) -> list[str]:
     while left:
         place, theirs = left[0]
         block = _block(place, theirs)
-        room = SIZE - RESERVE if len(filled) == LIMIT else SIZE
+        room = SIZE - RESERVE if len(filled) == limit else SIZE
         if filled and size + len(block) + 1 <= room:
             filled[-1][1].append(block)
             size += len(block) + 1
-        elif len(filled) < LIMIT:
+        elif len(filled) < limit:
             filled.append((_heading(place, theirs), [block]))
             size = len(block)
         else:
@@ -122,6 +138,6 @@ def commands(failures: Sequence[Failure]) -> list[str]:
             _cut(f"and {count} failed at {len(left)} more places: {rest}", RESERVE)
         )
     return [
-        f"::error title={_property(title)}::{_data(chr(10).join(blocks))}"
-        for title, blocks in filled
+        f"::error title={_property(title)}::{_data(_cut(chr(10).join(blocks), SIZE))}"
+        for title, blocks in coverage + filled
     ]

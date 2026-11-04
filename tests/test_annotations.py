@@ -1,6 +1,7 @@
 """What failed on CI, readable without signing in (decision 0015, item 20): the failures of a
 run become annotations of its job, a block for each place they were raised at
-(``support.annotations``, written by ``conftest.pytest_terminal_summary``).
+(``support.annotations``, written by ``conftest.pytest_terminal_summary``), after the rows of the
+coverage report under 100 %.
 """
 
 from types import SimpleNamespace
@@ -16,6 +17,7 @@ from support.annotations import (
     commands,
     failure,
     failures,
+    uncovered,
 )
 
 ROOT = "C:\\a\\kresorter"
@@ -143,3 +145,43 @@ def test_the_blocks_fill_ten_annotations_the_rest_counted_at_the_end() -> None:
     assert (
         len(commands([Failure(f"t{n}", "E", f"p{n}.py:1", "d" * 1250) for n in range(30)])) == LIMIT
     )
+
+
+REPORT = """\
+Name                    Stmts   Miss Branch BrPart  Cover   Missing
+-------------------------------------------------------------------
+src\\kresorter\\a.py         10      0      2      0   100%
+src\\kresorter\\b.py         10      2      4      1    79%   12-13, 40->42
+src/kresorter/c.py          5      0      2      1    86%   7->exit
+-------------------------------------------------------------------
+TOTAL                      25      2      8      2    91%
+"""
+
+
+def test_the_rows_of_the_coverage_report_under_100_percent() -> None:
+    # [0015.20] where the coverage is short, on the system where it is
+    assert uncovered(REPORT) == [
+        "src/kresorter/b.py 79% 12-13, 40->42",
+        "src/kresorter/c.py 86% 7->exit",
+        "TOTAL 91%",
+    ]
+    assert uncovered("") == []
+    (row,) = uncovered("x.py 1 1 0 0 0% " + "1, " * SIZE)
+    assert len(row) == SIZE // 4
+    assert row.endswith("...")
+
+
+def test_a_short_coverage_is_the_first_annotation() -> None:
+    # [0015.20]
+    found = commands([Failure("t", "E", "x.py:1")], ["b.py 79% 12", "TOTAL 91%"])
+    assert found == [
+        "::error title=coverage under 100 %25 in 2 rows::b.py 79%25 12%0ATOTAL 91%25",
+        "::error title=1 failed at x.py%3A1%3A E::== 1 failed at x.py:1: E%0At",
+    ]
+    (alone,) = commands([], ["r" * (SIZE // 4)] * 5)
+    assert len(message(alone)) == 4
+    assert message(alone)[-1].endswith("...")
+    many = [Failure(f"t{n}", "E", f"p{n}.py:1", "d" * 1250) for n in range(3 * LIMIT + 2)]
+    found = commands(many, ["TOTAL 91%"])
+    assert len(found) == LIMIT
+    assert message(found[-1])[-1].startswith("and 6 failed at 6 more places: p26.py:1, ")
