@@ -3,6 +3,8 @@ each call and answers a handle or an error, and the part of ``ctypes`` that ``Ke
 """
 
 import ntpath
+import threading
+import time
 from dataclasses import dataclass, field
 
 INVALID_HANDLE_VALUE = -1
@@ -114,3 +116,53 @@ class HoldingKernel(FakeKernel):
     ) -> int:
         self.error = SHARING_VIOLATION if ntpath.basename(name) == self._held else 0
         return super().CreateFileW(name, access, share, security, disposition, flags, template)
+
+
+class SideBySideKernel:
+    """Windows' kernel32 for checks side by side (decision 0018, item 12): each ``CreateFileW``
+    waits until ``parties`` checks run at once, and ``most`` is the most that ran at once; a
+    file named in ``held`` meets a sharing violation, a later file's check ends first. The last
+    error is each thread's own, as ``ctypes`` keeps it."""
+
+    def __init__(self, parties: int, held: set[str]) -> None:
+        self._barrier = threading.Barrier(parties, timeout=5)
+        self._held = held
+        self._lock = threading.Lock()
+        self._running = 0
+        self._last = threading.local()
+        self.most = 0
+
+    def CreateFileW(
+        self,
+        name: str,
+        access: int,
+        share: int,
+        security: None,
+        disposition: int,
+        flags: int,
+        template: None,
+        /,
+    ) -> int:
+        with self._lock:
+            self._running += 1
+            self.most = max(self.most, self._running)
+        try:
+            self._barrier.wait()
+        finally:
+            with self._lock:
+                self._running -= 1
+        base = ntpath.basename(name)
+        time.sleep(0.02 / (1 + int(base[1:3])))  # f00 last, f15 first
+        held = base in self._held
+        self._last.code = SHARING_VIOLATION if held else 0
+        return INVALID_HANDLE_VALUE if held else 7
+
+    def CloseHandle(self, handle: int, /) -> int:
+        return 1
+
+    def last_error(self) -> int:
+        code: int = self._last.code
+        return code
+
+    def message(self, code: int) -> str:
+        return f"the message of {code}"

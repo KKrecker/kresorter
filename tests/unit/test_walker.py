@@ -15,9 +15,11 @@ import pytest
 
 from fakes import FakeOpenFiles, make_policy
 from kresorter.core.models import FileEntry, Skipped, SkipReason
+from kresorter.core.open_files import ShareModeChecker
 from kresorter.core.policy import BlockReason, Verdict
 from kresorter.core.walker import walk
 from support.host import MTIME_STEP_NS, make_fifo
+from support.kernel import SideBySideKernel
 
 # A float st_mtime cannot carry it: the smallest step above a round second the system keeps.
 STAMP = 1_000_000_000_000_000_000 + MTIME_STEP_NS
@@ -318,3 +320,22 @@ def test_a_file_is_checked_by_its_name_in_a_directory_checked_once(
         Skipped(path=secret, reason=SkipReason.BLOCKED, block_reason=BlockReason.SYSTEM)
     ]
     assert asked == [root, root / "sub"]
+
+
+def test_a_directory_s_share_mode_checks_run_side_by_side_its_events_in_order(
+    tmp_path: Path,
+) -> None:
+    # [0018.12] Up to eight at once; each file's answer is its own and the events keep their
+    # order, whichever check ends first.
+    root = tmp_path / "root"
+    paths = [write(root / f"f{n:02}.bin") for n in range(16)]
+    held = {paths[3].name, paths[12].name}
+    kernel = SideBySideKernel(parties=8, held=held)
+    events = list(walk([root], make_policy(tmp_path), ShareModeChecker(kernel)))
+    assert events == [
+        Skipped(path=p, reason=SkipReason.BLOCKED, block_reason=BlockReason.OPEN_FILE)
+        if p.name in held
+        else FileEntry(path=p, size=1, mtime_ns=p.stat().st_mtime_ns)
+        for p in paths
+    ]
+    assert kernel.most == 8

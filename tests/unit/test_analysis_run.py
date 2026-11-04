@@ -33,3 +33,11 @@ def test_the_paths_given_are_analyzed_instead(
     scanned, _ = analyze_paths([str(zone / "b")], scan, Thresholds())
 
     assert [entry.path for entry in scanned.entries] == [zone / "b" / "notes.txt"]
+
+
+def test_the_scan_s_progress_is_passed_on(scan: ScanContext, zone: Path) -> None:
+    # [0018.16] For the window's scan.
+    write(zone / "a" / "notes.txt", b"hello")
+    read: list[int] = []
+    analyze_paths([], scan, Thresholds(), progress=read.append)
+    assert read == [1]

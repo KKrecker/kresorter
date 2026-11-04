@@ -193,3 +193,24 @@ def test_a_scan_without_a_list_of_processes_finds_every_file_open(tmp_path: Path
     assert [(s.path, s.block_reason) for s in report.skipped] == [
         (path, BlockReason.OPEN_FILE) for path in files
     ]
+
+
+def test_a_scan_reports_the_files_read_so_far(tmp_path: Path) -> None:
+    # [0018.16] At least every 1,000 files, and at the end.
+    root = tmp_path / "root"
+    for n in range(2500):
+        write(root / f"d{n % 3}" / f"f{n}.bin", b"")
+    read: list[int] = []
+    report = scan([root], context(tmp_path), hash_duplicates=False, progress=read.append)
+    assert report.files_scanned == 2500
+    assert read[-1] == 2500
+    assert read == sorted(set(read))
+    assert all(after - before <= 1000 for before, after in zip([0, *read], read, strict=False))
+
+
+def test_an_empty_scan_reports_its_end(tmp_path: Path) -> None:
+    # [0018.16]
+    read: list[int] = []
+    (tmp_path / "root").mkdir()
+    scan([tmp_path / "root"], context(tmp_path), progress=read.append)
+    assert read == [0]

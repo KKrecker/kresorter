@@ -2,6 +2,7 @@
 per level, and a card each for Quarantine, Organize and Autostart (decision 0014, items 19
 and 48)."""
 
+import threading
 import time
 from pathlib import Path
 
@@ -11,10 +12,16 @@ from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
+from kresorter.analysis.report import AnalysisReport
+from kresorter.analysis.run import analyze_paths
 from kresorter.analysis.score import Level
+from kresorter.analysis.size_age import Thresholds
 from kresorter.core.open_files.windows import ShareModeChecker
+from kresorter.core.scanner import Progress, ScanContext, ScanReport
+from kresorter.ui import overview
 from kresorter.ui.overview import FolderChip
 from kresorter.ui.shown import shown_path
+from kresorter.ui.tasks import Task
 from kresorter.ui.window import Window
 from support.files import write
 from support.kernel import FakeKernel
@@ -435,3 +442,53 @@ def test_the_cards_of_a_row_are_as_wide_as_each_other_and_their_words_start_at_t
         assert service.name.geometry().top() == service.icon.geometry().top()
         assert service.main.geometry().top() < service.note.geometry().top()
         assert service.note.geometry().top() - service.main.geometry().bottom() <= 8
+
+
+# --- the scan's progress [0018.16] ---------------------------------------------------------------
+
+
+def test_while_a_scan_runs_the_status_line_counts_the_files_read_at_most_ten_times_a_second(
+    qtbot: QtBot,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    tree: dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # [0018.16] The window's scan uses the scan's progress; the line is redrawn at most every
+    # tenth of a second, and says only what runs once the scan ends.
+    released = threading.Event()
+
+    def slow(
+        paths: list[str], context: ScanContext, thresholds: Thresholds, *, progress: Progress
+    ) -> tuple[ScanReport, AnalysisReport]:
+        progress(1500)
+        released.wait(10)
+        return analyze_paths(paths, context, thresholds, progress=progress)
+
+    monkeypatch.setattr(overview, "analyze_paths", slow)
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
+    window.overview.scan_button.click()
+    qtbot.waitUntil(
+        lambda: window.status.text() == "Выполняется: Сканирование, прочитано 1500 файлов"
+    )
+    assert window.progress_timer.isActive()
+    assert window.progress_timer.interval() >= 100
+    released.set()
+    wait_idle(qtbot, window)
+    assert window.status.text() == ""
+    assert not window.progress_timer.isActive()
+    assert window.overview.scanned is not None
+
+
+def test_a_task_without_progress_says_only_what_runs(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.16]
+    released = threading.Event()
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    window.run(Task("Waiting", lambda: released.wait(10), lambda _: None))
+    assert window.status.text() == "Running: Waiting"
+    assert not window.progress_timer.isActive()
+    released.set()
+    wait_idle(qtbot, window)

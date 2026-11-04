@@ -6,6 +6,8 @@ Files that changed since the scan (or during hashing) are reported, never hashed
 
 import hashlib
 import os
+import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -221,4 +223,61 @@ def test_file_changed_during_hashing_is_reported(
 
     assert candidates([a, b]) == [
         Skipped(path=b.path, reason=SkipReason.CHANGED, detail="modified during hashing")
+    ]
+
+
+# --- side by side (decision 0018, item 15) ------------------------------------------------------
+
+
+def test_hashing_runs_in_up_to_four_threads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0018.15] The prefixes of eight candidates: four at once, twice.
+    entries = [make(tmp_path / f"f{n}", bytes([n]) * 8) for n in range(8)]
+    barrier = threading.Barrier(4, timeout=5)
+    lock = threading.Lock()
+    running = [0, 0]  # now, most
+    real = hashing.hash_file
+
+    def side_by_side(path: Path, *, limit: int | None = None, chunk_size: int = 1 << 20) -> str:
+        with lock:
+            running[0] += 1
+            running[1] = max(running)
+        barrier.wait()
+        with lock:
+            running[0] -= 1
+        return real(path, limit=limit, chunk_size=chunk_size)
+
+    monkeypatch.setattr(hashing, "hash_file", side_by_side)
+    assert candidates(entries) == []
+    assert running == [0, 4]
+
+
+def test_side_by_side_the_groups_their_order_and_the_skipped_paths_are_those_of_before(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0018.15] Size groups in the order of the entries, the skipped of each stage before its
+    # digests, a small file's prefix its digest; a later file's hash ending first.
+    big = b"SAME-" + b"x" * 20
+    a = make(tmp_path / "a", big)
+    small1, small2 = make(tmp_path / "s1", b"abc"), make(tmp_path / "s2", b"abc")
+    b = make(tmp_path / "b", big)
+    c = make(tmp_path / "c", b"SAME-" + b"y" * 20)
+    ghost = FileEntry(path=tmp_path / "ghost", size=len(big), mtime_ns=0)
+    other = make(tmp_path / "o", b"OTHER" + b"x" * 20)
+    real = hashing.hash_file
+    order = [a, small1, small2, b, ghost, c, other]
+
+    def later_first(path: Path, *, limit: int | None = None, chunk_size: int = 1 << 20) -> str:
+        time.sleep(0.002 * (len(order) - [e.path for e in order].index(path)))
+        return real(path, limit=limit, chunk_size=chunk_size)
+
+    monkeypatch.setattr(hashing, "hash_file", later_first)
+    assert candidates(order) == [
+        Skipped(path=ghost.path, reason=SkipReason.NOT_FOUND),
+        HashedFile(a, blake(big)),
+        HashedFile(b, blake(big)),
+        HashedFile(c, blake(c.path.read_bytes())),
+        HashedFile(small1, blake(b"abc")),
+        HashedFile(small2, blake(b"abc")),
     ]
