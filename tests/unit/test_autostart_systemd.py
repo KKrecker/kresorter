@@ -22,7 +22,7 @@ from kresorter.autostart.models import (
     entry_digest,
 )
 from kresorter.autostart.systemd import read_systemd_user, systemd_user_dir
-from support.host import make_fifo
+from support.host import make_fifo, posix_only
 
 SYNC = "[Unit]\nDescription=Sync\n\n[Service]\nExecStart=/usr/bin/sync --serve\n"
 
@@ -140,13 +140,27 @@ def test_a_template_instance_keeps_its_specifiers(units: Path, vendor: Path) -> 
 
 
 def test_a_masked_unit_is_listed_as_disabled(units: Path, vendor: Path) -> None:
+    # a link to /dev/null as ``systemctl mask`` writes it, wherever its files are read
     enable(units, "default.target", "sync.service", unit(vendor, "sync.service"))
-    (units / "sync.service").symlink_to(os.devnull)
+    (units / "sync.service").symlink_to("/dev/null")
 
     found = only(read_systemd_user(units))
 
     assert found.enabled is False
     assert found.notes == ("WantedBy=default.target", "masked")
+
+
+@posix_only("a link to the null device, which Windows cannot make")
+def test_a_unit_leading_to_the_null_device_another_way_is_masked(
+    units: Path, vendor: Path, tmp_path: Path
+) -> None:
+    enable(units, "default.target", "sync.service", unit(vendor, "sync.service"))
+    (tmp_path / "null").symlink_to(os.devnull)
+    (units / "sync.service").symlink_to(tmp_path / "null")
+
+    found = only(read_systemd_user(units))
+
+    assert (found.enabled, found.notes) == (False, ("WantedBy=default.target", "masked"))
 
 
 def test_a_unit_that_is_not_a_service_names_its_unit_file(units: Path, vendor: Path) -> None:
