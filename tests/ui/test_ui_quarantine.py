@@ -406,3 +406,50 @@ def test_only_deleting_permanently_is_drawn_as_danger(window: Window) -> None:
     assert danger == {page.purge_button, page.permanent}
     assert page.purge_button.text() == "Delete permanently"
     assert page.permanent.text() == "Cannot be undone"
+
+
+# --- select all [0018.5] -------------------------------------------------------------------------
+
+
+def test_select_all_checks_every_row_and_clear_unchecks_them(window: Window) -> None:
+    # [0018.5] Beside the files checked, in the bar.
+    page = window.quarantine
+    assert page.select_all_button.text() == "Select all"
+    assert page.clear_button.text() == "Clear selection"
+    for part in (page.select_all_button, page.clear_button):
+        assert page.bar.isAncestorOf(part)
+    page.select_all_button.click()
+    assert page.selected() == [1, 2, 3]
+    assert _bar(window) == ("3 files selected", "· 27 B")
+    assert page.restore_button.isEnabled()
+    assert page.purge_button.isEnabled()
+    page.clear_button.click()
+    assert page.selected() == []
+    assert _bar(window) == ("0 files selected", "· 0 B")
+    assert not page.restore_button.isEnabled()
+
+
+def test_select_all_then_restore_asks_for_every_file(
+    qtbot: QtBot, window: Window, dialogs: FakeDialogs, tree: dict[str, Path], data_dir: Path
+) -> None:
+    # [0018.5] The confirmation of before, for every file.
+    window.quarantine.select_all_button.click()
+    window.quarantine.restore_button.click()
+    wait_idle(qtbot, window)
+    (asked,) = dialogs.asked
+    assert asked.text == "Restore 3 files (27 B) to where they were?"
+    assert window.quarantine.result.text() == "Restored: 3 files"
+    assert _states(data_dir) == [(1, "restored"), (2, "restored"), (3, "restored")]
+
+
+def test_select_all_and_clear_in_russian(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
+) -> None:
+    # [0018.5]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
+    _opened(qtbot, window)
+    page = window.quarantine
+    assert (page.select_all_button.text(), page.clear_button.text()) == (
+        "Выбрать все",
+        "Снять выбор",
+    )
