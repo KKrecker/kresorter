@@ -11,6 +11,7 @@ a page still working after the limit.
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 
 import pytest
 from PySide6.QtCore import QTimer
@@ -155,9 +156,16 @@ def test_a_page_whose_task_fails_is_a_failure(
 def test_a_page_still_working_after_the_limit_is_a_failure(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
-    # [0015.17] 60 seconds, made shorter here, long enough for the other pages on a slow runner;
-    # what still runs is left behind
-    monkeypatch.setattr(selftest, "LIMIT", 1.5)
+    # [0015.17] 60 seconds, made shorter here for the autostart page, the others keeping their
+    # minute, which a slow runner may need (organize took more than 1.5 s on Windows); what
+    # still runs is left behind
+    settle = selftest._settle
+
+    def settled(application: QApplication, window: Window, name: str, caught: list[Any]) -> None:
+        monkeypatch.setattr(selftest, "LIMIT", 1.5 if name == "autostart" else 60.0)
+        settle(application, window, name, caught)
+
+    monkeypatch.setattr(selftest, "_settle", settled)
     release = threading.Event()
 
     def slow(context: AutostartContext, *, include_machine: bool) -> AutostartListing:
