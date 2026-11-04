@@ -162,7 +162,7 @@ def test_a_language_chosen_is_saved_and_applies_the_next_time_the_window_opens(
 
     page.language.setCurrentIndex(2)
 
-    assert _saved(data_dir) == {"language": "ru", "include_machine": False}
+    assert _saved(data_dir) == {"language": "ru", "include_machine": False, "skipped_zones": []}
     assert page.result.text() == "Saved."
     assert page.current == Settings(language="ru")
     assert window.sidebar.item(0).text() == "Overview"
@@ -228,7 +228,7 @@ def test_a_broken_file_is_not_used_and_the_page_says_so(
 
     page.language.setCurrentIndex(1)
 
-    assert _saved(data_dir) == {"language": "en", "include_machine": False}
+    assert _saved(data_dir) == {"language": "en", "include_machine": False, "skipped_zones": []}
     assert page.unused.isHidden()
 
 
@@ -278,7 +278,7 @@ def test_on_windows_the_machine_scope_is_off_until_turned_on_after_confirmation(
     page.machine.click()
 
     assert page.machine.isChecked()
-    assert _saved(data_dir) == {"language": "system", "include_machine": True}
+    assert _saved(data_dir) == {"language": "system", "include_machine": True, "skipped_zones": []}
     assert page.result.text() == "Saved."
     assert _listed(qtbot, window) == ["Sync", "Agent"]
     assert window.autostart.machine.isHidden()
@@ -302,7 +302,7 @@ def test_turning_the_machine_scope_off_asks_nothing_and_keeps_the_language(
 
     assert dialogs.asked == []
     assert not page.machine.isChecked()
-    assert _saved(data_dir) == {"language": "ru", "include_machine": False}
+    assert _saved(data_dir) == {"language": "ru", "include_machine": False, "skipped_zones": []}
     assert _listed(qtbot, window) == ["Sync"]
 
 

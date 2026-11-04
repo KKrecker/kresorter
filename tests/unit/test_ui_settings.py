@@ -59,10 +59,12 @@ def _mode(path: Path) -> int:
 
 
 def test_the_settings_are_the_language_and_the_machine_scope() -> None:
-    # [0014.35] Nothing else is remembered: no finding, path, plan or explanation.
+    # [0014.35] Nothing else is remembered: no finding, path, plan or explanation; and the
+    # zones left out, by name [0018.17].
     assert [field.name for field in dataclasses.fields(Settings)] == [
         "language",
         "include_machine",
+        "skipped_zones",
     ]
     assert Settings() == DEFAULTS == Settings(language="system", include_machine=False)
     assert LANGUAGE_SETTINGS == ("system", "en", "ru")
@@ -79,7 +81,7 @@ def test_what_is_saved_is_loaded(
     assert save(context, settings) is None
     assert load(context) == Loaded(settings)
     saved = json.loads((data_dir / SETTINGS_NAME).read_text(encoding="utf-8"))
-    assert saved == {"language": language, "include_machine": include_machine}
+    assert saved == {"language": language, "include_machine": include_machine, "skipped_zones": []}
 
 
 def test_saving_makes_the_data_directory_private_and_the_file_alone_in_it(

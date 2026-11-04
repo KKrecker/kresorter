@@ -15,7 +15,7 @@ page does, and open their page on a click, Enter or Space.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -96,10 +96,10 @@ def scan(environment: Environment, roots: list[Path], read: Progress) -> Scanned
 
 
 class FolderChip(QFrame):
-    """A folder to scan: the folder icon and its path; an added folder's with a remove button
-    (``remove``, named ``removal``)."""
+    """A folder to scan: the folder icon and its path, and a remove button (``remove``, named
+    ``removal``): a safe zone's leaves it out (decision 0018, item 17)."""
 
-    def __init__(self, look: Look, path: Path, shown: str, removal: str | None) -> None:
+    def __init__(self, look: Look, path: Path, shown: str, removal: str) -> None:
         super().__init__()
         self.path = path
         self.setProperty("role", "chip")
@@ -107,16 +107,14 @@ class FolderChip(QFrame):
         self.setFixedHeight(36)
         self.icon = Icon(look, "folder", text_ink, size=16)
         self.label = QLabel(shown)
-        self.remove: QPushButton | None = None
-        layout = hbox(self, margins=(12, 0, 12 if removal is None else 8, 0), spacing=8)
+        layout = hbox(self, margins=(12, 0, 8, 0), spacing=8)
         layout.addWidget(self.icon)
         layout.addWidget(self.label)
-        if removal is not None:
-            self.remove = button(look, "", role="icon", icon="x")
-            self.remove.setFixedSize(20, 20)
-            self.remove.setAccessibleName(removal)
-            self.remove.setToolTip(removal)
-            layout.addWidget(self.remove)
+        self.remove = button(look, "", role="icon", icon="x")
+        self.remove.setFixedSize(20, 20)
+        self.remove.setAccessibleName(removal)
+        self.remove.setToolTip(removal)
+        layout.addWidget(self.remove)
 
 
 class LevelCard(QFrame):
@@ -209,8 +207,10 @@ class OverviewPage(QWidget):
         self._zones = [
             Path(zone) for zone in window.environment.scan_context().policy.default_roots()
         ]
+        self._skipped = set(window.settings.current.skipped_zones)  # by name (0018, item 17)
         self._added: list[Path] = []
         self._chips: list[FolderChip] = []
+        self._zone_links: dict[Path, QPushButton] = {}
         self.scanned: Scanned | None = None
 
         self.scan_card, inside = card(surface=True)
@@ -221,7 +221,7 @@ class OverviewPage(QWidget):
         self.scan_text.setWordWrap(True)
         self.scan_button = button(look, text("overview.scan"), role="primary", icon="refresh-cw")
         self.scan_button.clicked.connect(self.start_scan)
-        window.add_starter(self.scan_button)
+        window.add_starter(self.scan_button, lambda: bool(self.roots()))
         self.add_button = button(look, text("overview.add"), role="plain", icon="plus")
         self.add_button.clicked.connect(self._add)
         self.last = Note(self, text("overview.none"), role="caption")
@@ -242,7 +242,10 @@ class OverviewPage(QWidget):
         inside.addSpacing(4)
         inside.addWidget(self.last)
         for zone in self._zones:
-            self._chip(zone, removable=False)
+            if zone.name in self._skipped:
+                self._zone_link(zone)
+            else:
+                self._chip(zone, zone=True)
 
         self.unreliable = QLabel(text("overview.unreliable"))
         self.unreliable.setWordWrap(True)
@@ -279,34 +282,90 @@ class OverviewPage(QWidget):
     # --- the folders ---------------------------------------------------------------------------
 
     def roots(self) -> list[Path]:
-        """The safe zones, then the folders added."""
-        return [*self._zones, *self._added]
+        """The safe zones not left out, then the folders added."""
+        return [*self._shown_zones(), *self._added]
 
     def chips(self) -> list[FolderChip]:
         return list(self._chips)
 
-    def _chip(self, folder: Path, *, removable: bool) -> None:
+    def zone_links(self) -> list[QPushButton]:
+        """The links that put the zones left out back, in the order of the zones."""
+        return [self._zone_links[zone] for zone in self._zones if zone in self._zone_links]
+
+    def _shown_zones(self) -> list[Path]:
+        return [zone for zone in self._zones if zone.name not in self._skipped]
+
+    def _chip(self, folder: Path, *, zone: bool) -> None:
+        """A chip with its remove button: a zone's leaves it out, an added folder's removes it.
+        In the row, a zone's sits among the zones in their order, before the folders added."""
         translator = self._window.translator
         shown = shown_path(folder, Path.home())
-        removal = translator.text("overview.remove", folder=shown) if removable else None
+        removal = translator.text("overview.skip" if zone else "overview.remove", folder=shown)
         made = FolderChip(self._window.look, folder, shown, removal)
-        if made.remove is not None:
-            made.remove.clicked.connect(lambda _=False: self._remove(made))
-        self._row.insertWidget(len(self._chips), made)
-        self._chips.append(made)
+        leave = self._skip if zone else self._remove
+        made.remove.clicked.connect(lambda _=False: leave(made))
+        index = self._shown_zones().index(folder) if zone else len(self._chips)
+        self._row.insertWidget(index, made)
+        self._chips.insert(index, made)
+
+    def _zone_link(self, zone: Path) -> None:
+        """The link that puts ``zone`` back, after Add folder, among the others in the order of
+        the zones (decision 0018, item 18)."""
+        shown = shown_path(zone, Path.home())
+        text = self._window.translator.text
+        made = link(text("overview.zone_link", folder=shown))
+        made.setToolTip(text("overview.put_back", folder=shown))
+        made.setAccessibleName(made.toolTip())
+        made.clicked.connect(lambda _=False: self._put_back(zone))
+        self._zone_links[zone] = made
+        index = self.zone_links().index(made)
+        self._row.insertWidget(len(self._chips) + 1 + index, made)
 
     def _add(self) -> None:
         folder = self._window.dialogs.choose_folder()
         if folder is None or folder in self.roots():
             return
+        if folder in self._zone_links:  # a zone left out: put back where it was
+            self._put_back(folder)
+            return
         self._added.append(folder)
-        self._chip(folder, removable=True)
+        self._chip(folder, zone=False)
+        self._window.update_starters()
 
     def _remove(self, chip: FolderChip) -> None:
         self._added.remove(chip.path)
+        self._drop(chip)
+
+    def _drop(self, chip: FolderChip) -> None:
         self._chips.remove(chip)
         self._row.removeWidget(chip)
         chip.setParent(None)
+        self._window.update_starters()
+
+    def _skip(self, chip: FolderChip) -> None:
+        """Leave a zone out, once the window remembers it."""
+        if self._remember(self._skipped | {chip.path.name}):
+            self._drop(chip)
+            self._zone_link(chip.path)
+
+    def _put_back(self, zone: Path) -> None:
+        if self._remember(self._skipped - {zone.name}):
+            made = self._zone_links.pop(zone)
+            self._row.removeWidget(made)
+            made.setParent(None)
+            self._chip(zone, zone=True)
+            self._window.update_starters()
+
+    def _remember(self, skipped: set[str]) -> bool:
+        """The zones left out saved in the settings; the window says why when they are not."""
+        window = self._window
+        names = tuple(zone.name for zone in self._zones if zone.name in skipped)
+        refused = window.settings.remember(replace(window.settings.current, skipped_zones=names))
+        if refused is not None:
+            window.message.setText(refused)
+            return False
+        self._skipped = set(names)
+        return True
 
     # --- the scan ------------------------------------------------------------------------------
 

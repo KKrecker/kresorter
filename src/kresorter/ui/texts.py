@@ -77,6 +77,12 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "overview.add": {"en": "Add folder", "ru": "Добавить папку"},
     "overview.remove": {"en": "Remove folder {folder}", "ru": "Убрать папку {folder}"},
+    "overview.skip": {
+        "en": "Leave {folder} out of the scan",
+        "ru": "Убрать {folder} из сканирования",
+    },
+    "overview.zone_link": {"en": "+ {folder}", "ru": "+ {folder}"},
+    "overview.put_back": {"en": "Scan {folder} again", "ru": "Снова сканировать {folder}"},
     "overview.scan_title": {"en": "Scan", "ru": "Сканирование"},
     "overview.read_only": {
         "en": "Read-only: a scan never changes anything on the disk.",

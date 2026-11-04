@@ -73,8 +73,8 @@ def test_a_folder_is_shown_from_the_home_folder_as_tilde(tmp_path: Path) -> None
 def test_the_folders_are_the_safe_zones_at_first(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path
 ) -> None:
-    # [0014.19] [0014.48] A chip each: the folder icon and the path, a safe zone without a
-    # remove button.
+    # [0014.19] [0014.48] A chip each: the folder icon and the path; a safe zone's with a
+    # remove button too, that leaves it out [0018.17].
     window = make_window(qtbot, environment(tmp_path, zone, data_dir))
     page = window.overview
     assert _folders(window) == [zone]
@@ -83,7 +83,7 @@ def test_the_folders_are_the_safe_zones_at_first(
     assert chip.icon.name == "folder"
     assert chip.label.text() == str(Path("~") / "zone")
     assert chip.toolTip() == str(zone)
-    assert chip.remove is None
+    assert chip.remove.accessibleName() == f"Leave {Path('~') / 'zone'} out of the scan"
     assert chip.property("role") == "chip"
     assert page.add_button.text() == "Add folder"
     assert page.add_button.property("role") == "plain"
@@ -94,8 +94,8 @@ def test_the_folders_are_the_safe_zones_at_first(
 def test_folders_the_user_adds_can_be_removed_again(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path
 ) -> None:
-    # [0014.19] [0014.48] A safe zone stays; a folder added twice is listed once; a dialog
-    # closed adds none; an added folder's chip has a remove button.
+    # [0014.19] [0014.48] A folder added twice is listed once; a dialog closed adds none; an
+    # added folder's chip has a remove button.
     extra, other = tmp_path / "extra", tmp_path / "other"
     extra.mkdir()
     other.mkdir()
@@ -107,12 +107,9 @@ def test_folders_the_user_adds_can_be_removed_again(
     assert _folders(window) == [zone, extra, other]
     assert dialogs.folders == []
 
-    zone_chip, extra_chip, other_chip = _chips(window)
-    assert zone_chip.remove is None
-    assert extra_chip.remove is not None
+    _, extra_chip, _ = _chips(window)
     assert extra_chip.remove.accessibleName() == f"Remove folder {Path('~') / 'extra'}"
     assert extra_chip.remove.toolTip() == extra_chip.remove.accessibleName()
-    assert other_chip.remove is not None
     extra_chip.remove.click()
     assert _folders(window) == [zone, other]
     assert page.roots() == [zone, other]
@@ -543,9 +540,7 @@ def test_a_safe_zone_s_chip_has_a_remove_button_and_a_zone_left_out_is_not_scann
     write(zones[0] / "a.bin", b"a")
     write(zones[1] / "b.bin", b"b")
     window = make_window(qtbot, env)
-    first, second = _chips(window)
-    assert first.remove is not None
-    assert second.remove is not None
+    first, _ = _chips(window)
     assert first.remove.accessibleName() == f"Leave {_shown('.cache')} out of the scan"
     assert first.remove.toolTip() == first.remove.accessibleName()
     first.remove.click()
@@ -585,9 +580,14 @@ def test_the_link_puts_the_zone_back_where_it_was_and_saves(
     cache, downloads = page.zone_links()
     assert cache.property("role") == "link"
     assert cache.toolTip() == f"Scan {_shown('.cache')} again"
-    qtbot.waitUntil(lambda: cache.isVisible())
-    right = _chips(window)[-1].mapTo(page, _chips(window)[-1].rect().topRight()).x()
-    assert cache.mapTo(page, cache.rect().topLeft()).x() > right
+    last = _chips(window)[-1]
+
+    def after_the_folders() -> bool:
+        right = last.mapTo(page, last.rect().topRight()).x()
+        return cache.mapTo(page, cache.rect().topLeft()).x() > right
+
+    qtbot.waitUntil(lambda: cache.isVisible() and last.isVisible())
+    qtbot.waitUntil(after_the_folders)
     downloads.click()
     assert _folders(window) == [zones[1], extra]
     assert _links(window) == [f"+ {_shown('.cache')}"]
@@ -606,7 +606,6 @@ def test_with_no_folder_at_all_scan_now_is_disabled(
     page = window.overview
     assert page.scan_button.isEnabled()
     [chip] = _chips(window)
-    assert chip.remove is not None
     chip.remove.click()
     assert page.roots() == []
     assert not page.scan_button.isEnabled()
@@ -624,7 +623,6 @@ def test_a_zone_that_cannot_be_remembered_stays_and_the_window_says_why(
     data_dir.write_bytes(b"not a directory")
     window = make_window(qtbot, environment(tmp_path, zone, data_dir))
     [chip] = _chips(window)
-    assert chip.remove is not None
     chip.remove.click()
     assert _folders(window) == [zone]
     assert window.overview.zone_links() == []
@@ -632,13 +630,28 @@ def test_a_zone_that_cannot_be_remembered_stays_and_the_window_says_why(
     assert window.settings.current.skipped_zones == ()
 
 
-def test_the_zones_in_russian(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path) -> None:
+def test_the_zones_in_russian(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path
+) -> None:
     # [0018.17] [0018.18]
     window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
     [chip] = _chips(window)
-    assert chip.remove is not None
     assert chip.remove.accessibleName() == f"Убрать {_shown('zone')} из сканирования"
     chip.remove.click()
     [link] = window.overview.zone_links()
     assert link.text() == f"+ {_shown('zone')}"
     assert link.toolTip() == f"Снова сканировать {_shown('zone')}"
+
+
+def test_a_zone_left_out_that_is_added_as_a_folder_is_put_back(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.18] Where it was, as its link does: never twice.
+    window = make_window(
+        qtbot, environment(tmp_path, zone, data_dir), dialogs=FakeDialogs(folders=[zone])
+    )
+    _chips(window)[0].remove.click()
+    window.overview.add_button.click()
+    assert window.overview.roots() == [zone]
+    assert window.overview.zone_links() == []
+    assert window.settings.current.skipped_zones == ()

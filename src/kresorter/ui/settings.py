@@ -1,7 +1,9 @@
 """The window's settings (decision 0014, items 35-36).
 
 The window remembers only ``settings.json`` in the data directory: a JSON object with
-``language`` (``system``, ``en`` or ``ru``) and ``include_machine`` (a boolean). ``save`` alone
+``language`` (``system``, ``en`` or ``ru``), ``include_machine`` (a boolean) and
+``skipped_zones``, the names of the safe zones left out of the scan (each a zone's last part,
+once; decision 0018, item 17). ``save`` alone
 writes it, after the data directory is checked (0009), through one temporary file renamed over
 it, private (``0600`` on POSIX); a temporary file a crash left behind is written over. ``load``
 writes nothing. A missing file means the defaults; an unreadable file, invalid JSON, something
@@ -15,7 +17,7 @@ import json
 import os
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Literal
 
 from kresorter.core.scanner import ScanContext
@@ -51,6 +53,7 @@ _FLAGS = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | _NO_FOLLOW
 class Settings:
     language: LanguageSetting = "system"
     include_machine: bool = False
+    skipped_zones: tuple[str, ...] = ()  # in the order of the zones
 
 
 DEFAULTS = Settings()
@@ -90,10 +93,19 @@ def load(context: ScanContext) -> Loaded:
         return Loaded(DEFAULTS, Unused.NOT_JSON, str(error) or type(error).__name__)
     if not isinstance(found, dict):
         return Loaded(DEFAULTS, Unused.NOT_AN_OBJECT)
-    return _settings(found)
+    return _settings(found, tuple(PurePath(z).name for z in context.policy.default_roots()))
 
 
-def _settings(found: dict[str, object]) -> Loaded:
+def _zones(value: object, zones: tuple[str, ...]) -> tuple[str, ...] | None:
+    """The zones named, in their order; None unless each is named once, by its name."""
+    if not isinstance(value, list) or len(set(map(str, value))) != len(value):
+        return None
+    if not all(isinstance(name, str) and name in zones for name in value):
+        return None
+    return tuple(zone for zone in zones if zone in value)
+
+
+def _settings(found: dict[str, object], zones: tuple[str, ...]) -> Loaded:
     language = found.get("language", DEFAULTS.language)
     chosen = _LANGUAGES.get(language) if isinstance(language, str) else None
     if chosen is None:
@@ -103,7 +115,11 @@ def _settings(found: dict[str, object]) -> Loaded:
         return Loaded(
             DEFAULTS, Unused.WRONG_VALUE, f"include_machine={json.dumps(include_machine)}"
         )
-    return Loaded(Settings(language=chosen, include_machine=include_machine))
+    skipped = found.get("skipped_zones", [])
+    skipped_zones = _zones(skipped, zones)
+    if skipped_zones is None:
+        return Loaded(DEFAULTS, Unused.WRONG_VALUE, f"skipped_zones={json.dumps(skipped)}")
+    return Loaded(Settings(chosen, include_machine, skipped_zones))
 
 
 def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
@@ -112,7 +128,11 @@ def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
         data_dir = check_data_dir(context.policy, context.classifier)
     except DataDirError as error:
         return SessionFailed(SessionFailure.DATA_DIR, str(error))
-    content = {"language": settings.language, "include_machine": settings.include_machine}
+    content = {
+        "language": settings.language,
+        "include_machine": settings.include_machine,
+        "skipped_zones": list(settings.skipped_zones),
+    }
     try:
         data_dir.mkdir(mode=PRIVATE, parents=True, exist_ok=True)
         _replace(data_dir, (json.dumps(content, indent=2) + "\n").encode("utf-8"))

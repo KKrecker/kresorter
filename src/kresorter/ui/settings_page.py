@@ -249,16 +249,21 @@ class SettingsPage(QWidget):
             self._save(replace(self._settings, include_machine=checked))
         self._show()
 
-    def _save(self, settings: Settings) -> None:
+    def remember(self, settings: Settings) -> str | None:
+        """Save ``settings``, then they are the ones remembered; when they cannot be saved,
+        why, in the window's words, and nothing changes."""
         translator = self._window.translator
         failed = save(self._window.environment.scan_context(), settings)
         if failed is not None:
             reason = translator.reason(failed.failure, failed.detail)
-            self.result.setText(translator.text("settings.not_saved", reason=reason))
-            return
+            return translator.text("settings.not_saved", reason=reason)
         self._settings = settings
         self.unused.clear()
-        self.result.setText(translator.text("settings.saved"))
+        return None
+
+    def _save(self, settings: Settings) -> None:
+        refused = self.remember(settings)
+        self.result.setText(refused or self._window.translator.text("settings.saved"))
 
     def _check(self) -> None:
         window = self._window
