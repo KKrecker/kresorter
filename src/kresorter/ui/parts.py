@@ -27,6 +27,7 @@ from PySide6.QtCore import (
     QRectF,
     QSize,
     Qt,
+    QVariantAnimation,
 )
 from PySide6.QtGui import (
     QColor,
@@ -60,7 +61,7 @@ from PySide6.QtWidgets import (
 )
 
 from kresorter.analysis.score import Level
-from kresorter.ui import icons
+from kresorter.ui import icons, motion
 from kresorter.ui.theme import KEYBOARD_FOCUS, Badge, Look, Palette
 
 __all__ = [
@@ -364,7 +365,9 @@ class Switch(QAbstractButton):
     """A switch, named ``name``: on, its track on the accent and its knob at the right; off,
     on the border colour with its knob at the left; disabled, at half strength; focused, in a
     ring of the accent. A click, or Space, asks to turn it (``clicked``): it turns only when it
-    is set, once what it stands for has turned."""
+    is set, once what it stands for has turned. Its state, and its track's colour, are the new
+    ones at once; a switch shown slides its knob to its side over ``motion.DURATION_MS``
+    (decision 0018, item 7)."""
 
     def __init__(self, look: Look, name: str) -> None:
         super().__init__()
@@ -373,7 +376,31 @@ class Switch(QAbstractButton):
         self.setAccessibleName(name)
         self.setFixedSize(SWITCH_SIZE)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._knob = 0.0  # drawn from the left (0) to the right (1)
+        self._slide = QVariantAnimation(self)
+        self._slide.valueChanged.connect(self._slid)
+        self.toggled.connect(self._turned)
         look.changed.connect(self.update)
+
+    def knob(self) -> float:
+        """Where the knob is drawn now: 0 at the left, 1 at the right."""
+        return self._knob
+
+    def _turned(self, checked: bool) -> None:
+        side = 1.0 if checked else 0.0
+        self._slide.stop()
+        if not (motion.moving() and self.isVisible()):
+            self._knob = side
+            self.update()
+            return
+        self._slide.setDuration(motion.DURATION_MS)
+        self._slide.setStartValue(self._knob)
+        self._slide.setEndValue(side)
+        self._slide.start()
+
+    def _slid(self, _value: object) -> None:
+        self._knob = float(self._slide.currentValue())
+        self.update()
 
     def nextCheckState(self) -> None:
         """A click does not turn it."""
@@ -401,7 +428,7 @@ class Switch(QAbstractButton):
         painter.setBrush(QColor(track_colour))
         painter.drawRoundedRect(track, radius, radius)
         side = track.height() - 4
-        left = track.right() - 2 - side if self.isChecked() else track.left() + 2
+        left = track.left() + 2 + self._knob * (track.width() - 4 - side)
         painter.setBrush(QColor(knob_colour))
         painter.drawEllipse(QRectF(left, track.top() + 2, side, side))
         painter.end()

@@ -7,7 +7,8 @@ screens, every one when none is named. Nothing of the user's is read or written:
 and settings folders are the temporary home's while it runs, the scan and autostart read only
 there, and the local AI has no address. Every page is read first, as a user would have by then,
 so that one screen looks the same whether it is made alone or with the others; the confirmation
-is the real dialog, drawn over the window and then cancelled: nothing is moved.
+is the real dialog, drawn over the window and then cancelled: nothing is moved. Nothing moves
+either: each screen is drawn as its motion ends.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from kresorter.llm.transport import LIMITS
 from kresorter.organize.synced import NoSyncedFolders
+from kresorter.ui import motion
 from kresorter.ui.dialogs import Confirmation, ConfirmDialog, Dialogs
 from kresorter.ui.i18n import Translator
 from kresorter.ui.window import Window
@@ -266,6 +268,16 @@ class Shots:
         self.application.processEvents()
 
 
+@contextmanager
+def no_motion() -> Iterator[None]:
+    """Each screen drawn as its motion ends (decision 0018, item 10), then the motion again."""
+    before, motion.DURATION_MS = motion.DURATION_MS, 0
+    try:
+        yield
+    finally:
+        motion.DURATION_MS = before
+
+
 def shoot(out: Path, screens: Sequence[str] = SCREENS) -> list[Path]:
     """``out/<screen>.png`` for each of ``screens``, on a made-up home that is gone after."""
     unknown = [screen for screen in screens if screen not in SCREENS]
@@ -274,7 +286,7 @@ def shoot(out: Path, screens: Sequence[str] = SCREENS) -> list[Path]:
     application = QApplication.instance() or QApplication(sys.argv[:1])
     out.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
-    with tempfile.TemporaryDirectory(prefix="home-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="home-") as temporary, no_motion():
         home = Path(temporary).resolve()
         made_up_home(home)
         with at_home(home):

@@ -6,7 +6,9 @@ that is on lies on ``selection``, the likely safe badge's background (the likely
 the accent); accented text and the primary button use ``accent text``; a level's badge is its
 text on its background and its dot the level's colour; ``danger`` is the purge's alone. The
 parts of item 47 (cards, chips, fields, buttons, links, badges, lists, dots) have their rules
-here; a list is ringed only while ``KEYBOARD_FOCUS`` is true on it (decision 0018, item 23).
+here; a list is ringed only while ``KEYBOARD_FOCUS`` is true on it (decision 0018, item 23). The
+pointer over a button puts it on ``surface 2``, a primary one on ``accent``; over a chip or a
+card that opens a page (``opens``), it rings them in the accent (decision 0018, item 8).
 ``Look`` follows the colour scheme Qt reports, dark or not, and applies a change at once, while
 the theme is the system's; a theme chosen light or dark is its palette whatever the system says,
 and a choice applies at once (decision 0018, item 2).
@@ -359,6 +361,21 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
             'QPushButton[role="plain"]:focus, QPushButton[role="icon"]:focus',
             {"border": f"1px solid {p.accent}"},
         ),
+        # The pointer over what can be clicked (decision 0018, item 8).
+        ("QPushButton:enabled:hover", {"background-color": p.surface2}),
+        (
+            'QPushButton[role="primary"]:enabled:hover',
+            {"background-color": p.accent, "border": f"1px solid {p.accent}"},
+        ),
+        ('QPushButton[role="danger"]:enabled:hover', {"background-color": p.danger}),
+        ('QPushButton[role="link"]:enabled:hover', {"background-color": "transparent"}),
+        (
+            'QPushButton[role="chip"]:enabled:hover',
+            {"background-color": p.canvas, "border": f"1px solid {p.accent}"},
+        ),
+        ('QPushButton[role="chip"]:checked:enabled:hover', {"background-color": p.selection}),
+        ('QFrame[role="chip"]:hover', {"border": f"1px solid {p.accent}"}),
+        ('QFrame[role="card"][opens="true"]:hover', {"border": f"1px solid {p.accent}"}),
         (
             'QListWidget[role="nav"], QListWidget[role="nav"]:focus',
             {"background-color": p.surface, "border": "none"},

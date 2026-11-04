@@ -32,6 +32,7 @@ from kresorter.core.scanner import Progress, ScanReport
 from kresorter.environment import Environment
 from kresorter.organize.planner import Plan
 from kresorter.ui.i18n import Translator
+from kresorter.ui.motion import Bar
 from kresorter.ui.parts import (
     Head,
     Icon,
@@ -103,6 +104,7 @@ class FolderChip(QFrame):
         super().__init__()
         self.path = path
         self.setProperty("role", "chip")
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover)  # its border shows the pointer over it
         self.setToolTip(str(path))
         self.setFixedHeight(36)
         self.icon = Icon(look, "folder", text_ink, size=16)
@@ -153,6 +155,8 @@ class ServiceCard(QFrame):
     def __init__(self, look: Look, name: str, icon: str) -> None:
         super().__init__()
         self.setProperty("role", "card")
+        self.setProperty("opens", True)  # its border shows the pointer over it
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover)
         shares(self)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -225,6 +229,8 @@ class OverviewPage(QWidget):
         self.add_button = button(look, text("overview.add"), role="plain", icon="plus")
         self.add_button.clicked.connect(self._add)
         self.last = Note(self, text("overview.none"), role="caption")
+        self.scan_bar = Bar(look)  # while a scan runs (decision 0018, item 9)
+        window.tasks.busy.connect(self._busy)
         words = vbox(spacing=4)
         words.addWidget(self.scan_title)
         words.addWidget(self.scan_text)
@@ -235,6 +241,7 @@ class OverviewPage(QWidget):
         self._row.addWidget(self.add_button)
         self._row.addStretch(1)
         inside.addLayout(top)
+        inside.addWidget(self.scan_bar)
         inside.addSpacing(8)
         inside.addLayout(self._row)
         inside.addSpacing(4)
@@ -374,7 +381,13 @@ class OverviewPage(QWidget):
         window, roots, read = self._window, self.roots(), Read()
         title = window.translator.text("task.scan")
         work = partial(scan, window.environment, roots, read)
-        window.run(Task(title, work, self._scanned, read=read))
+        if window.run(Task(title, work, self._scanned, read=read)):
+            self.scan_bar.run()
+
+    def _busy(self, running: bool) -> None:
+        """The scan's bar stops once no task runs, the scan's having ended or failed."""
+        if not running:
+            self.scan_bar.stop()
 
     def _scanned(self, scanned: Scanned) -> None:
         translator = self._window.translator

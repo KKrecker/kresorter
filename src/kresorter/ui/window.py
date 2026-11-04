@@ -33,6 +33,7 @@ from kresorter.ui.autostart import AutostartPage
 from kresorter.ui.dialogs import Dialogs, choose_folder, confirm
 from kresorter.ui.findings import FindingsPage
 from kresorter.ui.i18n import Translator
+from kresorter.ui.motion import Fade
 from kresorter.ui.organize import OrganizePage
 from kresorter.ui.overview import OverviewPage
 from kresorter.ui.parts import Note, hbox, vbox
@@ -113,6 +114,7 @@ class Window(QMainWindow):
         for name in PAGES:
             self._pages.append(made[name])
             self.pages.addWidget(self._pages[-1])
+        self.fade = Fade(self)
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
         self.sidebar.currentRowChanged.connect(self._opened)
         self.sidebar.setCurrentRow(0)
@@ -158,8 +160,9 @@ class Window(QMainWindow):
         self.sidebar.setCurrentRow(PAGES.index(name))
 
     def _opened(self, row: int) -> None:
-        """The Quarantine and Organize pages read the journal each time they open, the
-        Autostart page its entries."""
+        """A page fades in as it opens (decision 0018, item 6). The Quarantine and Organize
+        pages read the journal each time they open, the Autostart page its entries."""
+        self.fade.fade_in(self._pages[row])
         loads = {
             "quarantine": self.quarantine.load,
             "organize": self.organize.load,

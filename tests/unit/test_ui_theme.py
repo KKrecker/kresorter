@@ -325,11 +325,16 @@ def test_a_title_is_24_px_semibold_and_what_it_does_secondary_text(palette: Pale
 
 @pytest.mark.parametrize("palette", [LIGHT, DARK], ids=["light", "dark"])
 def test_danger_is_the_purge_s_alone(palette: Palette) -> None:
-    # [0014.32] Only the danger button and the danger badge use the danger colours.
+    # [0014.32] Only the danger button, the pointer over it too (decision 0018, item 8), and
+    # the danger badge use the danger colours.
     danger = {palette.danger, palette.danger_badge.text, palette.danger_badge.background}
     users = [
         selector
         for selector, declarations in _rules(style_sheet(palette))
         if any(colour in value for colour in danger for value in declarations.values())
     ]
-    assert users == ['QPushButton[role="danger"]', 'QLabel[badge="danger"]']
+    assert users == [
+        'QPushButton[role="danger"]',
+        'QPushButton[role="danger"]:enabled:hover',
+        'QLabel[badge="danger"]',
+    ]

@@ -78,7 +78,9 @@ def test_the_screenshots_are_drawn_with_no_motion(
     grab = screenshots.Shots.grab
 
     def recorded(shots: screenshots.Shots, name: str) -> QPixmap:
-        grabbed.append((motion.DURATION_MS, shots.window.pages.currentWidget().graphicsEffect()))
+        page = shots.window.pages.currentWidget()
+        assert page is not None
+        grabbed.append((motion.DURATION_MS, page.graphicsEffect()))
         return grab(shots, name)
 
     monkeypatch.setattr(screenshots.Shots, "grab", recorded)

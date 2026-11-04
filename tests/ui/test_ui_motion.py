@@ -55,7 +55,8 @@ def _colour(widget: QWidget, x: int, y: int) -> str:
 
 
 def _hover(qtbot: QtBot, widget: QWidget) -> None:
-    """The pointer over ``widget``, near its left edge."""
+    """The pointer over ``widget``, near its left edge, once its page is laid out."""
+    QApplication.processEvents()
     QTest.mouseMove(widget, QPoint(6, widget.height() // 2))
     qtbot.waitUntil(widget.underMouse)
     QApplication.processEvents()

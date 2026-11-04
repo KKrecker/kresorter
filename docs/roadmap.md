@@ -337,7 +337,7 @@ src/kresorter/
 └── ui/           # step 7: launch, app, window, sidebar, tasks, i18n, texts, labels, theme,
                   #   icons (and icons/, Lucide's), parts, shown, settings, dialogs, sessions,
                   #   overview, findings, organize, autostart, quarantine, recovery, explain,
-                  #   settings_page (0014); step 8: errors, selftest (0015)
+                  #   settings_page (0014); step 8: errors, selftest (0015); motion (0018)
 ```
 
 Directories are created only when their step starts.

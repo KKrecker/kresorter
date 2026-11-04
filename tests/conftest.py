@@ -107,6 +107,15 @@ def no_live_system(
         guard(monkeypatch, tmp_path_factory.mktemp("home"))
 
 
+@pytest.fixture(autouse=True)
+def no_motion(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The window's tests draw the end of each motion at once, as the screenshots do (decision
+    0018, item 10); the tests of the motion alone keep it as the window ships."""
+    path = Path(request.node.path).resolve()
+    if _WINDOW_TESTS in path.parents and path.name != "test_ui_motion.py":
+        monkeypatch.setattr("kresorter.ui.motion.DURATION_MS", 0)
+
+
 @pytest.fixture(scope="session")
 def built(tmp_path_factory: pytest.TempPathFactory) -> Built:
     """The sdist, and the wheel built from it: once per run, offline, or those of CI's build job
