@@ -369,14 +369,42 @@ def test_the_command_runs_one_trial_in_a_temporary_folder(
 
 
 def test_a_failed_trial_is_exit_1_and_says_why(
-    tmp_path: Path, machine: Machine, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    machine: Machine,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # [0015.22]
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     dist = dist_with(tmp_path)
 
     assert trial.main(["wheel", str(dist)], machine) == 1
 
     assert capsys.readouterr() == ("", f"wheel: {dist}: 0 files kresorter-*.whl\n")
+
+
+def test_on_github_a_failed_trial_is_an_annotation_of_the_job_too(
+    tmp_path: Path,
+    machine: Machine,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # [0015.20] which GitHub shows without signing in, unlike the job's log
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    dist = dist_with(tmp_path)
+
+    assert trial.main(["wheel", str(dist)], machine) == 1
+
+    why = f"wheel: {dist}: 0 files kresorter-*.whl"
+    assert capsys.readouterr() == (f"::error title=trial.py wheel::{why}\n", why + "\n")
+
+
+def test_an_annotation_is_one_line_of_ascii() -> None:
+    # [0015.20] a workflow command is one line; Windows' runners write in the code page
+    failed = trial.TrialFailed("50%\r\nit went wrong \u00b7")
+    assert trial.annotation("portable", failed) == (
+        r"::error title=trial.py portable::portable: 50%25%0D%0Ait went wrong \xb7"
+    )
 
 
 def test_the_command_knows_three_trials(capsys: pytest.CaptureFixture[str]) -> None:
