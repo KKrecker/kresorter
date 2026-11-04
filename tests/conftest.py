@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 
 from kresorter.core.scanner import ScanContext
+from support.annotations import commands, failures
 from support.artifacts import Built, Installed, built_for_the_run, install, lend_qt
 from support.cli import scan_context
 from support.kernel import FakeCtypes
@@ -209,3 +210,12 @@ def _forget_the_window(monkeypatch: pytest.MonkeyPatch) -> None:
         if name != "kresorter.ui.launch":
             monkeypatch.delitem(sys.modules, name)
             monkeypatch.delattr(window, name.rsplit(".", 1)[-1], raising=False)
+
+
+def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
+    """On GitHub's runners, the failures as annotations of the job (``support.annotations``)."""
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return
+    found = failures(terminalreporter.stats, str(terminalreporter.config.rootpath))
+    for line in commands(found):
+        terminalreporter.write_line(line)
