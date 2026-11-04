@@ -6,6 +6,7 @@
 as it was; ``installer``: run silently for the current user, the self-test of the installed
 ``Kresorter.exe``, then the silent uninstall, after which the installed folder is gone and the
 data directory is still there. Every program is started by one runner, which the tests replace.
+On GitHub a failed trial is an annotation of the job too, which anyone can read, unlike its log.
 The Python that runs this has no Kresorter and no Qt: what it needs of them is written here.
 """
 
@@ -31,6 +32,7 @@ __all__ = [
     "TRIALS",
     "Runner",
     "TrialFailed",
+    "annotation",
     "installer",
     "main",
     "portable",
@@ -176,6 +178,14 @@ TRIALS: dict[str, Callable[[Path, Path, Runner], None]] = {
 }
 
 
+def annotation(kind: str, failed: TrialFailed) -> str:
+    """The workflow command ``::error`` saying why, which GitHub shows on the run's page without
+    signing in, unlike its log: one line of ASCII, Windows' runners writing in the code page."""
+    text = f"{kind}: {failed}".encode("ascii", "backslashreplace").decode("ascii")
+    text = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    return f"::error title=trial.py {kind}::{text}"
+
+
 def main(argv: Sequence[str] | None = None, runner: Runner = run) -> int:
     parser = argparse.ArgumentParser(prog="trial.py", description="Run what CI built.")
     parser.add_argument("kind", choices=list(TRIALS), help="what to run")
@@ -187,6 +197,8 @@ def main(argv: Sequence[str] | None = None, runner: Runner = run) -> int:
             TRIALS[kind](Path(options.dist).resolve(), Path(work), runner)
         except TrialFailed as failed:
             print(f"{kind}: {failed}", file=sys.stderr)
+            if os.environ.get("GITHUB_ACTIONS") == "true":
+                print(annotation(kind, failed))
             return 1
     print(f"{kind}: passed")
     return 0
