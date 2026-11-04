@@ -65,9 +65,10 @@ def test_live_the_context_is_the_running_systems(context: ScanContext, data_dir:
 def test_live_quarantine_restore_and_purge(
     context: ScanContext, downloads: Path, data_dir: Path
 ) -> None:
-    # [0016.9] safe findings into the vault, back with their mtime_ns, then purged
-    first = stamped(write(downloads / "proj" / "__pycache__" / "a.cpython-313.pyc", b"first"))
-    second = stamped(write(downloads / "proj" / "__pycache__" / "b.cpython-313.pyc", b"second"))
+    # [0016.9] safe findings into the vault, back with their mtime_ns, then purged; thumbnails,
+    # since a cache is likely safe (decision 0018, item 19)
+    first = stamped(write(downloads / "photos" / "Thumbs.db", b"first"))
+    second = stamped(write(downloads / "scans" / "Thumbs.db", b"second"))
     notes = write(downloads / "notes.txt", b"kept")
     add = ["quarantine", "add", "--from-analysis", str(downloads), "--level", "safe", "--yes"]
 

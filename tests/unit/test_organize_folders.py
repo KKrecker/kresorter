@@ -29,7 +29,7 @@ from kresorter.organize.mover import check
 from kresorter.organize.planner import plan
 from kresorter.ui.i18n import Translator
 from support.files import write
-from support.host import alias, posix_only
+from support.host import WINDOWS, alias, posix_only
 from support.synced import FakeSynced
 
 DECISION = Path(__file__).resolve().parents[2] / "docs" / "decisions" / "0012-organize.md"
@@ -243,7 +243,8 @@ def test_the_markers_include_every_one_the_decision_names() -> None:
 @pytest.mark.parametrize(
     ("folder", "rule"),
     [
-        (".cache/thumbnails", "xdg-thumbnails"),
+        # The freedesktop thumbnails are Linux's; on Windows the folder is a cache.
+        (".cache/thumbnails", "user-cache-dir" if WINDOWS else "xdg-thumbnails"),
         ("app/__pycache__", "python-bytecode"),
         ("app/.pytest_cache", "tool-caches"),
     ],
