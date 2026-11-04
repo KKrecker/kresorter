@@ -21,7 +21,8 @@ from kresorter.analysis.size_age import Thresholds
 from kresorter.core.open_files.windows import ShareModeChecker
 from kresorter.core.scanner import Progress, ScanContext, ScanReport
 from kresorter.environment import Environment
-from kresorter.ui import overview
+from kresorter.storage.session import SessionFailed, SessionFailure
+from kresorter.ui import overview, settings_page
 from kresorter.ui.overview import FolderChip
 from kresorter.ui.shown import shown_path
 from kresorter.ui.tasks import Task
@@ -628,6 +629,39 @@ def test_a_zone_that_cannot_be_remembered_stays_and_the_window_says_why(
     assert window.overview.zone_links() == []
     assert window.message.text().startswith("Not saved: The data folder cannot be used: ")
     assert window.settings.current.skipped_zones == ()
+
+
+def test_a_zone_that_cannot_be_put_back_stays_out_and_the_window_says_why(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0018.18] As a setting that cannot be saved: nothing changes.
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    [chip] = _chips(window)
+    chip.remove.click()
+    failed = SessionFailed(SessionFailure.DATA_DIR_OS, "No space left on device")
+    monkeypatch.setattr(settings_page, "save", lambda context, settings: failed)
+    [link] = window.overview.zone_links()
+    link.click()
+    assert window.overview.roots() == []
+    assert window.overview.zone_links() == [link]
+    assert window.message.text().startswith("Not saved: ")
+    assert "No space left on device" in window.message.text()
+    assert window.settings.current.skipped_zones == ("zone",)
+
+
+def test_a_scan_asked_for_while_a_task_runs_does_not_start(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.9] As Scan again on Findings would while the window works: no bar either.
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    released = threading.Event()
+    assert window.run(Task("Waiting", lambda: released.wait(10), lambda _: None))
+    window.overview.start_scan()
+    assert window.status.text() == "Running: Waiting"
+    assert window.overview.scan_bar.isHidden()
+    released.set()
+    wait_idle(qtbot, window)
+    assert window.overview.scanned is None
 
 
 def test_the_zones_in_russian(
