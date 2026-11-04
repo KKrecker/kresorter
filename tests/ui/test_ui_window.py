@@ -208,6 +208,34 @@ def test_closing_while_a_task_that_acts_runs_is_refused_then_it_closes_after_it(
     assert results == [True]  # its result is applied first
 
 
+def test_a_restart_closes_the_window_as_closing_does_and_keeps_its_page(
+    qtbot: QtBot, window: Window
+) -> None:
+    # [0018.4] [0014.17] It waits for a task that acts.
+    window.show_page("findings")
+    wait_idle(qtbot, window)
+    release = threading.Event()
+    results: list[bool] = []
+    moving = Task("Moving to quarantine", lambda: release.wait(timeout=10), results.append, True)
+    assert window.run(moving)
+    window.restart()
+    assert window.isVisible()
+    assert window.message.text() == (
+        "Moving to quarantine is still running; the window closes when it ends."
+    )
+    release.set()
+    qtbot.waitUntil(lambda: not window.isVisible())
+    assert results == [True]
+    assert window.restart_page == "findings"
+
+
+def test_a_window_closed_otherwise_is_not_restarted(window: Window) -> None:
+    # [0018.4]
+    assert window.restart_page is None
+    assert window.close()
+    assert window.restart_page is None
+
+
 def test_a_task_that_only_reads_is_left_behind_when_the_window_closes(
     qtbot: QtBot, window: Window
 ) -> None:

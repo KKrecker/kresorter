@@ -214,6 +214,116 @@ def test_a_setting_that_cannot_be_saved_says_why_and_stays_as_it_was(
     assert data_dir.read_bytes() == b"not a directory"
 
 
+# --- a restart [0018.3] [0018.4] -----------------------------------------------------------------
+
+RESTART = (
+    "Restart the window?",
+    "The window opens again in the new language, on this page. A task that changes files"
+    " ends first.",
+    (),
+    "Restart now",
+    False,
+)
+
+
+def _asked(dialogs: FakeDialogs) -> list[tuple[object, ...]]:
+    return [(a.title, a.text, a.details, a.action, a.danger) for a in dialogs.asked]
+
+
+def test_a_new_language_offers_a_restart_and_declined_it_applies_the_next_time(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.3] As the note says.
+    dialogs = FakeDialogs(confirm=False)
+    window = _window(qtbot, tmp_path, zone, data_dir, dialogs=dialogs)
+    page = window.settings
+
+    page.language.setCurrentIndex(2)
+
+    assert _asked(dialogs) == [RESTART]
+    assert window.isVisible()
+    assert window.restart_page is None
+    assert page.result.text() == "Saved."
+    assert page.current == Settings(language="ru")
+    assert window.sidebar.item(0).text() == "Overview"
+    assert page.language_note.text() == "A new language applies the next time the window opens."
+
+
+def test_restart_now_closes_the_window_to_open_it_again_on_the_same_page(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.3] [0018.4]
+    dialogs = FakeDialogs(confirm=True)
+    window = _window(qtbot, tmp_path, zone, data_dir, dialogs=dialogs)
+
+    window.settings.language.setCurrentIndex(1)
+
+    assert _asked(dialogs) == [RESTART]
+    assert not window.isVisible()
+    assert window.restart_page == "settings"
+    assert _saved(data_dir) == {
+        "language": "en",
+        "include_machine": False,
+        "skipped_zones": [],
+        "theme": "system",
+    }
+
+
+def test_a_restart_is_offered_in_the_window_s_language(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.3]
+    dialogs = FakeDialogs(confirm=False)
+    window = _window(qtbot, tmp_path, zone, data_dir, dialogs=dialogs, language="ru")
+
+    window.settings.language.setCurrentIndex(1)
+
+    assert _asked(dialogs) == [
+        (
+            "Перезапустить окно?",
+            "Окно откроется снова на новом языке, на этой же странице. Задача, которая меняет"
+            " файлы, сначала завершится.",
+            (),
+            "Перезапустить сейчас",
+            False,
+        )
+    ]
+
+
+def test_no_restart_is_offered_for_the_language_already_set_or_the_theme(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.3]
+    settled(data_dir, language="en")
+    dialogs = FakeDialogs(confirm=True)
+    window = _window(qtbot, tmp_path, zone, data_dir, dialogs=dialogs)
+    page = window.settings
+    page.language.setCurrentIndex(1)
+    page.theme.setCurrentIndex(2)
+
+    assert page.result.text() == "Saved."
+    assert dialogs.asked == []
+    assert window.isVisible()
+    assert window.restart_page is None
+
+
+def test_no_restart_is_offered_for_a_language_that_cannot_be_saved(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.3]
+    data_dir.parent.mkdir(parents=True)
+    data_dir.write_bytes(b"not a directory")
+    dialogs = FakeDialogs(confirm=True)
+    window = _window(qtbot, tmp_path, zone, data_dir, dialogs=dialogs)
+
+    window.settings.language.setCurrentIndex(2)
+
+    assert window.settings.result.text().startswith("Not saved: ")
+    assert dialogs.asked == []
+    assert window.isVisible()
+    assert window.restart_page is None
+
+
 # --- the theme [0018.1] [0018.2] -----------------------------------------------------------------
 
 
