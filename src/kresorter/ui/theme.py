@@ -6,7 +6,8 @@ that is on lies on ``selection``, the likely safe badge's background (the likely
 the accent); accented text and the primary button use ``accent text``; a level's badge is its
 text on its background and its dot the level's colour; ``danger`` is the purge's alone. The
 parts of item 47 (cards, chips, fields, buttons, links, badges, lists, dots) have their rules
-here. ``Look`` follows the colour scheme Qt reports, dark or not, and applies a change at once.
+here; a list is ringed only while ``KEYBOARD_FOCUS`` is true on it (decision 0018, item 23).
+``Look`` follows the colour scheme Qt reports, dark or not, and applies a change at once.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from kresorter.analysis.score import Level
 
 __all__ = [
     "DARK",
+    "KEYBOARD_FOCUS",
     "LIGHT",
     "Badge",
     "Look",
@@ -32,6 +34,10 @@ __all__ = [
     "style_sheet",
     "tint",
 ]
+
+
+# A list's property: true while the keyboard focused it, which alone draws its ring.
+KEYBOARD_FOCUS = "keyboardFocus"
 
 
 @dataclass(frozen=True)
@@ -307,7 +313,11 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
             },
         ),
         (
-            "QPushButton:focus, QLineEdit:focus, QComboBox:focus, QAbstractItemView:focus",
+            "QPushButton:focus, QLineEdit:focus, QComboBox:focus",
+            {"border": f"1px solid {p.accent}"},
+        ),
+        (  # a list clicked shows where it is by its selected row (decision 0018, item 23)
+            f'QAbstractItemView[{KEYBOARD_FOCUS}="true"]:focus',
             {"border": f"1px solid {p.accent}"},
         ),
         (

@@ -20,6 +20,7 @@ from PySide6.QtCore import (
     QAbstractItemModel,
     QEvent,
     QModelIndex,
+    QObject,
     QPersistentModelIndex,
     QPoint,
     QRect,
@@ -29,6 +30,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QColor,
+    QFocusEvent,
     QFont,
     QFontMetrics,
     QFontMetricsF,
@@ -59,7 +61,7 @@ from PySide6.QtWidgets import (
 
 from kresorter.analysis.score import Level
 from kresorter.ui import icons
-from kresorter.ui.theme import Badge, Look, Palette
+from kresorter.ui.theme import KEYBOARD_FOCUS, Badge, Look, Palette
 
 __all__ = [
     "BADGE",
@@ -68,6 +70,7 @@ __all__ = [
     "EMPHASIS",
     "GRID",
     "INITIAL",
+    "KEYBOARD_FOCUS",
     "PAGE_MARGIN",
     "QUIET",
     "ROW_HEIGHT",
@@ -716,9 +719,40 @@ class RowDelegate(QStyledItemDelegate):
         return True
 
 
+_KEYBOARD = frozenset(
+    {
+        Qt.FocusReason.TabFocusReason,
+        Qt.FocusReason.BacktabFocusReason,
+        Qt.FocusReason.ShortcutFocusReason,
+    }
+)
+_KEPT = frozenset({Qt.FocusReason.ActiveWindowFocusReason, Qt.FocusReason.PopupFocusReason})
+
+
+class _KeyboardFocus(QObject):
+    """Marks its list ``KEYBOARD_FOCUS`` while the keyboard focused it (decision 0018, item 23):
+    Tab, Backtab or a shortcut marks it, a click or losing the focus unmarks it, and the
+    window losing and finding its focus, or a popup, keeps the mark as it was."""
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if isinstance(event, QFocusEvent) and isinstance(watched, QWidget):
+            reason = event.reason()
+            if reason not in _KEPT:
+                mark = event.type() == QEvent.Type.FocusIn and reason in _KEYBOARD
+                if watched.property(KEYBOARD_FOCUS) is not mark:
+                    watched.setProperty(KEYBOARD_FOCUS, mark)
+                    style = watched.style()
+                    style.unpolish(watched)
+                    style.polish(watched)
+        return False
+
+
 def rows(view: QAbstractItemView, look: Look) -> QAbstractItemView:
     """``view`` drawn as the window's lists: by ``RowDelegate``, without a frame, a grid or
-    alternate rows, its header (if any) in capitals of small secondary text."""
+    alternate rows, its header (if any) in capitals of small secondary text; ringed only while
+    the keyboard focused it."""
+    view.setProperty(KEYBOARD_FOCUS, False)
+    view.installEventFilter(_KeyboardFocus(view))
     view.setItemDelegate(RowDelegate(look, view))
     view.setAlternatingRowColors(False)
     view.setFrameShape(QFrame.Shape.NoFrame)

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QFocusEvent
-from PySide6.QtWidgets import QAbstractItemView, QApplication
+from PySide6.QtWidgets import QAbstractItemView, QApplication, QTreeWidget
 from pytestqt.qtbot import QtBot
 
 from kresorter.ui.parts import KEYBOARD_FOCUS
@@ -29,8 +29,9 @@ def window(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path) -> Window:
     return made
 
 
-def _lists(window: Window) -> list[QAbstractItemView]:
-    return window.findChildren(QAbstractItemView)
+def _lists(window: Window) -> list[QTreeWidget]:
+    """The window's lists, all trees: a header and a choice's popup are no list of its own."""
+    return window.findChildren(QTreeWidget)
 
 
 def _focused(qtbot: QtBot, view: QAbstractItemView, reason: Qt.FocusReason) -> None:
@@ -48,10 +49,10 @@ def _ringed(view: QAbstractItemView) -> bool:
 
 
 def test_every_list_of_the_window_can_be_ringed_from_the_keyboard(window: Window) -> None:
-    # [0018.23] Every list and tree of the window follows the rule, the sidebar's apart (it
-    # marks its current page instead).
-    views = [view for view in _lists(window) if view.property("role") != "nav"]
-    assert views
+    # [0018.23] Every list and tree of the window follows the rule; the sidebar's pages are
+    # a list of their own, which marks the current page instead.
+    views = _lists(window)
+    assert len(views) == 5
     assert all(view.property(KEYBOARD_FOCUS) is not None for view in views)
 
 
