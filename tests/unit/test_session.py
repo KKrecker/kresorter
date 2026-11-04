@@ -97,7 +97,7 @@ def test_its_own_steps_on_the_data_directory_are_reported(
 
     assert isinstance(failed, SessionFailed)
     assert failed.failure is SessionFailure.DATA_DIR_OS
-    assert failed.detail.startswith("[Errno ")
+    assert failed.detail.startswith(("[Errno ", "[WinError "))  # as the system says it
 
 
 def test_a_journal_that_cannot_be_opened_is_reported(scan: ScanContext, data_dir: Path) -> None:

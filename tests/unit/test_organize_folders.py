@@ -10,7 +10,7 @@ a wrong match only refuses a folder, a missed one breaks what is in it.
 import dataclasses
 import os
 import re
-from pathlib import Path, PurePath, PurePosixPath
+from pathlib import Path, PurePath
 
 import pytest
 
@@ -379,7 +379,7 @@ def test_a_folder_beside_or_above_a_synced_one_is_sorted(zone: Path, scan: ScanC
 
 def test_synced_folders_are_compared_ignoring_case(zone: Path, scan: ScanContext) -> None:
     # [0017.8] as NTFS compares paths
-    root = PurePosixPath(str(zone / "OneDrive").upper())
+    root = PurePath(str(zone / "OneDrive").upper())
     folder = zone / "OneDrive" / "Documents"
     folder.mkdir(parents=True)
     assert refusal(folder, syncing(scan, root)) == (FolderReason.CLOUD_SYNC, str(root))

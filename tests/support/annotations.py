@@ -85,6 +85,9 @@ def uncovered(report: str) -> list[str]:
 
 
 def _data(text: str) -> str:
+    """One line of ASCII: Windows' runners write in the system's code page, which GitHub reads
+    as UTF-8 and cannot show; ``\\xb7`` still says what it was."""
+    text = text.encode("ascii", "backslashreplace").decode("ascii")
     return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
 
 

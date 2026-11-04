@@ -130,6 +130,13 @@ def test_an_annotation_is_escaped() -> None:
     )
 
 
+def test_an_annotation_is_ascii_whatever_the_output_s_encoding() -> None:
+    # [0015.20] the runner's code page on Windows, which GitHub would not read as UTF-8
+    (odd,) = commands([Failure("t", "Desktop \u00b7 \u0444\U0001f600", "\u00e9.py:1")])
+    assert odd.isascii()
+    assert message(odd)[0] == r"== 1 failed at \xe9.py:1: Desktop \xb7 \u0444\U0001f600"
+
+
 def test_the_blocks_fill_ten_annotations_the_rest_counted_at_the_end() -> None:
     # [0015.20] GitHub keeps ten errors of a step, each up to about 4000 characters
     places = 3 * LIMIT + 2

@@ -722,7 +722,7 @@ def test_the_search_keeps_the_entries_whose_name_or_location_contains_its_text(
     desktop, systemd = "Desktop autostart · 2 entries", "systemd user service · 1 entry"
     assert page.search.placeholderText() == "Search entries"
     assert _shown(window) == ([desktop, systemd], ["app", "other", "sync.service"])
-    page.search.setText("APP")
+    page.search.setText("APP.DESKTOP")  # not "APP": Windows' temporary files are in AppData
     assert _shown(window) == ([desktop], ["app"])
     page.search.setText(native("ETC/xdg"))
     assert _shown(window) == ([desktop], ["other"])
