@@ -8,7 +8,7 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
-from PySide6.QtWidgets import QAbstractButton, QTreeWidgetItem, QWidget
+from PySide6.QtWidgets import QAbstractButton, QApplication, QTreeWidgetItem, QWidget
 from pytestqt.qtbot import QtBot
 
 from kresorter.autostart.registry import UserRegistry
@@ -113,7 +113,10 @@ def make_window(
 
 
 def wait_idle(qtbot: QtBot, window: Window) -> None:
+    """Until no task runs, then what its end posted, the layouts of what it showed among them,
+    which a slow runner may not have done yet when the wait sees it (Windows, CI run 16)."""
     qtbot.waitUntil(lambda: window.tasks.running is None, timeout=10_000)
+    QApplication.sendPostedEvents()
 
 
 def scanned(qtbot: QtBot, window: Window) -> None:
