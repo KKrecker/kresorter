@@ -7,9 +7,12 @@ private. ``load`` writes nothing; a missing file means the defaults, a broken on
 and why it was not used; unknown keys are ignored.
 """
 
+import contextlib
 import dataclasses
 import json
+import os
 import stat
+import threading
 from pathlib import Path
 
 import pytest
@@ -19,6 +22,7 @@ from kresorter.storage.session import SessionFailure
 from kresorter.ui.settings import (
     DEFAULTS,
     LANGUAGE_SETTINGS,
+    SETTINGS_BYTES,
     SETTINGS_NAME,
     TEMP_NAME,
     THEME_SETTINGS,
@@ -31,7 +35,8 @@ from kresorter.ui.settings import (
     save,
 )
 from support.cli import scan_context
-from support.host import as_kept, posix_only, record_opens
+from support.files import write
+from support.host import as_kept, make_fifo, posix_only, record_opens
 
 
 @pytest.fixture
@@ -199,7 +204,7 @@ def test_an_unreadable_file_means_the_defaults(context: ScanContext, data_dir: P
 
 @pytest.mark.parametrize(
     "content",
-    [b"", b"{", b"{'language': 'ru'}", b"\xff\xfe\xfa", b"NaN!", b"[" * 100_000],
+    [b"", b"{", b"{'language': 'ru'}", b"\xff\xfe\xfa", b"NaN!", b"[" * 60_000],
     ids=["empty", "open", "quotes", "not utf-8", "after", "too deep"],
 )
 def test_invalid_json_means_the_defaults(
@@ -405,3 +410,105 @@ def test_a_model_that_is_no_model_name_is_a_wrong_value(
     # [0018.32] A name decision 0013's item 9 accepts, as KRESORTER_OLLAMA_MODEL.
     _write(data_dir, json.dumps({"language": "ru", "model": value}).encode())
     assert load(context) == Loaded(DEFAULTS, Unused.WRONG_VALUE, detail)
+
+
+# --- the file is not a door [0018.39] ------------------------------------------------------------
+
+KIB_64 = 64 * 1024
+RUSSIAN = json.dumps({"language": "ru"}).encode()
+
+
+def _padded(size: int) -> bytes:
+    """Settings in Russian, padded with spaces to ``size`` bytes."""
+    return RUSSIAN + b" " * (size - len(RUSSIAN))
+
+
+def test_the_file_is_read_up_to_64_kib(context: ScanContext, data_dir: Path) -> None:
+    # [0018.39]
+    assert SETTINGS_BYTES == KIB_64
+    _write(data_dir, _padded(KIB_64))
+    assert load(context) == Loaded(Settings(language="ru"))
+
+
+@pytest.mark.parametrize("size", [KIB_64 + 1, 16 * 1024 * 1024])
+def test_a_larger_file_is_unreadable(context: ScanContext, data_dir: Path, size: int) -> None:
+    # [0018.39] Refused, never read whole.
+    _write(data_dir, _padded(size))
+    assert load(context) == Loaded(DEFAULTS, Unused.UNREADABLE, "larger than 65536 bytes")
+
+
+def test_the_file_is_opened_as_bytes_and_never_through_a_link(
+    context: ScanContext, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0018.39] O_NOFOLLOW where the system has it (POSIX).
+    _write(data_dir, RUSSIAN)
+    opens = record_opens(monkeypatch)
+    assert load(context) == Loaded(Settings(language="ru"))
+    assert opens.in_binary(SETTINGS_NAME)
+    assert opens.flags[SETTINGS_NAME] & getattr(os, "O_NOFOLLOW", 0) == getattr(os, "O_NOFOLLOW", 0)
+    assert opens.flags[SETTINGS_NAME] & (os.O_WRONLY | os.O_RDWR | os.O_CREAT) == 0
+
+
+@posix_only("a link is not followed when read on POSIX")
+@pytest.mark.parametrize("to", ["a file", "nothing"])
+def test_a_link_in_place_of_the_file_is_unreadable(
+    context: ScanContext, data_dir: Path, tmp_path: Path, to: str
+) -> None:
+    # [0018.39] Whether it leads to settings or to nothing: it is not the file.
+    target = tmp_path / "elsewhere.json"
+    if to == "a file":
+        write(target, RUSSIAN)
+    data_dir.mkdir(parents=True)
+    (data_dir / SETTINGS_NAME).symlink_to(target)
+    loaded = load(context)
+    assert (loaded.settings, loaded.unused) == (DEFAULTS, Unused.UNREADABLE)
+    assert loaded.detail
+
+
+@posix_only("a FIFO is POSIX's")
+def test_a_fifo_in_place_of_the_file_is_unreadable_without_waiting(
+    context: ScanContext, data_dir: Path
+) -> None:
+    # [0018.39] Opening a FIFO waits for a writer: the window would never open.
+    data_dir.mkdir(parents=True)
+    fifo = data_dir / SETTINGS_NAME
+    make_fifo(fifo)
+    loaded: list[Loaded] = []
+    reader = threading.Thread(target=lambda: loaded.append(load(context)), daemon=True)
+    reader.start()
+    reader.join(5)
+    waited = reader.is_alive()
+    with contextlib.suppress(OSError):  # a reader still waiting is let go by a writer
+        os.close(os.open(fifo, os.O_WRONLY | os.O_NONBLOCK))
+    reader.join(5)
+    assert not waited
+    assert loaded == [Loaded(DEFAULTS, Unused.UNREADABLE, "not a regular file")]
+
+
+@posix_only("a link is not followed when written on POSIX")
+def test_a_link_in_place_of_the_temporary_file_is_not_written_through(
+    context: ScanContext, data_dir: Path, tmp_path: Path
+) -> None:
+    # [0018.39]
+    target = write(tmp_path / "elsewhere", b"kept")
+    data_dir.mkdir(parents=True)
+    (data_dir / TEMP_NAME).symlink_to(target)
+    failed = save(context, Settings(language="ru"))
+    assert failed is not None
+    assert failed.failure is SessionFailure.DATA_DIR_OS
+    assert target.read_bytes() == b"kept"
+    assert not (data_dir / SETTINGS_NAME).exists()
+
+
+@posix_only("a link is not followed when written on POSIX")
+def test_a_link_in_place_of_the_file_is_replaced_never_written_through(
+    context: ScanContext, data_dir: Path, tmp_path: Path
+) -> None:
+    # [0018.39]
+    target = write(tmp_path / "elsewhere", b"kept")
+    data_dir.mkdir(parents=True)
+    (data_dir / SETTINGS_NAME).symlink_to(target)
+    assert save(context, Settings(language="ru")) is None
+    assert not (data_dir / SETTINGS_NAME).is_symlink()
+    assert target.read_bytes() == b"kept"
+    assert load(context) == Loaded(Settings(language="ru"))

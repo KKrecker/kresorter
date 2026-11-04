@@ -7,6 +7,7 @@ never leaves a stale lock. The lock file itself is never deleted (decision 0001)
 """
 
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -110,6 +111,19 @@ def test_a_crashed_holder_leaves_no_stale_lock(lock_path: Path) -> None:
     holder.communicate()
     with InstanceLock(lock_path):
         pass
+
+
+@posix_only
+def test_a_link_in_place_of_the_lock_is_refused(lock_path: Path, tmp_path: Path) -> None:
+    # [0018.36] Found by the audit: the lock made the link's target private, and held it.
+    target = tmp_path / "elsewhere"
+    target.write_bytes(b"kept")
+    target.chmod(0o644)
+    lock_path.symlink_to(target)
+    with pytest.raises(OSError, match=re.escape(lock_path.name)), InstanceLock(lock_path):
+        pytest.fail("locked through a link")
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
+    assert target.read_bytes() == b"kept"
 
 
 def test_missing_directory_is_an_os_error(tmp_path: Path) -> None:

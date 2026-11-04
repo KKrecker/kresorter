@@ -104,6 +104,14 @@ def test_no_resolver_is_asked(host: str, resolvers: list[str]) -> None:
     assert ollama.received[0].header("Host") == f"127.0.0.1:{ollama.address.port}"
 
 
+@pytest.mark.parametrize("host", ["192.0.2.1", "0.0.0.0", "::", "localhost", "example.com"])
+def test_an_address_off_loopback_is_never_asked(host: str, resolvers: list[str]) -> None:
+    # [0018.40] Whatever made the address, the one network point checks it itself.
+    with pytest.raises(ValueError, match="is not a loopback address"):
+        request(Address(host, 11434), "GET", "/api/version", seconds=0.5)
+    assert resolvers == []
+
+
 def test_ipv6_loopback_without_a_resolver(resolvers: list[str]) -> None:
     # [0013.10]
     with ScriptedOllama(host="::1") as ollama:
