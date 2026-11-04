@@ -9,6 +9,7 @@ that cannot be listed is skipped with a reason, and nothing it could change is s
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,8 +58,10 @@ class _Entry:
 
 
 def autostart_dirs(env: Mapping[str, str], home: Path) -> tuple[Path, tuple[Path, ...]]:
-    """The user autostart directory and the system ones, most important first."""
-    dirs = [Path(d) for d in env.get("XDG_CONFIG_DIRS", "").split(":") if d]
+    """The user autostart directory and the system ones, most important first.
+    ``$XDG_CONFIG_DIRS`` is a list as the running system writes one: ``:`` on Linux, as the
+    spec says, ``;`` on Windows, whose paths have a ``:`` of their own."""
+    dirs = [Path(d) for d in env.get("XDG_CONFIG_DIRS", "").split(os.pathsep) if d]
     system = [d for d in dirs if d.is_absolute()] or [Path("/etc/xdg")]
     return config_home(env, home) / "autostart", tuple(d / "autostart" for d in system)
 
