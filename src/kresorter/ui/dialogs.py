@@ -183,7 +183,8 @@ class FolderDialog(QDialog):
         current: QModelIndex | QPersistentModelIndex,
         previous: QModelIndex | QPersistentModelIndex,
     ) -> None:
-        self.path.setText(self.model.filePath(current))
+        # as the system writes a path: Qt's model writes it with '/', on Windows too
+        self.path.setText(str(Path(self.model.filePath(current))))
 
     def _typed(self, text: str) -> None:
         folder = Path(text)
