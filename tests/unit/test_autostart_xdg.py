@@ -7,6 +7,7 @@ with the replaced system file in ``shadows``. ``Hidden=true`` and
 never evaluated. A file that cannot be read is skipped with a reason. Reading never writes.
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -370,23 +371,41 @@ def test_default_directories(tmp_path: Path) -> None:
     )
 
 
+# absolute on every system: C:\\cfg and so on on Windows
+CFG, ONE, TWO, ABS = (Path(path).resolve() for path in ("/cfg", "/one", "/two", "/abs"))
+
+
 def test_directories_from_the_environment(tmp_path: Path) -> None:
-    env = {"XDG_CONFIG_HOME": "/cfg", "XDG_CONFIG_DIRS": "/one:/two"}
+    env = {"XDG_CONFIG_HOME": str(CFG), "XDG_CONFIG_DIRS": os.pathsep.join([str(ONE), str(TWO)])}
 
     assert autostart_dirs(env, tmp_path) == (
-        Path("/cfg/autostart"),
-        (Path("/one/autostart"), Path("/two/autostart")),
+        CFG / "autostart",
+        (ONE / "autostart", TWO / "autostart"),
     )
 
 
+def test_the_directories_are_a_list_as_the_system_writes_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0015.20] ':' on Linux, as the XDG spec says; ';' on Windows, whose paths have a ':' too
+    one, two = tmp_path / "one", tmp_path / "two"
+    env = {"XDG_CONFIG_DIRS": os.pathsep.join([str(one), str(two)])}
+    assert autostart_dirs(env, tmp_path)[1] == (one / "autostart", two / "autostart")
+    monkeypatch.setattr(os, "pathsep", ";")  # Windows' separator, wherever the test runs
+    env = {"XDG_CONFIG_DIRS": f"{one};{two}"}
+    assert autostart_dirs(env, tmp_path)[1] == (one / "autostart", two / "autostart")
+
+
 def test_relative_and_empty_environment_values_are_ignored(tmp_path: Path) -> None:
-    env = {"XDG_CONFIG_HOME": "cfg", "XDG_CONFIG_DIRS": "rel::/abs:"}
+    dirs = os.pathsep.join(["rel", "", str(ABS), ""])
+    env = {"XDG_CONFIG_HOME": "cfg", "XDG_CONFIG_DIRS": dirs}
 
     assert autostart_dirs(env, tmp_path) == (
         tmp_path / ".config" / "autostart",
-        (Path("/abs/autostart"),),
+        (ABS / "autostart",),
     )
 
 
 def test_no_usable_config_dirs_fall_back_to_etc_xdg(tmp_path: Path) -> None:
-    assert autostart_dirs({"XDG_CONFIG_DIRS": "rel:"}, tmp_path)[1] == (Path("/etc/xdg/autostart"),)
+    env = {"XDG_CONFIG_DIRS": f"rel{os.pathsep}"}
+    assert autostart_dirs(env, tmp_path)[1] == (Path("/etc/xdg/autostart"),)
