@@ -2,6 +2,8 @@
 per level, and a card each for Quarantine, Organize and Autostart (decision 0014, items 19
 and 48)."""
 
+import dataclasses
+import json
 import threading
 import time
 from pathlib import Path
@@ -11,13 +13,14 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 from pytestqt.qtbot import QtBot
 
-from fakes import UnreliableOpenFiles
+from fakes import UnreliableOpenFiles, make_policy
 from kresorter.analysis.report import AnalysisReport
 from kresorter.analysis.run import analyze_paths
 from kresorter.analysis.score import Level
 from kresorter.analysis.size_age import Thresholds
 from kresorter.core.open_files.windows import ShareModeChecker
 from kresorter.core.scanner import Progress, ScanContext, ScanReport
+from kresorter.environment import Environment
 from kresorter.ui import overview
 from kresorter.ui.overview import FolderChip
 from kresorter.ui.shown import shown_path
@@ -26,7 +29,15 @@ from kresorter.ui.window import Window
 from support.files import write
 from support.kernel import FakeKernel
 from support.moves import three_files
-from support.window import FakeDialogs, environment, junk_tree, make_window, scanned, wait_idle
+from support.window import (
+    FakeDialogs,
+    environment,
+    junk_tree,
+    make_window,
+    scanned,
+    settled,
+    wait_idle,
+)
 
 
 @pytest.fixture
@@ -492,3 +503,142 @@ def test_a_task_without_progress_says_only_what_runs(
     assert not window.progress_timer.isActive()
     released.set()
     wait_idle(qtbot, window)
+
+
+# --- the zones left out and put back [0018.17] [0018.18] ------------------------------------------
+
+
+def _zones(tmp_path: Path, data_dir: Path) -> tuple[Environment, list[Path]]:
+    """Two safe zones, as a system has them: ``~/.cache`` and ``~/Downloads``."""
+    zones = [tmp_path / ".cache", tmp_path / "Downloads"]
+    for zone in zones:
+        zone.mkdir()
+    base = environment(tmp_path, zones[0], data_dir)
+
+    def context() -> ScanContext:
+        system = tmp_path / "system"
+        policy = make_policy(tmp_path, system, default_roots=zones, app_data_dir=data_dir)
+        return dataclasses.replace(base.scan_context(), policy=policy)
+
+    return dataclasses.replace(base, scan_context=context), zones
+
+
+def _links(window: Window) -> list[str]:
+    return [link.text() for link in window.overview.zone_links()]
+
+
+def _skipped(data_dir: Path) -> object:
+    return json.loads((data_dir / "settings.json").read_text(encoding="utf-8"))["skipped_zones"]
+
+
+def _shown(name: str) -> str:
+    return str(Path("~") / name)
+
+
+def test_a_safe_zone_s_chip_has_a_remove_button_and_a_zone_left_out_is_not_scanned(
+    qtbot: QtBot, tmp_path: Path, data_dir: Path, home: Path
+) -> None:
+    # [0018.17] As an added folder's chip; the window remembers the zone's name.
+    env, zones = _zones(tmp_path, data_dir)
+    write(zones[0] / "a.bin", b"a")
+    write(zones[1] / "b.bin", b"b")
+    window = make_window(qtbot, env)
+    first, second = _chips(window)
+    assert first.remove is not None
+    assert second.remove is not None
+    assert first.remove.accessibleName() == f"Leave {_shown('.cache')} out of the scan"
+    assert first.remove.toolTip() == first.remove.accessibleName()
+    first.remove.click()
+    assert _folders(window) == [zones[1]]
+    assert _links(window) == [f"+ {_shown('.cache')}"]
+    assert _skipped(data_dir) == [".cache"]
+    scanned(qtbot, window)
+    assert window.overview.scanned is not None
+    assert [e.path for e in window.overview.scanned.report.entries] == [zones[1] / "b.bin"]
+
+
+def test_a_zone_left_out_stays_out_when_the_window_opens_again(
+    qtbot: QtBot, tmp_path: Path, data_dir: Path, home: Path
+) -> None:
+    # [0018.17]
+    env, zones = _zones(tmp_path, data_dir)
+    settled(data_dir, skipped_zones=["Downloads"])
+    window = make_window(qtbot, env)
+    assert _folders(window) == [zones[0]]
+    assert window.overview.roots() == [zones[0]]
+    assert _links(window) == [f"+ {_shown('Downloads')}"]
+
+
+def test_the_link_puts_the_zone_back_where_it_was_and_saves(
+    qtbot: QtBot, tmp_path: Path, data_dir: Path, home: Path
+) -> None:
+    # [0018.18] A link each, at the end of the folders.
+    env, zones = _zones(tmp_path, data_dir)
+    extra = tmp_path / "extra"
+    extra.mkdir()
+    settled(data_dir, skipped_zones=[".cache", "Downloads"])
+    window = make_window(qtbot, env, dialogs=FakeDialogs(folders=[extra]))
+    page = window.overview
+    page.add_button.click()
+    assert _folders(window) == [extra]
+    assert _links(window) == [f"+ {_shown('.cache')}", f"+ {_shown('Downloads')}"]
+    cache, downloads = page.zone_links()
+    assert cache.property("role") == "link"
+    assert cache.toolTip() == f"Scan {_shown('.cache')} again"
+    qtbot.waitUntil(lambda: cache.isVisible())
+    right = _chips(window)[-1].mapTo(page, _chips(window)[-1].rect().topRight()).x()
+    assert cache.mapTo(page, cache.rect().topLeft()).x() > right
+    downloads.click()
+    assert _folders(window) == [zones[1], extra]
+    assert _links(window) == [f"+ {_shown('.cache')}"]
+    assert _skipped(data_dir) == [".cache"]
+    cache.click()
+    assert _folders(window) == [*zones, extra]
+    assert _links(window) == []
+    assert _skipped(data_dir) == []
+
+
+def test_with_no_folder_at_all_scan_now_is_disabled(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.18]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    page = window.overview
+    assert page.scan_button.isEnabled()
+    [chip] = _chips(window)
+    assert chip.remove is not None
+    chip.remove.click()
+    assert page.roots() == []
+    assert not page.scan_button.isEnabled()
+    [link] = page.zone_links()
+    link.click()
+    assert page.roots() == [zone]
+    assert page.scan_button.isEnabled()
+
+
+def test_a_zone_that_cannot_be_remembered_stays_and_the_window_says_why(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.17] As a setting that cannot be saved: nothing changes.
+    data_dir.parent.mkdir(parents=True, exist_ok=True)
+    data_dir.write_bytes(b"not a directory")
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    [chip] = _chips(window)
+    assert chip.remove is not None
+    chip.remove.click()
+    assert _folders(window) == [zone]
+    assert window.overview.zone_links() == []
+    assert window.message.text().startswith("Not saved: The data folder cannot be used: ")
+    assert window.settings.current.skipped_zones == ()
+
+
+def test_the_zones_in_russian(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path) -> None:
+    # [0018.17] [0018.18]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
+    [chip] = _chips(window)
+    assert chip.remove is not None
+    assert chip.remove.accessibleName() == f"Убрать {_shown('zone')} из сканирования"
+    chip.remove.click()
+    [link] = window.overview.zone_links()
+    assert link.text() == f"+ {_shown('zone')}"
+    assert link.toolTip() == f"Снова сканировать {_shown('zone')}"

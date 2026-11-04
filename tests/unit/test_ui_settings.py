@@ -269,3 +269,43 @@ def test_a_broken_file_is_not_written_by_loading(
     assert save(context, Settings(language="en")) is None
     assert load(context) == Loaded(Settings(language="en"))
     assert path.read_bytes() != content
+
+
+# --- the zones left out (decision 0018, item 17) -------------------------------------------------
+
+
+def test_the_zones_left_out_are_remembered_by_their_names(
+    context: ScanContext, data_dir: Path
+) -> None:
+    # [0018.17] A zone's last part, never a path.
+    settings = Settings(skipped_zones=("zone",))
+    assert save(context, settings) is None
+    assert load(context) == Loaded(settings)
+    saved = json.loads((data_dir / SETTINGS_NAME).read_text(encoding="utf-8"))
+    assert saved["skipped_zones"] == ["zone"]
+    assert Settings().skipped_zones == ()
+
+
+@pytest.mark.parametrize(
+    ("value", "detail"),
+    [
+        ("zone", 'skipped_zones="zone"'),
+        (["other"], 'skipped_zones=["other"]'),
+        (["Zone"], 'skipped_zones=["Zone"]'),
+        (["zone", "zone"], 'skipped_zones=["zone", "zone"]'),
+        ([1], "skipped_zones=[1]"),
+        (None, "skipped_zones=null"),
+    ],
+)
+def test_a_name_of_no_zone_is_a_wrong_value(
+    context: ScanContext, data_dir: Path, value: object, detail: str
+) -> None:
+    # [0018.17] Not the other names either: the file is not used at all.
+    _write(data_dir, json.dumps({"language": "ru", "skipped_zones": value}).encode())
+    assert load(context) == Loaded(DEFAULTS, Unused.WRONG_VALUE, detail)
+
+
+def test_a_zone_s_path_is_a_wrong_value(context: ScanContext, data_dir: Path, zone: Path) -> None:
+    # [0018.17]
+    _write(data_dir, json.dumps({"skipped_zones": [str(zone)]}).encode())
+    assert load(context).unused == Unused.WRONG_VALUE
