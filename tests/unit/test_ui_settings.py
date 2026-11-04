@@ -1,6 +1,7 @@
 """The window's settings file (decision 0014, items 35-36).
 
-Only ``settings.json`` in the data directory: ``language`` and ``include_machine``, written by
+Only ``settings.json`` in the data directory: ``language``, ``include_machine``, the zones left
+out and the theme (decision 0018, items 1 and 17), written by
 ``save`` alone, after the data directory is checked, through a temporary file renamed over it,
 private. ``load`` writes nothing; a missing file means the defaults, a broken one the defaults
 and why it was not used; unknown keys are ignored.
@@ -20,9 +21,11 @@ from kresorter.ui.settings import (
     LANGUAGE_SETTINGS,
     SETTINGS_NAME,
     TEMP_NAME,
+    THEME_SETTINGS,
     LanguageSetting,
     Loaded,
     Settings,
+    ThemeSetting,
     Unused,
     load,
     save,
@@ -65,6 +68,7 @@ def test_the_settings_are_the_language_and_the_machine_scope() -> None:
         "language",
         "include_machine",
         "skipped_zones",
+        "theme",
     ]
     assert Settings() == DEFAULTS == Settings(language="system", include_machine=False)
     assert LANGUAGE_SETTINGS == ("system", "en", "ru")
@@ -81,7 +85,12 @@ def test_what_is_saved_is_loaded(
     assert save(context, settings) is None
     assert load(context) == Loaded(settings)
     saved = json.loads((data_dir / SETTINGS_NAME).read_text(encoding="utf-8"))
-    assert saved == {"language": language, "include_machine": include_machine, "skipped_zones": []}
+    assert saved == {
+        "language": language,
+        "include_machine": include_machine,
+        "skipped_zones": [],
+        "theme": "system",
+    }
 
 
 def test_saving_makes_the_data_directory_private_and_the_file_alone_in_it(
@@ -235,7 +244,7 @@ def test_a_value_of_the_wrong_type_or_unknown_means_every_default(
 
 def test_unknown_keys_are_ignored(context: ScanContext, data_dir: Path) -> None:
     # [0014.36]
-    content = {"language": "ru", "include_machine": True, "theme": "dark", "findings": [1]}
+    content = {"language": "ru", "include_machine": True, "colour": "dark", "findings": [1]}
     _write(data_dir, json.dumps(content).encode())
     assert load(context) == Loaded(Settings(language="ru", include_machine=True))
 
@@ -311,3 +320,43 @@ def test_a_zone_s_path_is_a_wrong_value(context: ScanContext, data_dir: Path, zo
     # [0018.17]
     _write(data_dir, json.dumps({"skipped_zones": [str(zone)]}).encode())
     assert load(context).unused == Unused.WRONG_VALUE
+
+
+# --- the theme [0018.1] --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("theme", ["system", "light", "dark"])
+def test_the_theme_is_remembered(context: ScanContext, data_dir: Path, theme: ThemeSetting) -> None:
+    # [0018.1]
+    settings = Settings(language="ru", theme=theme)
+    assert save(context, settings) is None
+    assert load(context) == Loaded(settings)
+    saved = json.loads((data_dir / SETTINGS_NAME).read_text(encoding="utf-8"))
+    assert saved["theme"] == theme
+
+
+def test_a_theme_left_out_is_the_system_s(context: ScanContext, data_dir: Path) -> None:
+    # [0018.1]
+    assert THEME_SETTINGS == ("system", "light", "dark")
+    assert DEFAULTS.theme == "system"
+    _write(data_dir, json.dumps({"language": "ru"}).encode())
+    assert load(context) == Loaded(Settings(language="ru", theme="system"))
+
+
+@pytest.mark.parametrize(
+    ("value", "detail"),
+    [
+        ("blue", 'theme="blue"'),
+        ("Dark", 'theme="Dark"'),
+        ("", 'theme=""'),
+        (1, "theme=1"),
+        (None, "theme=null"),
+        (["dark"], 'theme=["dark"]'),
+    ],
+)
+def test_any_other_theme_is_a_wrong_value(
+    context: ScanContext, data_dir: Path, value: object, detail: str
+) -> None:
+    # [0018.1] [0014.36] The file is not used at all.
+    _write(data_dir, json.dumps({"language": "ru", "theme": value}).encode())
+    assert load(context) == Loaded(DEFAULTS, Unused.WRONG_VALUE, detail)

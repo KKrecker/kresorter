@@ -3,7 +3,8 @@ the machine scope of autostart, turned on only after a confirmation that says wh
 Check of the local AI that runs the checks of ``kresorter llm status`` and shows each; the data
 directory's path; a card each, the page scrolling under its head. The page says when the
 settings file was not used, and the file is written only when the user changes a setting
-(decision 0014, items 27, 36, 37 and 55)."""
+(decision 0014, items 27, 36, 37 and 55). The theme, saved and applied at once (decision 0018,
+items 1 and 2)."""
 
 import io
 import json
@@ -12,7 +13,8 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QFrame, QLabel, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QWidget
 from pytestqt.qtbot import QtBot
 
 from fakes import FakeRegistry
@@ -25,7 +27,7 @@ from kresorter.llm.settings import MODEL_VARIABLE, URL_VARIABLE, Address
 from kresorter.ui.i18n import Language
 from kresorter.ui.settings import Settings, load
 from kresorter.ui.settings_page import SettingsPage
-from kresorter.ui.theme import LIGHT
+from kresorter.ui.theme import DARK, LIGHT, style_sheet
 from kresorter.ui.window import Window
 from support.cli import autostart_context, run, scan_context
 from support.host import native
@@ -90,6 +92,11 @@ def _window(
 
 def _choices(window: Window) -> list[str]:
     combo = window.settings.language
+    return [combo.itemText(index) for index in range(combo.count())]
+
+
+def _themes(window: Window) -> list[str]:
+    combo = window.settings.theme
     return [combo.itemText(index) for index in range(combo.count())]
 
 
@@ -162,7 +169,12 @@ def test_a_language_chosen_is_saved_and_applies_the_next_time_the_window_opens(
 
     page.language.setCurrentIndex(2)
 
-    assert _saved(data_dir) == {"language": "ru", "include_machine": False, "skipped_zones": []}
+    assert _saved(data_dir) == {
+        "language": "ru",
+        "include_machine": False,
+        "skipped_zones": [],
+        "theme": "system",
+    }
     assert page.result.text() == "Saved."
     assert page.current == Settings(language="ru")
     assert window.sidebar.item(0).text() == "Overview"
@@ -202,6 +214,88 @@ def test_a_setting_that_cannot_be_saved_says_why_and_stays_as_it_was(
     assert data_dir.read_bytes() == b"not a directory"
 
 
+# --- the theme [0018.1] [0018.2] -----------------------------------------------------------------
+
+
+def test_the_appearance_card_has_a_choice_of_system_light_and_dark(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.1] The system's theme until another is chosen.
+    window = _window(qtbot, tmp_path, zone, data_dir)
+    page = window.settings
+    assert _titles(page.appearance_card) == ["Appearance"]
+    assert _themes(window) == ["System", "Light", "Dark"]
+    assert page.theme.accessibleName() == "Appearance"
+    assert page.theme.currentIndex() == 0
+    assert (window.look.theme, window.look.palette) == ("system", LIGHT)
+    assert not data_dir.exists()
+
+
+def test_a_theme_chosen_is_saved_and_applied_at_once(
+    qtbot: QtBot, qapp: QApplication, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.2] Dark whatever the system says, then light.
+    window = _window(qtbot, tmp_path, zone, data_dir)
+    page = window.settings
+
+    page.theme.setCurrentIndex(2)
+
+    assert _saved(data_dir) == {
+        "language": "system",
+        "include_machine": False,
+        "skipped_zones": [],
+        "theme": "dark",
+    }
+    assert page.result.text() == "Saved."
+    assert page.current == Settings(theme="dark")
+    assert window.look.palette is DARK
+    assert window.styleSheet() == style_sheet(DARK)
+    qapp.styleHints().colorSchemeChanged.emit(Qt.ColorScheme.Light)
+    assert window.look.palette is DARK
+
+    page.theme.setCurrentIndex(1)
+
+    assert _saved(data_dir) == {
+        "language": "system",
+        "include_machine": False,
+        "skipped_zones": [],
+        "theme": "light",
+    }
+    assert window.look.palette is LIGHT
+    assert window.styleSheet() == style_sheet(LIGHT)
+
+
+@pytest.mark.parametrize(("theme", "index"), [("light", 1), ("dark", 2)])
+def test_the_window_opens_in_the_theme_remembered(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, theme: str, index: int
+) -> None:
+    # [0018.2]
+    settled(data_dir, theme=theme)
+    window = _window(qtbot, tmp_path, zone, data_dir)
+    assert window.settings.theme.currentIndex() == index
+    assert window.look.theme == theme
+    palette = DARK if theme == "dark" else LIGHT
+    assert window.look.palette is palette
+    assert window.styleSheet() == style_sheet(palette)
+
+
+def test_a_theme_that_cannot_be_saved_is_not_applied(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0018.2] [0014.35] The data directory cannot be made: the theme stays as it was.
+    data_dir.parent.mkdir(parents=True)
+    data_dir.write_bytes(b"not a directory")
+    window = _window(qtbot, tmp_path, zone, data_dir)
+    page = window.settings
+
+    page.theme.setCurrentIndex(2)
+
+    assert page.result.text().startswith("Not saved: The data folder cannot be used: ")
+    assert page.theme.currentIndex() == 0
+    assert (window.look.theme, window.look.palette) == ("system", LIGHT)
+    assert page.current == Settings()
+
+
 # --- a broken file -------------------------------------------------------------------------------
 
 
@@ -228,7 +322,12 @@ def test_a_broken_file_is_not_used_and_the_page_says_so(
 
     page.language.setCurrentIndex(1)
 
-    assert _saved(data_dir) == {"language": "en", "include_machine": False, "skipped_zones": []}
+    assert _saved(data_dir) == {
+        "language": "en",
+        "include_machine": False,
+        "skipped_zones": [],
+        "theme": "system",
+    }
     assert page.unused.isHidden()
 
 
@@ -278,7 +377,12 @@ def test_on_windows_the_machine_scope_is_off_until_turned_on_after_confirmation(
     page.machine.click()
 
     assert page.machine.isChecked()
-    assert _saved(data_dir) == {"language": "system", "include_machine": True, "skipped_zones": []}
+    assert _saved(data_dir) == {
+        "language": "system",
+        "include_machine": True,
+        "skipped_zones": [],
+        "theme": "system",
+    }
     assert page.result.text() == "Saved."
     assert _listed(qtbot, window) == ["Sync", "Agent"]
     assert window.autostart.machine.isHidden()
@@ -302,7 +406,12 @@ def test_turning_the_machine_scope_off_asks_nothing_and_keeps_the_language(
 
     assert dialogs.asked == []
     assert not page.machine.isChecked()
-    assert _saved(data_dir) == {"language": "ru", "include_machine": False, "skipped_zones": []}
+    assert _saved(data_dir) == {
+        "language": "ru",
+        "include_machine": False,
+        "skipped_zones": [],
+        "theme": "system",
+    }
     assert _listed(qtbot, window) == ["Sync"]
 
 
@@ -462,6 +571,8 @@ def test_the_page_in_russian(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir:
     assert _choices(window)[1:] == ["English", "Русский"]
     assert page.language_note.text() == "Новый язык применится при следующем открытии окна."
     assert _titles(page.data_card) == ["Папка данных"]
+    assert _titles(page.appearance_card) == ["Оформление"]
+    assert _themes(window) == ["Как в системе", "Светлая", "Тёмная"]
     assert page.address.text() == f"Адрес: {ollama.address.url} · Модель: llama3.2"
     assert _lines(page)[:2] == [
         f"Ollama: работает по адресу {ollama.address.url} (версия 0.6.2)",
@@ -482,10 +593,17 @@ def test_a_card_each_the_page_scrolling_under_its_head(
     # Check at the right of their titles.
     window = _window(qtbot, tmp_path, zone, data_dir, platform=platform)
     page = window.settings
-    cards = [page.language_card, page.machine_card, page.ai_card, page.data_card]
-    assert [part.property("role") for part in cards] == ["card"] * 4
+    cards = [
+        page.language_card,
+        page.appearance_card,
+        page.machine_card,
+        page.ai_card,
+        page.data_card,
+    ]
+    assert [part.property("role") for part in cards] == ["card"] * 5
     assert [_titles(part) for part in cards] == [
         ["Language"],
+        ["Appearance"],
         ["Autostart"],
         ["Local AI (Ollama)"],
         ["Data folder"],
@@ -501,6 +619,7 @@ def test_a_card_each_the_page_scrolling_under_its_head(
     assert page.head.parentWidget() is page
     language, ai = page.language_card, page.ai_card
     assert _right(page.language, language) == _right(page.language_note, language)
+    assert _right(page.theme, page.appearance_card) == _right(page.language, language)
     assert _right(page.check_button, ai) == _right(page.address, ai)
 
 
