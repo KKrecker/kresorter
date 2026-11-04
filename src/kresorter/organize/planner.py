@@ -11,6 +11,10 @@ the same category directory stays too. Names are compared folded (``names``); wh
 is taken is asked of the file system. The plan is sorted, so it does not depend on the order the
 folder is listed in.
 
+Groups by meaning (decision 0018, item 28) give a file, by its name, a category of their own: a
+file of a kind or of none goes to its group's folder, and every reason to stay above holds, the
+new destinations checked as any. The groups' categories come after the table's.
+
 The limit (decision 0017, item 6) is Windows's without long paths, whether they are enabled or
 not: a category directory of at most ``DIRECTORY_LIMIT`` characters and a destination of at most
 ``PATH_LIMIT``, counted in UTF-16 code units. It is decided from the names alone, before the
@@ -21,6 +25,7 @@ from __future__ import annotations
 
 import os
 import stat
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -81,14 +86,16 @@ class Stay:
 @dataclass(frozen=True)
 class Plan:
     folder: Path
-    moves: tuple[Move, ...]  # by category in table order, then by name
+    moves: tuple[Move, ...]  # by category in table order, then the groups', then by name
     stays: tuple[Stay, ...]  # by reason in StayReason order, then by name
 
 
-def plan(folder: Path, context: ScanContext) -> Plan:
-    """The plan for ``folder``, as the system spells it. Raises FolderRefused when it is not one
-    organize sorts."""
+def plan(folder: Path, context: ScanContext, groups: Mapping[str, str] | None = None) -> Plan:
+    """The plan for ``folder``, as the system spells it, ``groups`` giving a file, by its name,
+    its group's folder as its category. Raises FolderRefused when it is not one organize
+    sorts."""
     folder, found = entries(folder, context)
+    grouped = groups or {}
     table = default_table()
     libraries = any(first_match(name, LIBRARIES) for name in found)
     blocked: dict[str, str | None] = {}
@@ -97,18 +104,19 @@ def plan(folder: Path, context: ScanContext) -> Plan:
         path = folder / name
         stay = _kept(path, info, context)
         kind = None if stay is not None else table.match(name)
+        category = grouped.get(name, None if kind is None else kind.category)
         if stay is not None:
             outcome[name] = stay
-        elif kind is None:
+        elif category is None:
             outcome[name] = Stay(path, StayReason.UNKNOWN_KIND)
-        elif libraries and kind.extension == "exe":
+        elif libraries and kind is not None and kind.extension == "exe":
             outcome[name] = Stay(path, StayReason.PROGRAM)
-        elif context.platform == "windows" and (long := _too_long(path, kind.category)):
+        elif context.platform == "windows" and (long := _too_long(path, category)):
             outcome[name] = Stay(path, StayReason.PATH_TOO_LONG, long)
         else:
-            if kind.category not in blocked:
-                blocked[kind.category] = _not_a_directory(folder / kind.category)
-            outcome[name] = _placed(path, kind.category, info, blocked[kind.category])
+            if category not in blocked:
+                blocked[category] = _not_a_directory(folder / category)
+            outcome[name] = _placed(path, category, info, blocked[category])
     targets: dict[str, set[str | None]] = {}
     for name, planned in outcome.items():
         if not stat.S_ISDIR(found[name].st_mode):
@@ -120,9 +128,12 @@ def plan(folder: Path, context: ScanContext) -> Plan:
     order = {category: rank for rank, category in enumerate(table.names)}
     moves = [m for m in outcome.values() if isinstance(m, Move)]
     stays = [s for s in outcome.values() if isinstance(s, Stay)]
+    last = len(order)
     return Plan(
         folder,
-        tuple(sorted(moves, key=lambda m: (order[m.category], m.source.name))),
+        tuple(
+            sorted(moves, key=lambda m: (order.get(m.category, last), m.category, m.source.name))
+        ),
         tuple(sorted(stays, key=lambda s: (_RANK[s.reason], s.path.name))),
     )
 

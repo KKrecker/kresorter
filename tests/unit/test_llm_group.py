@@ -136,12 +136,7 @@ def test_a_file_not_sent_or_named_twice_is_not_taken() -> None:
         ("Trip", ["c.txt", "e.jpg", "f.jpg"]),
         ("Again", ["d.txt", "d.txt", "a.pdf"]),
     )
-    assert groups_from(answer, SENT) == {
-        "a.pdf": "Taxes",
-        "b.pdf": "Taxes",
-        "e.jpg": "Trip",
-        "f.jpg": "Trip",
-    }
+    assert groups_from(answer, SENT) == {"e.jpg": "Trip", "f.jpg": "Trip"}
 
 
 def test_a_group_needs_two_files_taken() -> None:

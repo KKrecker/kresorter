@@ -16,12 +16,19 @@ when the batch stopped, its state and what is still sorted. Every session ends w
 as they are then, newest first, in the card of the recent batches; they are read again each time
 the page opens. Undo shows the undo's plan first and, confirmed, moves back only what its plan,
 made again, still holds.
+
+Once a plan is shown, Group by meaning (local AI) asks the local AI to group its files by what
+they are about (``llm.group``, decision 0018, items 24-31): nothing is sent before it is pressed,
+and it is offered only for two files or more to group. The groups make a new plan through the
+planner, shown as any with a note that the groups come from the local AI and may be wrong; By
+kind goes back to the plan by kind. Sort… makes the plan again with the same groups and asks the
+model nothing. A grouping that fails, or finds no group, says so and leaves the plan by kind.
 """
 
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
@@ -39,6 +46,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from kresorter.llm.group import Grouping, group, names_to_group
 from kresorter.organize.folders import FolderRefused
 from kresorter.organize.journal import Batch, BatchState, Summary
 from kresorter.organize.mover import BatchResult, Planned
@@ -154,6 +162,8 @@ class OrganizePage(QWidget):
         super().__init__()
         self._window = window
         self._plan = _NO_PLAN
+        self._by_kind = _NO_PLAN  # while the plan shown is grouped by meaning
+        self._groups: Mapping[str, str] | None = None  # the plan shown's groups by meaning
         self._rows: dict[int, QTreeWidgetItem] = {}
         self.cards: list[CategoryCard] = []
         self.planned_at: float | None = None
@@ -177,6 +187,11 @@ class OrganizePage(QWidget):
         self.folder.setMaximumWidth(480)
         self.choose_button = button(look, text("organize.choose"))
         self.choose_button.clicked.connect(self._choose)
+        self.group_button = button(look, text("organize.group"), icon="sparkles")
+        self.group_button.clicked.connect(self._group)
+        self.kind_button = button(look, text("organize.by_kind"))
+        self.kind_button.clicked.connect(self._kind_again)
+        self.grouped = Note(self.controls, role="secondary")
         self.state = Note(self.controls, role="caption")
         self.state.setWordWrap(False)
         self.summary = Note(self.controls)
@@ -237,6 +252,8 @@ class OrganizePage(QWidget):
         chosen = hbox(spacing=8)
         chosen.addWidget(self.folder, 3)
         chosen.addWidget(self.choose_button)
+        chosen.addWidget(self.group_button)
+        chosen.addWidget(self.kind_button)
         chosen.addStretch(1)
         chosen.addWidget(self.state)
         stays_head = hbox(spacing=12)
@@ -261,6 +278,7 @@ class OrganizePage(QWidget):
         lower.addWidget(self.recent, 0, Qt.AlignmentFlag.AlignTop)
         inside = vbox(self.controls, margins=(32, 16, 32, 16), spacing=16)
         inside.addLayout(chosen)
+        inside.addWidget(self.grouped)
         inside.addWidget(self.summary)
         inside.addLayout(self.categories)
         inside.addLayout(lower)
@@ -285,6 +303,8 @@ class OrganizePage(QWidget):
         layout.addStretch(0)
         layout.addWidget(self.bar)
         window.add_starter(self.choose_button)
+        window.add_starter(self.group_button, lambda: len(names_to_group(self._plan)) >= 2)
+        window.add_starter(self.kind_button)
         window.add_starter(self.move_button, lambda: bool(self._plan.moves))
         window.add_starter(self.undo_button, lambda: bool(self.batches.selectedItems()))
         self._show_plan()
@@ -374,7 +394,8 @@ class OrganizePage(QWidget):
     def _planned(self, found: Plan | FolderRefused) -> None:
         text = self._window.translator.text
         self.result.clear()
-        self._plan = _NO_PLAN
+        self.grouped.clear()
+        self._plan, self._groups = _NO_PLAN, None
         self.planned_at = None
         self.folder.setText(shown_path(found.folder, Path.home()))
         self.choose_button.setText(text("organize.change"))
@@ -386,6 +407,47 @@ class OrganizePage(QWidget):
         self._plan = found
         self.planned_at = time.time()
         self._window.overview.show_plan(found)
+        self._show_plan()
+
+    def _group(self) -> None:
+        """The local AI asked for groups, then the plan made with them; or why there are none,
+        the plan by kind kept."""
+        window = self._window
+        text = window.translator.text
+        by_kind, env, language = self._plan, window.llm_env, window.translator.language
+        limits = window.environment.llm_limits
+
+        def work() -> Grouping:
+            return group(by_kind, env, language, limits=limits)
+
+        def done(grouping: Grouping) -> None:
+            failed = grouping.unavailable
+            if failed is not None:
+                reason = window.translator.reason(failed.reason, failed.detail)
+                self.grouped.setText(text("organize.not_grouped", reason=reason))
+                return
+            if not grouping.groups:
+                self.grouped.setText(text("organize.no_groups"))
+                return
+            act = plan_folder(by_kind.folder, grouping.groups)
+            self._session("task.plan", act, lambda found: self._regrouped(found, grouping, by_kind))
+
+        window.run(Task(text("task.group"), work, done))
+
+    def _regrouped(self, found: Plan | FolderRefused, grouping: Grouping, by_kind: Plan) -> None:
+        """The plan made with ``grouping``'s groups, shown; ``by_kind`` kept for By kind."""
+        self._planned(found)
+        if isinstance(found, FolderRefused):
+            return
+        self._by_kind, self._groups = by_kind, grouping.groups
+        self.grouped.setText(self._window.translator.text("organize.grouped", model=grouping.model))
+        self._show_plan()
+
+    def _kind_again(self) -> None:
+        """Back to the plan by kind."""
+        self.grouped.clear()
+        self._plan, self._groups = self._by_kind, None
+        self._window.overview.show_plan(self._plan)
         self._show_plan()
 
     def _show_plan(self) -> None:
@@ -428,6 +490,8 @@ class OrganizePage(QWidget):
         into = count("folders.into", len(groups))
         self.will.setText(text("organize.will", files=count("file", len(found.moves)), into=into))
         self.bar.setHidden(not moves)
+        self.group_button.setHidden(planned is None or self._groups is not None)
+        self.kind_button.setHidden(self._groups is None)
         window.update_starters()
 
     def _current(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
@@ -459,11 +523,13 @@ class OrganizePage(QWidget):
         )
         if not self._window.dialogs.confirm(asked):
             return
-        self._session("task.organize", sort_folder(found.folder, found.moves), self._sorted)
+        act = sort_folder(found.folder, found.moves, self._groups)
+        self._session("task.organize", act, self._sorted)
 
     def _sorted(self, carried: Carried | FolderRefused) -> None:
         text = self._window.translator.text
-        self._plan = _NO_PLAN
+        self._plan, self._groups = _NO_PLAN, None
+        self.grouped.clear()
         self.planned_at = None
         self._window.overview.show_plan(None)
         self._show_plan()

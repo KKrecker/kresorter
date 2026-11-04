@@ -31,6 +31,8 @@ class Limits:
     generate_seconds: float = 60.0
     answer_bytes: int = 64 * 1024
     request_bytes: int = 4 * 1024
+    group_seconds: float = 120.0  # grouping by meaning's own deadline (decision 0018, item 30)
+    group_bytes: int = 32 * 1024  # and its body's
 
 
 LIMITS = Limits()

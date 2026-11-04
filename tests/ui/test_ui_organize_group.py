@@ -6,6 +6,8 @@ plan again with the same groups, without asking the model again, as one batch un
 """
 
 import json
+import socket
+import threading
 from pathlib import Path
 
 import pytest
@@ -232,6 +234,29 @@ def test_a_grouping_that_found_no_group_leaves_the_plan_by_kind(
     )
     assert _cards(window) == BY_KIND
     assert page.kind_button.isHidden()
+
+
+def test_a_folder_gone_while_the_model_answered_is_refused_as_any(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, folder: Path
+) -> None:
+    # [0018.28] The groups' plan is made by the planner, which finds the folder gone.
+    def renamed(client: socket.socket, stop: threading.Event) -> None:
+        folder.rename(folder.with_name("Elsewhere"))
+        GROUPED(client, stop)
+
+    with ScriptedOllama(VERSION, TAGS, renamed) as ollama:
+        window, _ = _window(qtbot, tmp_path, zone, data_dir, ollama, folder)
+        _group(qtbot, window)
+
+    page = window.organize
+    assert page.summary.text().startswith("Refused: ")
+    assert page.cards == []
+    assert page.grouped.text() == ""
+    assert page.kind_button.isHidden()
+    assert files(folder.with_name("Elsewhere")) == {
+        **{name: name.encode() for name in NAMES},
+        "old.tmp": b"old",
+    }
 
 
 def test_sort_keeps_the_groups_without_asking_again_and_its_batch_is_undone_as_any(

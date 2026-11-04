@@ -66,15 +66,18 @@ def status(env: Mapping[str, str], *, limits: Limits = LIMITS) -> Status:
 
 def generate(address: Address, model: str, subject: Facts, *, limits: Limits = LIMITS) -> str:
     """One explanation of one subject, cleaned (item 20); any other answer is a reason."""
+    body = generate_body(model, subject)
+    text = cleaned_answer(generated(address, body, seconds=limits.generate_seconds, limits=limits))
+    if not text:
+        raise ExplanationUnavailable(Unavailable.EMPTY, "nothing left once cleaned")
+    return text
+
+
+def generated(address: Address, body: bytes, *, seconds: float, limits: Limits) -> str:
+    """The text of one finished answer to ``POST /api/generate`` with ``body``, as it came;
+    any other answer is a reason."""
     method, path = GENERATE
-    answer = request(
-        address,
-        method,
-        path,
-        generate_body(model, subject),
-        seconds=limits.generate_seconds,
-        limits=limits,
-    )
+    answer = request(address, method, path, body, seconds=seconds, limits=limits)
     if answer.status != 200:
         raise ExplanationUnavailable(
             Unavailable.HTTP_STATUS, f"{method} {path}: status {answer.status}"
@@ -89,10 +92,7 @@ def generate(address: Address, model: str, subject: Facts, *, limits: Limits = L
         raise ExplanationUnavailable(
             Unavailable.BAD_RESPONSE, f"{method} {path}: no text in the answer"
         )
-    text = cleaned_answer(response)
-    if not text:
-        raise ExplanationUnavailable(Unavailable.EMPTY, "nothing left once cleaned")
-    return text
+    return response
 
 
 def _not_ollama(asked: Asked, why: str) -> ExplanationUnavailable:

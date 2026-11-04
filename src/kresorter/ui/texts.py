@@ -259,6 +259,25 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "organize.choose": {"en": "Choose folder…", "ru": "Выбрать папку…"},
     "organize.change": {"en": "Change…", "ru": "Изменить…"},
+    "organize.group": {
+        "en": "Group by meaning (local AI)",
+        "ru": "Сгруппировать по смыслу (локальный ИИ)",
+    },
+    "organize.by_kind": {"en": "By kind", "ru": "По типу"},
+    "organize.grouped": {
+        "en": "Grouped by meaning by the local AI ({model}): the groups may be wrong. By kind goes"
+        " back to the plan by kind.",
+        "ru": "Сгруппировано по смыслу локальным ИИ ({model}): группы могут быть неверными."
+        " «По типу» возвращает план по типам.",
+    },
+    "organize.not_grouped": {
+        "en": "Not grouped: {reason}. The plan by kind stays.",
+        "ru": "Не сгруппировано: {reason}. План по типам остаётся.",
+    },
+    "organize.no_groups": {
+        "en": "The local AI found no group of two files or more; the plan by kind stays.",
+        "ru": "Локальный ИИ не нашёл групп из двух файлов и более; план по типам остаётся.",
+    },
     "organize.folder": {"en": "Folder", "ru": "Папка"},
     "organize.no_folder": {"en": "No folder chosen", "ru": "Папка не выбрана"},
     "organize.state": {
@@ -358,6 +377,10 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "task.batches": {"en": "Reading the batches", "ru": "Чтение пакетов"},
     "task.plan": {"en": "Planning", "ru": "Подготовка плана"},
+    "task.group": {
+        "en": "Grouping by meaning (local AI)",
+        "ru": "Группировка по смыслу (локальный ИИ)",
+    },
     "task.organize": {"en": "Moving files", "ru": "Перемещение файлов"},
     "task.plan_undo": {"en": "Planning the undo", "ru": "Подготовка возврата"},
     "task.undo": {"en": "Moving files back", "ru": "Возврат файлов"},

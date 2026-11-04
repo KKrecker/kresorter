@@ -16,7 +16,7 @@ words (``problem``). No Qt is needed here.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Generic, Literal, TypeVar
@@ -168,21 +168,25 @@ def no_act(context: ScanContext, conn: Journal) -> None:
     return None
 
 
-def plan_folder(folder: Path) -> Act[Plan | FolderRefused]:
-    """The plan of ``folder``, or why organize does not sort it."""
+def plan_folder(folder: Path, groups: Mapping[str, str] | None = None) -> Act[Plan | FolderRefused]:
+    """The plan of ``folder``, with ``groups`` by meaning when given (decision 0018, item 28),
+    or why organize does not sort it."""
 
     def act(context: ScanContext, conn: Journal) -> Plan | FolderRefused:
-        return _plan(folder, context)
+        return _plan(folder, context, groups)
 
     return act
 
 
-def sort_folder(folder: Path, confirmed: Sequence[Move]) -> Act[Carried | FolderRefused]:
-    """The ``confirmed`` moves that ``folder``'s plan, made again, still holds unchanged, checked
-    again and carried out as one batch."""
+def sort_folder(
+    folder: Path, confirmed: Sequence[Move], groups: Mapping[str, str] | None = None
+) -> Act[Carried | FolderRefused]:
+    """The ``confirmed`` moves that ``folder``'s plan, made again with the same ``groups``
+    (decision 0018, item 29), still holds unchanged, checked again and carried out as one
+    batch."""
 
     def act(context: ScanContext, conn: Journal) -> Carried | FolderRefused:
-        found = _plan(folder, context)
+        found = _plan(folder, context, groups)
         if isinstance(found, FolderRefused):
             return found
         still, changed = _still(confirmed, found.moves)
@@ -219,9 +223,11 @@ def undo_batch(batch_id: int, confirmed: Sequence[UndoMove]) -> Act[Carried]:
     return act
 
 
-def _plan(folder: Path, context: ScanContext) -> Plan | FolderRefused:
+def _plan(
+    folder: Path, context: ScanContext, groups: Mapping[str, str] | None
+) -> Plan | FolderRefused:
     try:
-        return plan(folder, context)
+        return plan(folder, context, groups)
     except FolderRefused as refused:
         return refused
 
