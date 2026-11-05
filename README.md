@@ -352,11 +352,12 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
   the models the server has, to choose the one every explanation and grouping uses;
   `KRESORTER_LLM_SERVER` and the server's model variable (`KRESORTER_OLLAMA_MODEL`,
   `KRESORTER_LMSTUDIO_MODEL`), when set, win, and the card says so. The card recommends a model
-  for the computer's memory and processors, Qwen 2.5 for its Russian: `qwen2.5:1.5b` under
-  8 GiB, `qwen2.5:3b` under 16 GiB, `qwen2.5:7b` under 32 GiB, `qwen2.5:14b` otherwise, one
-  size smaller with fewer than four processors; you get it with `ollama pull` and the name, or
-  in LM Studio's Discover tab as `qwen2.5-1.5b-instruct`, `qwen2.5-3b-instruct`,
-  `qwen2.5-7b-instruct` or `qwen2.5-14b-instruct`; kresorter installs nothing.
+  for the computer's memory and processors, Qwen3 for its Russian and for its instruct models,
+  which answer without thinking first: `qwen3:1.7b` under 8 GiB, `qwen3:4b-instruct` under
+  32 GiB, `qwen3:30b-instruct` otherwise (a mixture of experts with 3B active: on a processor
+  about as fast as a 3B model), one size smaller with fewer than four processors; you get it
+  with `ollama pull` and the name, or in LM Studio's Discover tab as `qwen/qwen3-1.7b`,
+  `qwen/qwen3-4b-2507` or `qwen/qwen3-30b-a3b-2507`; kresorter installs nothing.
 
 ![Findings: the Safe files chosen, grouped by their strongest reason, and the detail of one at the right with why it was found](docs/screenshots/findings.png)
 
