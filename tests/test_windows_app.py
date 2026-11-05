@@ -25,12 +25,12 @@ from pathlib import Path
 import pytest
 import winbuild
 from PySide6 import QtCore
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QColor, QImage
 
 import kresorter
 from kresorter import __version__
 from kresorter.environment import default_context
-from kresorter.ui import launch
+from kresorter.ui import brand, launch
 from kresorter.ui.theme import LIGHT
 from support.markdown import section
 
@@ -264,21 +264,56 @@ def test_what_the_package_imports_by_name_travels_too(
     assert {*named - {"fcntl"}, "PySide6.QtSvg"} <= set(hidden)
 
 
-def icon_images(path: Path) -> list[tuple[int, QImage]]:
-    """Each image of an ICO file, with the side its entry gives: PNG, 32 bits."""
+PNG = b"\x89PNG\r\n\x1a\n"
+
+
+def icon_blobs(path: Path) -> list[tuple[int, bytes]]:
+    """Each image of an ICO file, as it is stored, with the side its entry gives, 32 bits."""
     data = path.read_bytes()
     reserved, kind, count = struct.unpack_from("<HHH", data)
     assert (reserved, kind) == (0, 1)
-    found: list[tuple[int, QImage]] = []
+    found: list[tuple[int, bytes]] = []
     for index in range(count):
         width, height, colours, _, planes, bits, size, offset = struct.unpack_from(
             "<BBBBHHII", data, 6 + 16 * index
         )
-        blob = data[offset : offset + size]
-        assert blob.startswith(b"\x89PNG\r\n\x1a\n")
         assert (height, colours, planes, bits) == (width, 0, 1, 32)
-        found.append((width or 256, QImage.fromData(blob)))
+        found.append((width or 256, data[offset : offset + size]))
     return found
+
+
+def bitmap(blob: bytes, side: int) -> QImage:
+    """An icon's uncompressed bitmap: its header, its 32-bit colours (blue, green, red, alpha),
+    the bottom row first, then its mask, a bit a pixel, set where the pixel is transparent, each
+    row of the mask four bytes or a multiple of four."""
+    row = (side + 31) // 32 * 4
+    colours = side * side * 4
+    assert len(blob) == 40 + colours + row * side
+    header = struct.unpack_from("<IiiHHIIiiII", blob)
+    assert header == (40, side, 2 * side, 1, 32, 0, colours + row * side, 0, 0, 0, 0)
+    image = QImage(side, side, QImage.Format.Format_ARGB32)
+    for y in range(side):
+        for x in range(side):
+            at = 40 + ((side - 1 - y) * side + x) * 4
+            blue, green, red, alpha = blob[at : at + 4]
+            image.setPixelColor(x, y, QColor(red, green, blue, alpha))
+            masked = blob[40 + colours + (side - 1 - y) * row + x // 8] >> (7 - x % 8) & 1
+            assert masked == (alpha == 0), (side, x, y)
+    return image
+
+
+def icon_images(path: Path) -> list[tuple[int, QImage]]:
+    """Each image of an ICO file, with its side: bitmaps under 256 px, a PNG at 256 [0019.4]."""
+    found: list[tuple[int, QImage]] = []
+    for side, blob in icon_blobs(path):
+        assert blob.startswith(PNG) == (side == 256), side
+        found.append((side, QImage.fromData(blob) if side == 256 else bitmap(blob, side)))
+    return found
+
+
+def pixels(image: QImage) -> list[int]:
+    plain = image.convertToFormat(QImage.Format.Format_ARGB32)
+    return [plain.pixel(x, y) for y in range(plain.height()) for x in range(plain.width())]
 
 
 def test_the_icon_is_the_sidebars_mark_at_each_size_windows_shows(tmp_path: Path) -> None:
@@ -293,6 +328,18 @@ def test_the_icon_is_the_sidebars_mark_at_each_size_windows_shows(tmp_path: Path
     large = images[-1][1]
     colours = {large.pixelColor(x, y).name() for x in range(0, 256, 2) for y in range(0, 256, 2)}
     assert LIGHT.primary_text.lower() in colours
+
+
+def test_the_icon_is_made_from_the_brands_mark_with_its_alpha(tmp_path: Path) -> None:
+    # [0019.4] under 256 px uncompressed 32-bit bitmaps, at 256 a PNG, as Windows' guidelines
+    images = icon_images(winbuild.icon(tmp_path / "build" / "kresorter.ico"))
+
+    assert winbuild.SIDES == brand.SIDES
+    assert [side for side, _ in images] == list(brand.SIDES)
+    for side, image in images:
+        assert pixels(image) == pixels(brand.mark(side)), side
+        alphas = {value >> 24 for value in pixels(image)}
+        assert {0, 255} < alphas, side  # the round corners' edges, partly transparent
 
 
 def test_the_spec_gives_the_executable_the_icon_and_the_version_resource(
