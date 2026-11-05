@@ -206,6 +206,10 @@ class PathPolicy:
                 "swapfile.sys",
                 "$Recycle.Bin",
                 "System Volume Information",
+                # an upgrade's: Windows cleans them itself (decision 0020, item 16)
+                "Windows.old",
+                "$Windows.~BT",
+                "$Windows.~WS",
             ),
             profile=(
                 home.parent,

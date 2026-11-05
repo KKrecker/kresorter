@@ -17,7 +17,7 @@ import pytest
 from kresorter.core.policy import BlockReason
 from kresorter.core.scanner import ScanTimes
 from kresorter.organize.categories import default_table
-from kresorter.ui.i18n import Translator
+from kresorter.ui.i18n import Language, Translator
 from kresorter.ui.texts import CATALOG
 from support.markdown import headings, section
 
@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DECISION = "docs/decisions/0020-owners-requests-3.md"
 DONE = "Decision 0020: done (the owner's requests, third round)"
 LIMITS = "Accepted limitations of decision 0020"
-READMES = [("README.md", "en"), ("README.ru.md", "ru")]
+READMES: list[tuple[str, Language]] = [("README.md", "en"), ("README.ru.md", "ru")]
 REPORTS = "Reports: `scan`, `analyze`"
 ORGANIZE = "Organize"
 AI = "AI explanations (optional)"
@@ -81,7 +81,7 @@ def _limitations() -> list[str]:
 
 
 @pytest.mark.parametrize(("name", "language"), READMES)
-def test_grouping_is_said_in_batches_of_numbered_names(name: str, language: str) -> None:
+def test_grouping_is_said_in_batches_of_numbered_names(name: str, language: Language) -> None:
     # [0020.21] at most 40 names a batch, 10 batches, 400 names; the note
     organize = _page(_said(name, DESKTOP), CATALOG["page.organize"][language])
     if language == "en":
@@ -94,7 +94,7 @@ def test_grouping_is_said_in_batches_of_numbered_names(name: str, language: str)
 
 
 @pytest.mark.parametrize(("name", "language"), READMES)
-def test_the_context_and_the_answer_s_shape_are_said(name: str, language: str) -> None:
+def test_the_context_and_the_answer_s_shape_are_said(name: str, language: Language) -> None:
     # [0020.21] the recommended models are said on the Settings page (decision 0019)
     text = _said(name, AI)
     for words in ("4096", '`"think": false`', "`/no_think`", "`format`", "`response_format`"):
@@ -103,7 +103,7 @@ def test_the_context_and_the_answer_s_shape_are_said(name: str, language: str) -
 
 
 @pytest.mark.parametrize(("name", "language"), READMES)
-def test_the_kinds_added(name: str, language: str) -> None:
+def test_the_kinds_added(name: str, language: Language) -> None:
     # [0020.21] every category, as its directory is named; in the window in its language
     text = _said(name, ORGANIZE)
     assert [n for n in default_table().names if f"`{n}`" not in text] == []
@@ -114,7 +114,7 @@ def test_the_kinds_added(name: str, language: str) -> None:
 
 
 @pytest.mark.parametrize(("name", "language"), READMES)
-def test_the_sessions_are_never_touched(name: str, language: str) -> None:
+def test_the_sessions_are_never_touched(name: str, language: Language) -> None:
     # [0020.21]
     text = _said(name, REPORTS)
     assert Translator(language).label(BlockReason.SESSION) in text
@@ -122,7 +122,7 @@ def test_the_sessions_are_never_touched(name: str, language: str) -> None:
 
 
 @pytest.mark.parametrize(("name", "language"), READMES)
-def test_the_programs_caches_are_a_zone_on_windows(name: str, language: str) -> None:
+def test_the_programs_caches_are_a_zone_on_windows(name: str, language: Language) -> None:
     # [0020.21]
     overview = _page(_said(name, DESKTOP), CATALOG["page.overview"][language])
     assert CATALOG["overview.caches"][language] in overview
@@ -130,7 +130,7 @@ def test_the_programs_caches_are_a_zone_on_windows(name: str, language: str) -> 
 
 
 @pytest.mark.parametrize(("name", "language"), READMES)
-def test_what_is_left_to_windows_and_why(name: str, language: str) -> None:
+def test_what_is_left_to_windows_and_why(name: str, language: Language) -> None:
     # [0020.21] [0020.16]
     text = _said(name, REPORTS)
     assert [words for words in LEFT_TO_WINDOWS if words not in text] == []
@@ -139,7 +139,7 @@ def test_what_is_left_to_windows_and_why(name: str, language: str) -> None:
 
 
 @pytest.mark.parametrize(("name", "language"), READMES)
-def test_what_a_scan_spends_its_time_on(name: str, language: str) -> None:
+def test_what_a_scan_spends_its_time_on(name: str, language: Language) -> None:
     # [0020.21] [0020.20] and the line the Findings page shows
     text = _said(name, REPORTS)
     assert "MFT" in text

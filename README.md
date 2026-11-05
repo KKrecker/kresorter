@@ -114,6 +114,42 @@ proposed: the browsers say it holds no sign-ins, which they keep in their cookie
 yet making it again costs the time and the traffic of every page, so the choice is yours
 ([decision 0018](docs/decisions/0018-owners-requests.md)).
 
+Sign-ins and sessions are never touched: what keeps a sign-in, a saved password or the open
+tabs is blocked as a system file is, for the reason Sign-ins and sessions, never a finding, not
+even when named by hand, and its folders are not listed. In a Chromium browser's profile
+(Chrome, Edge, Brave, Vivaldi, Opera, Yandex, an app's WebView2) that is `Network`, `Cookies`,
+`Login Data`, `Web Data`, `Local Storage`, `Session Storage`, `Sessions`, `IndexedDB`,
+`Extensions`, `Preferences`, `Bookmarks` and `History`, and `Local State` wherever it is, which
+holds the key the cookies and the passwords are encrypted with; in a Firefox or Thunderbird
+profile, `cookies.sqlite`, `logins.json`, `key4.db`, `places.sqlite`, `sessionstore` and
+`storage`; then Windows' credentials and tokens (`Microsoft\Credentials`, `Microsoft\Protect`,
+`Microsoft\Vault`, `TokenBroker`), the keychains of macOS, the keyrings of Linux, Telegram
+Desktop's `tdata`, Steam's `config`, and the keys and tokens of `.ssh`, `.gnupg`,
+`.aws/credentials` or `.git-credentials`. The list is data,
+[`sessions.toml`](src/kresorter/core/sessions.toml), names that end a path anywhere, so a copy
+of a profile on another disk keeps its sign-ins too. A browser's cache (`Cache`, `Code Cache`,
+`GPUCache`, `cache2`) holds none of them: it stays a finding, for review.
+
+What Windows cleans itself is left to it. `C:\Windows` and `C:\ProgramData` stay blocked, with
+Windows Update's downloads (`SoftwareDistribution\Download`), the system's temp, `Prefetch`,
+`WinSxS`, the memory dumps and Delivery Optimization's cache, and so do `Windows.old`,
+`$Windows.~BT` and `$Windows.~WS`, which an upgrade leaves, `hiberfil.sys` and `pagefile.sys`:
+they need an administrator, some are in use while Windows runs, and Windows cleans them safely,
+in Settings > System > Storage > Temporary files, or in Disk Cleanup with Clean up system
+files. Prefetch is not to be cleaned at all: Windows keeps it small and rebuilds it, and a
+program starts slower until it has.
+
+A scan lists each folder, file by file, without opening one, and classifies the junk as it
+goes; then it hashes the files that may be duplicates, those of one size by their first 64 KiB,
+those still alike whole; only then does it ask whether the junk and the copies are open, eight
+at once on Windows, in one look at every process's open files on Linux: an open file is
+skipped, and a copy leaves its group. A large or old file, listed for review, is asked about
+when something acts on it. The hashing takes the longest; the window keeps the digests while it
+is open, so a later scan there reads no file that is unchanged, and its Findings page says how
+long the scan took and what took it. Kresorter does not read the MFT, as WizTree does to map a
+whole drive in seconds: that needs an administrator, reads a volume and not folders, and works
+on NTFS only, while kresorter scans the folders you choose, with no rights of its own.
+
 ### Quarantine
 
 ```bash
@@ -163,13 +199,14 @@ kresorter organize undo 4 --yes            # move it back
 ```
 
 Only the regular files directly in the folder move, each to `<folder>/<Category>/<its name>`
-(`Images`, `Videos`, `Audio`, `Documents`, `Archives`, `Installers`); subdirectories are never
-entered or moved. Nothing is renamed, overwritten or deleted: a file whose destination is taken
-stays, and undo leaves the category directories. A folder whose files break when moved is
+(`Images`, `Videos`, `Audio`, `Documents`, `Archives`, `Installers`, `Torrents`, `Fonts`,
+`3D models`), a film's subtitles (`srt`, `ass`, `vtt`) with it in `Videos`; subdirectories are
+never entered or moved. Nothing is renamed, overwritten or deleted: a file whose destination is
+taken stays, and undo leaves the category directories. A folder whose files break when moved is
 refused as a whole (the home directory or above it, a game library, a project, a cache or temp
 directory), and every file that stays is listed with its reason: links, the folder's own
 metadata, downloads in progress, junk, unknown kinds (web pages included), files with
-companions (`movie.mkv` and `movie.srt`), programs next to their libraries. Every file is
+companions (`movie.mkv` and `movie.nfo`), programs next to their libraries. Every file is
 checked again right before it moves; a batch that stops puts back what it moved. On Windows a
 folder a sync client keeps (OneDrive, Dropbox, iCloud and any other client Windows knows of) is
 refused as a whole, since a move there reaches every device, and a file whose new path would
@@ -277,6 +314,15 @@ either server; the explanation is labelled with them as `name=value`:
 Nothing else is sent: not the path, the folder, the size, the times, the digest, the location,
 the whole command, notes or details, and never a file's content.
 
+A grouping (the window's Group by meaning, see [Desktop app](#desktop-app-optional)) is asked in
+batches that fit the context Ollama and LM Studio give a model by default, 4096 tokens: a
+batch, its instruction and its answer. The answer's shape is asked of both servers, as a JSON
+schema in Ollama's `format` (from Ollama 0.5.0; `"json"` before it) and in LM Studio's
+`response_format`. Every body sent to Ollama says `"think": false`; LM Studio's chat has no such
+switch, so the system message of each body sent to it ends with `/no_think`, which Qwen3's
+models that think take to answer at once. An answer the server cut at its length is refused
+with `the answer was cut at its length`: a larger context for the model, or fewer files, helps.
+
 ### Exit codes
 
 | Code | Meaning |
@@ -316,7 +362,11 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
 - **Overview**: the folders to scan (the safe zones, and folders you add) and Scan now, which
   only reads, with a moving bar and the files read so far while it runs. A safe zone can be
   left out with its remove button and put back with its own link (`+ ~/.cache`); the window
-  remembers it. Then a card per level with its files, size and strongest reasons, which opens
+  remembers it. On Windows one more zone, Programs' caches, holds the folders of the junk rules
+  under `AppData\Local` and `AppData\LocalLow` that exist (the browsers' and the graphics
+  drivers' caches, the internet cache, the crash dumps and the error reports): it is read for
+  junk only, never compared for duplicates nor listed as large or old, and left out by its
+  name, `caches`. Then a card per level with its files, size and strongest reasons, which opens
   Findings with that level only, and a card each for Quarantine, Organize, Autostart and Local
   AI: the server and the model in use, and whether the last Check found it available, which
   opens Settings.
@@ -324,20 +374,26 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
   the right the detail of the file chosen, with why it was found. Only what is proposed at the
   Safe level is selected at first; a Review finding is selected only by its own check box, the
   copy a duplicate group keeps never. Move to quarantine, in the bar at the bottom, moves the
-  selection.
+  selection. Under the findings, how long the scan took and what took it: `Scanned in 9.8 s:
+  listing 2.1 s, open-file checks 0.4 s, duplicates 7.3 s.`
 - **Organize**: a folder's plan as a card per category and the files that stay, with their
   reasons; Sort moves the plan as one batch, and the recent batches can be undone. Where
-  `organize` refuses (macOS, or no reliable open-file check), the page says why. The
-  Russian window names the categories in Russian, but the directories keep their English names
-  (`Images`, `Documents`, ...) in every language, so `organize undo` moves back what the window
-  sorted, and the window what the command sorted. Once a plan is shown, Group by meaning
-  (local AI) asks the local model to group the files by what their names say (a trip, taxes):
-  it sends the names only, of the files the plan moves or keeps for no kind, sorted, at most
-  100 of at most 100 characters each, with no path, folder, size, time or content. The groups
-  it answers, at most 12 of two files or more into folders whose names are names, make a new
-  plan through the same planner, checked as any; the page says they come from the local AI and
-  may be wrong, and By kind goes back. Sort then moves the plan shown without asking the model
-  again, as one batch that can be undone.
+  `organize` refuses (macOS, or no reliable open-file check), the page says why. The kinds
+  are those of `organize`, Torrents, Fonts and 3D models among them. The Russian window names
+  the categories in Russian, but the directories keep their English names (`Images`,
+  `Documents`, ...) in every language, so `organize undo` moves back what the window sorted,
+  and the window what the command sorted. Once a plan is shown, Group by meaning (local AI)
+  asks the local model to group the files by what their names say (a trip, taxes, drivers): it
+  sends the names only, of the files the plan moves or keeps for no kind, sorted, at most 400 of
+  at most 100 characters each, in batches of at most 40 (at most 10 requests), each name
+  numbered, with no path, folder, size, time or content; the model answers with the numbers.
+  Each batch is given the folders of the batches before it, to use when its files belong
+  there; the groups, at most 24 of two files or more into folders whose names are names, make a
+  new plan through the same planner, checked as any. The page says how many files the local AI
+  grouped, into how many folders, and that the groups may be wrong; when a batch fails, the
+  groups before it stay, and the page says so: The local AI (its model) grouped N of M files
+  into K folders, then stopped, and why. By kind goes back. Sort then moves the plan shown
+  without asking the model again, as one batch that can be undone.
 - **Autostart**: the entries by source, each with its location, its scope and a switch that is
   on while it starts, and a search over names and locations; the switch of an entry that can
   change disables or enables it, and an entry that cannot has a lock.

@@ -56,7 +56,7 @@ in Python, on the runner's `C:` (1,361,152 records): 15.0 s, 7.7 of them reading
 to make the paths. It pays for a whole volume, which kresorter never scans: for the folders it
 scans, listing costs 2.2 s of the 33, and the MFT would not make the open-file check or the
 hashing any cheaper. Kresorter keeps listing directories; the time goes from where it is spent
-(items 19-22).
+(items 17-20).
 
 ## Grouping that is read (request 1)
 

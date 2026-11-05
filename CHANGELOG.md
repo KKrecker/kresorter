@@ -16,7 +16,8 @@ The first release, an alpha: the console commands and the window, on Windows and
 - `kresorter scan [paths] [--json] [--no-hash]`: junk candidates (caches, temporary files,
   thumbnails, crash dumps, the system's metadata files), duplicate groups and everything it
   skipped, with the reason; the safe zones `~/.cache` and `~/Downloads` when no folder is
-  named. It only reads.
+  named. It only reads: it lists without opening a file, then asks only the junk and the copies
+  whether they are open, and an open copy leaves its group.
 - `kresorter analyze [paths] [--json] [--large MIB] [--older-than DAYS] [--explain]`: a safety
   level for each finding, `safe`, `likely_safe` or `review`, with every reason; a cache is
   `likely_safe` and a browser's cache `review`, never proposed; the copy of a duplicate group
@@ -29,7 +30,8 @@ The first release, an alpha: the console commands and the window, on Windows and
   vault's copies only with `--yes`. On Linux and Windows; refused on macOS, which has no
   open-file check yet.
 - `kresorter organize move|list|undo`: the regular files directly in a folder sorted into
-  `Images`, `Videos`, `Audio`, `Documents`, `Archives` and `Installers` as one batch, which
+  `Images`, `Videos`, `Audio`, `Documents`, `Archives`, `Installers`, `Torrents`, `Fonts` and
+  `3D models` as one batch, which
   `undo` moves back; the plan first, the move only with `--yes`, and every file that stays
   listed with its reason. A folder whose files break when moved is refused as a whole (the home
   directory, a project, a game library, a cache, and on Windows a folder a sync client keeps).
@@ -60,6 +62,11 @@ The first release, an alpha: the console commands and the window, on Windows and
 - Never findings: the system's and the programs' folders, the profile's private ones
   (`~/.ssh`, `~/.gnupg`, `AppData\Roaming`), open files, Kresorter's data directory and the
   folder it runs from; links are never followed.
+- Never findings either, whatever is named: Sign-ins and sessions, what keeps a sign-in, a
+  saved password or the open tabs (a browser's cookies, passwords, sessions and `Local State`,
+  a Firefox profile's, Windows' credentials, Telegram Desktop's `tdata`, keys and tokens); and
+  what Windows cleans itself (`C:\Windows`, `C:\ProgramData`, `Windows.old`, `hiberfil.sys`,
+  `pagefile.sys`), which the README says how to clean with Windows' own tools.
 - The window, `kresorter-ui` (or `python -m kresorter.ui`) with the extra `ui`: a sidebar of
   six pages, in English or Russian, light or dark as the system is or as chosen, running what
   the commands run on the same journal and lock; every action opens a dialog first, with
@@ -68,13 +75,18 @@ The first release, an alpha: the console commands and the window, on Windows and
 - The **Overview** page: the folders to scan, a safe zone left out and put back as you choose,
   and Scan now, which only reads and shows its progress; a card per safety level with its
   files, size and strongest reasons, and a card each for Quarantine, Organize, Autostart and
-  Local AI, the server and the model in use and whether the last Check found it.
+  Local AI, the server and the model in use and whether the last Check found it; on Windows
+  one more zone, Programs' caches, read for junk only.
 - The **Findings** page: the findings grouped by their strongest reason, with a chip per level,
   a search and the detail of the file chosen; only the Safe ones are selected at first, and
-  Move to quarantine moves the selection.
+  Move to quarantine moves the selection. Under them, how long the scan took and what took it:
+  `Scanned in 9.8 s: listing 2.1 s, open-file checks 0.4 s, duplicates 7.3 s.`; a later scan in
+  the same window reads no file that is unchanged.
 - The **Organize** page: a folder's plan as a card per category and the files that stay, with
   their reasons; Group by meaning (local AI) groups the files by what their names say, sending
-  the local model their names only, and By kind goes back; Sort moves the plan shown as one
+  the local model their names only, up to 400, numbered, in batches that fit its default context
+  of 4096 tokens; a batch that fails keeps the groups before it, and the page says how many
+  files were grouped. By kind goes back; Sort moves the plan shown as one
   batch, and the recent batches can be undone.
 - The **Autostart** page: the entries by source, each with its location, its scope and a
   switch that disables or enables it where it can change, and a lock where it cannot.
@@ -83,8 +95,8 @@ The first release, an alpha: the console commands and the window, on Windows and
 - The **Settings** page: the language, applied at once with Restart now; Appearance, System,
   Light or Dark; on Windows the machine-wide autostart entries; the local AI with its Server,
   Ollama or LM Studio, its Check, the model chosen among those the server has and the one
-  recommended for the computer; the data folder, the version and the licence: Kresorter's, the
-  MIT licence, and the Windows build's Qt and PySide6, under the LGPL-3.0.
+  recommended for the computer, a Qwen3 model; the data folder, the version and the licence:
+  Kresorter's, the MIT licence, and the Windows build's Qt and PySide6, under the LGPL-3.0.
 - `kresorter-ui --self-test REPORT`: opens the window, shows each page, closes it and writes a
   line per page to `REPORT`, changing nothing; on a failure, the error and exit code 1.
 - For Windows, `Kresorter-0.1.0-setup.exe`, for the current user with no administrator rights,

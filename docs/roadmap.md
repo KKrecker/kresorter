@@ -390,6 +390,44 @@ Scanner core and `kresorter scan` (read-only report).
 - **PyPI is the owner's to turn on**: until it is, the wheel and the sdist come from the GitHub
   release.
 
+### Decision 0020: done (the owner's requests, third round)
+- [Decision 0020](decisions/0020-owners-requests-3.md): the owner's four requests after using
+  the Windows build (a grouping that was not read, more sorted by kind, a cleanup that keeps
+  every session, a faster scan), by its plan of nine steps, each a test and then its fix.
+- A grouping that is read: the names in numbered batches, at most 40 and 2,000 bytes each and
+  at most 10 (400 names), a batch with its instruction and its answer within 4096 tokens; the
+  answer's JSON schema asked of Ollama (`format`) and of LM Studio (`response_format`),
+  `"think": false` for Ollama and `/no_think` for LM Studio; the answer read from a fenced block
+  or between its braces too, a cut one said; the folders of the batches before passed on; a
+  batch that fails keeps the groups before it, and the note says how many files were grouped.
+  Qwen3 recommended, in both servers' names.
+- More kinds: the table's extensions, and `Torrents`, `Fonts` and `3D models` after the others.
+- The sessions: `core/sessions.toml` read by `core.sessions`, blocked for a reason of their own,
+  `session`, each pattern found by the last name it writes out, a folder's once; Windows'
+  upgrade folders (`Windows.old`, `$Windows.~BT`, `$Windows.~WS`) blocked at the drive's root.
+- The caches: the graphics drivers' and the browsers' shader caches, Windows Error Reporting's
+  reports; on Windows the zone of programs' caches, `caches`, read for junk only.
+- The scan: the walk opens no file; the junk and the copies are checked for being open once
+  they are known; the window keeps the digests (`core.hashing.Digests`); the Findings page says
+  the times (`ScanTimes`). No MFT: on a GitHub Windows runner, 190,433 files were listed in
+  2.2 s and scanned in 9.8 s without the open-file check, in 32.9 s with it on every file, and
+  reading the MFT of C:, 1.36 million records, took 15 s as an administrator.
+- 4057 tests, 100 % line and branch coverage.
+
+### Accepted limitations of decision 0020
+- Everything of decision 0019 still holds.
+- **A small model still groups less**: the batches and the numbers make its answer short and
+  readable, not wise; the plan is shown before anything moves and a batch can be undone.
+- **A grouping takes longer**: up to 10 requests instead of one, each short.
+- **A file kept open by a program is found by a scan** when it is neither junk nor a
+  duplicate (a large or old one, shown for review): the check comes when it is acted on.
+- **Digests are kept in memory only**: the first scan after the window opens hashes again.
+- **Firefox and the other browsers' session lists are by name**: a browser that adds a store
+  of its own is not protected until the list says so.
+- **The system's own folders are Windows' to clean**: Settings > System > Storage, or Disk
+  Cleanup.
+- **No MFT**: a scan of a large folder still lists it directory by directory.
+
 ### Left for later
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
 - B11: CI on macOS, and live `WinRegistry` tests.
@@ -400,7 +438,8 @@ Scanner core and `kresorter scan` (read-only report).
 
 ```
 src/kresorter/
-├── core/         # step 1: models, policy, walker, hashing, heuristics, open_files, scanner
+├── core/         # step 1: models, policy, walker, hashing, heuristics, open_files, scanner;
+                  #   preflight (0004); sessions (0020)
 ├── quarantine/   # step 2: move with metadata, restore, purge, recovery
 ├── storage/      # step 2: SQLite journal, data directory, lock, unfinished work by domain
 ├── analysis/     # step 3: duplicates, size_age, score, report
