@@ -351,3 +351,18 @@ def test_the_github_release_has_the_installer_the_zip_the_wheel_the_sdist_and_th
         line for line in stripped(release) if line.startswith("name: ") and "dist" in line
     ]
     assert downloaded == ["name: python-dist", "name: windows-dist"]
+
+
+# --- a hung job ---------------------------------------------------------------------------------
+
+
+def test_a_hung_job_ends_within_half_an_hour() -> None:
+    # CI run 42003708808: the tests of Windows 3.13 hung; the job would have waited GitHub's six
+    # hours, the artifacts held back behind it, when a check takes about ten minutes
+    jobs = block(workflow(), "jobs")
+    names = [line.strip().removesuffix(":") for line in jobs if indent(line) == indent(jobs[0])]
+
+    assert names == ["check", "build", "windows", "release", "pypi"]
+    assert {name: value(job(name), "timeout-minutes") for name in names} == dict.fromkeys(
+        names, "30"
+    )

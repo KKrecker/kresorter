@@ -20,3 +20,10 @@ def test_a_warning_fails_the_tests() -> None:
     # dependency removes what it deprecated
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["tool"]["pytest"]["ini_options"]["filterwarnings"] == ["error"]
+
+
+def test_a_hung_test_shows_where_it_waits() -> None:
+    # CI run 42003708808: a test still running after two minutes has every thread's stack
+    # written out, so the log of a hang says where it waits
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert project["tool"]["pytest"]["ini_options"]["faulthandler_timeout"] == 120
