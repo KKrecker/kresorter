@@ -3,8 +3,10 @@
 The window remembers only ``settings.json`` in the data directory: a JSON object with ``language``
 (``system``, ``en`` or ``ru``), ``include_machine`` (a boolean), ``skipped_zones``, the names of the
 safe zones left out of the scan (each a zone's last part, once; decision 0018, item 17), ``theme``
-(``system``, ``light`` or ``dark``; item 1) and ``model``, the local AI's model chosen (a name
-decision 0013's item 9 accepts; left out, and not written, when none is chosen; 0018 item 32).
+(``system``, ``light`` or ``dark``; item 1), ``server``, the local AI's server (``ollama`` or
+``lmstudio``; left out, and not written, for Ollama; decision 0019, item 12) and ``model``, the
+model chosen for that server (a name decision 0013's item 9 accepts; left out, and not written,
+when none is chosen; 0018 item 32).
 ``save`` alone writes it, after the data directory is checked (0009), through one temporary file
 renamed over it, private (``0600`` on POSIX); a temporary file a crash left behind is written over.
 ``load`` writes nothing. A missing file means the defaults; an unreadable file, invalid JSON,
@@ -30,7 +32,7 @@ from pathlib import Path, PurePath
 from typing import Literal
 
 from kresorter.core.scanner import ScanContext
-from kresorter.llm.settings import is_model_name
+from kresorter.llm.settings import SERVERS, Server, is_model_name
 from kresorter.storage.data_dir import PRIVATE, DataDirError, check_data_dir
 from kresorter.storage.lock import PRIVATE_FILE
 from kresorter.storage.session import SessionFailed, SessionFailure
@@ -59,6 +61,7 @@ _LANGUAGES: dict[str, LanguageSetting] = {setting: setting for setting in LANGUA
 ThemeSetting = Literal["system", "light", "dark"]
 THEME_SETTINGS: tuple[ThemeSetting, ...] = ("system", "light", "dark")
 _THEMES: dict[str, ThemeSetting] = {setting: setting for setting in THEME_SETTINGS}
+_SERVERS: dict[str, Server] = {server: server for server in SERVERS}
 SETTINGS_BYTES = 64 * 1024  # the most read of the file; a larger one is refused
 _NO_FOLLOW = getattr(os, "O_NOFOLLOW", 0)  # POSIX: never read or write through a link
 # With O_BINARY on Windows, where os.open is otherwise in text mode: each \n would be \r\n.
@@ -73,7 +76,8 @@ class Settings:
     include_machine: bool = False
     skipped_zones: tuple[str, ...] = ()  # in the order of the zones
     theme: ThemeSetting = "system"
-    model: str | None = None  # None: the local AI's default, or KRESORTER_OLLAMA_MODEL's
+    model: str | None = None  # the server's: None, its default, or its model variable's
+    server: Server = "ollama"  # unless KRESORTER_LLM_SERVER names one (decision 0019, item 12)
 
 
 DEFAULTS = Settings()
@@ -156,12 +160,16 @@ def _settings(found: dict[str, object], zones: tuple[str, ...]) -> Loaded:
     themed = _THEMES.get(theme) if isinstance(theme, str) else None
     if themed is None:
         return Loaded(DEFAULTS, Unused.WRONG_VALUE, f"theme={json.dumps(theme)}")
+    server = found.get("server", DEFAULTS.server)
+    served = _SERVERS.get(server) if isinstance(server, str) else None
+    if served is None:
+        return Loaded(DEFAULTS, Unused.WRONG_VALUE, f"server={json.dumps(server)}")
     if "model" not in found:
-        return Loaded(Settings(chosen, include_machine, skipped_zones, themed))
+        return Loaded(Settings(chosen, include_machine, skipped_zones, themed, server=served))
     model = found["model"]
     if not isinstance(model, str) or not is_model_name(model):
         return Loaded(DEFAULTS, Unused.WRONG_VALUE, f"model={json.dumps(model)}")
-    return Loaded(Settings(chosen, include_machine, skipped_zones, themed, model))
+    return Loaded(Settings(chosen, include_machine, skipped_zones, themed, model, served))
 
 
 def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
@@ -176,6 +184,8 @@ def save(context: ScanContext, settings: Settings) -> SessionFailed | None:
         "skipped_zones": list(settings.skipped_zones),
         "theme": settings.theme,
     }
+    if settings.server != DEFAULTS.server:
+        content["server"] = settings.server
     if settings.model is not None:
         content["model"] = settings.model
     try:

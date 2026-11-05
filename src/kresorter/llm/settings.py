@@ -126,12 +126,17 @@ def model_from(env: Mapping[str, str]) -> str | None:
     return value
 
 
+def server_in(env: Mapping[str, str]) -> Server:
+    """The server ``env`` names; Ollama when it names none, or one refused (``server_from``
+    says why)."""
+    return "lmstudio" if env.get(SERVER_VARIABLE) == "lmstudio" else "ollama"
+
+
 def with_model(env: Mapping[str, str], model: str | None) -> Mapping[str, str]:
     """``env`` with ``model`` as its server's model unless it names one: the variable, when
     set, wins (decision 0018, item 32). A server refused takes Ollama's, refused all the same.
     ``env`` itself is not changed."""
-    server: Server = "lmstudio" if env.get(SERVER_VARIABLE) == "lmstudio" else "ollama"
-    variable = variables(server).model
+    variable = variables(server_in(env)).model
     if model is None or variable in env:
         return env
     return {**env, variable: model}

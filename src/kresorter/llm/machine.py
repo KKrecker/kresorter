@@ -2,9 +2,10 @@
 item 33).
 
 ``qwen2.5``, for its languages, Russian among them: sized by the memory, one size smaller with
-fewer than four processors. The memory is ``GlobalMemoryStatusEx``'s on Windows and
-``os.sysconf``'s elsewhere; a memory or a number of processors the system does not say is taken
-for the least. kresorter recommends; it installs nothing.
+fewer than four processors; for LM Studio, the same model as LM Studio names it (decision 0019,
+item 13). The memory is ``GlobalMemoryStatusEx``'s on Windows and ``os.sysconf``'s elsewhere; a
+memory or a number of processors the system does not say is taken for the least. kresorter
+recommends; it installs nothing.
 """
 
 from __future__ import annotations
@@ -15,10 +16,27 @@ import os
 from dataclasses import dataclass
 from typing import Protocol, cast
 
-__all__ = ["GIB", "RECOMMENDED", "Machine", "MemoryStatus", "recommended", "this_machine"]
+from kresorter.llm.settings import Server
+
+__all__ = [
+    "GIB",
+    "LMSTUDIO_RECOMMENDED",
+    "RECOMMENDED",
+    "Machine",
+    "MemoryStatus",
+    "recommended",
+    "this_machine",
+]
 
 GIB = 1 << 30
 RECOMMENDED = ("qwen2.5:1.5b", "qwen2.5:3b", "qwen2.5:7b", "qwen2.5:14b")
+LMSTUDIO_RECOMMENDED = (
+    "qwen2.5-1.5b-instruct",
+    "qwen2.5-3b-instruct",
+    "qwen2.5-7b-instruct",
+    "qwen2.5-14b-instruct",
+)
+_NAMES: dict[Server, tuple[str, ...]] = {"ollama": RECOMMENDED, "lmstudio": LMSTUDIO_RECOMMENDED}
 _SIZES = (8 * GIB, 16 * GIB, 32 * GIB)  # under each, the model of its place
 _FEW_PROCESSORS = 4
 
@@ -31,12 +49,13 @@ class Machine:
     processors: int | None
 
 
-def recommended(machine: Machine) -> str:
+def recommended(machine: Machine, server: Server = "ollama") -> str:
+    """The model for ``machine``, by ``server``'s name for it."""
     memory = machine.memory or 0
     size = sum(memory >= least for least in _SIZES)
     if (machine.processors or 0) < _FEW_PROCESSORS:
         size = max(size - 1, 0)
-    return RECOMMENDED[size]
+    return _NAMES[server][size]
 
 
 class MemoryStatus(ctypes.Structure):

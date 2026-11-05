@@ -632,4 +632,4 @@ def test_no_explanation_when_lm_studio_is_not_running_says_the_local_ai(
     wait_idle(qtbot, window)
 
     assert page.explain.answer.text() == ""
-    assert page.explain.note.text().startswith("No explanation: The local AI is not running (")
+    assert page.explain.note.text().startswith("No explanation: The local AI is not running: ")

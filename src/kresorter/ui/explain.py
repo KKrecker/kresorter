@@ -19,6 +19,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame
 
 from kresorter.llm.explain import Explanations, explain
+from kresorter.llm.settings import SERVER_NAMES
 from kresorter.llm.subjects import Result, subjects
 from kresorter.ui.i18n import Translator
 from kresorter.ui.parts import Icon, Label, Note, badge, button, hbox, vbox
@@ -37,7 +38,8 @@ def answer(translator: Translator, explained: Explanations) -> tuple[str, str]:
     failed = explained.unavailable
     if explained.explained or failed is None:  # one subject: an answer, or why there is none
         text = "\n".join(one.text for one in explained.explained)
-        return text, translator.text("explain.model", model=explained.model)
+        server = SERVER_NAMES[explained.server]  # the one that answered (decision 0019, item 11)
+        return text, translator.text("explain.model", model=explained.model, server=server)
     reason = translator.reason(failed.reason, failed.detail)
     return "", translator.text("explain.none", reason=reason)
 

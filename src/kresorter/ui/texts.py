@@ -129,7 +129,11 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "overview.autostart_off": {"en": "{n} turned off", "ru": "отключено: {n}"},
     "overview.ai_title": {"en": "Local AI", "ru": "Локальный ИИ"},
-    "overview.ai": {"en": "Model: {model}", "ru": "Модель: {model}"},
+    "overview.ai": {"en": "{server} · Model: {model}", "ru": "{server} · Модель: {model}"},
+    "overview.ai_first": {
+        "en": "{server} · Model: the first it lists",
+        "ru": "{server} · Модель: первая в списке",
+    },
     "overview.ai_refused": {"en": "{name} is refused", "ru": "Значение {name} отклонено"},
     "overview.ai_not_checked": {
         "en": "Not checked yet; Check is in Settings",
@@ -535,8 +539,8 @@ CATALOG: dict[str, dict[str, str]] = {
     "explain.title": {"en": "AI explanation", "ru": "Объяснение ИИ"},
     "explain.advisory": {"en": "advisory", "ru": "лишь совет"},
     "explain.model": {
-        "en": "{model} via Ollama · may be wrong",
-        "ru": "{model} через Ollama · может ошибаться",
+        "en": "{model} via {server} · may be wrong",
+        "ru": "{model} через {server} · может ошибаться",
     },
     "explain.none": {
         "en": "No explanation: {reason}. The Check on the Settings page shows how to set it up.",
@@ -613,7 +617,18 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Address: {url} · Model: {model}",
         "ru": "Адрес: {url} · Модель: {model}",
     },
-    "settings.ai": {"en": "Local AI (Ollama)", "ru": "Локальный ИИ (Ollama)"},
+    "settings.ai": {"en": "Local AI", "ru": "Локальный ИИ"},
+    "settings.server": {"en": "Server", "ru": "Сервер"},
+    "settings.server_env": {
+        "en": "{variable} sets the server: {server}. The server chosen here applies once it is"
+        " unset.",
+        "ru": "{variable} задаёт сервер: {server}. Сервер, выбранный здесь, применится, когда"
+        " переменная не задана.",
+    },
+    "settings.first_model": {
+        "en": "the first model LM Studio lists",
+        "ru": "первая модель в списке LM Studio",
+    },
     "settings.check": {"en": "Check", "ru": "Проверить"},
     "settings.model": {"en": "Model", "ru": "Модель"},
     "settings.model_env": {
@@ -629,6 +644,14 @@ CATALOG: dict[str, dict[str, str]] = {
         " пишет и по-русски, и по-английски. Чтобы получить её: ollama pull {model} (kresorter"
         " сам ничего не устанавливает).",
     },
+    "settings.recommended_lmstudio": {
+        "en": "Recommended for this computer ({memory}, {processors}): {model}; Qwen 2.5 writes"
+        " Russian as well as English. To get it: find {model} in LM Studio's Discover tab and"
+        " download it (kresorter installs nothing itself).",
+        "ru": "Рекомендуется для этого компьютера ({memory}, {processors}): {model}; Qwen 2.5"
+        " пишет и по-русски, и по-английски. Чтобы получить её: найдите {model} на вкладке"
+        " Discover в LM Studio и скачайте её (kresorter сам ничего не устанавливает).",
+    },
     "settings.memory": {"en": "{size} of memory", "ru": "{size} памяти"},
     "settings.memory_unknown": {"en": "memory unknown", "ru": "память неизвестна"},
     "settings.processors_unknown": {
@@ -636,19 +659,20 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "число процессоров неизвестно",
     },
     "task.check": {"en": "Checking the local AI", "ru": "Проверка локального ИИ"},
-    "check.ollama": {"en": "Ollama: {state}", "ru": "Ollama: {state}"},
+    "check.server": {"en": "{server}: {state}", "ru": "{server}: {state}"},
     "check.model": {"en": "Model: {state}", "ru": "Модель: {state}"},
     "check.running": {
         "en": "running at {url} (version {version})",
         "ru": "работает по адресу {url} (версия {version})",
     },
+    "check.running_unversioned": {"en": "running at {url}", "ru": "работает по адресу {url}"},
     "check.unreachable": {
         "en": "not reachable at {url} ({detail})",
         "ru": "недоступна по адресу {url} ({detail})",
     },
-    "check.not_ollama": {
-        "en": "{url} does not answer as Ollama ({detail})",
-        "ru": "{url} отвечает не как Ollama ({detail})",
+    "check.not_server": {
+        "en": "{url} does not answer as {server} ({detail})",
+        "ru": "{url} отвечает не как {server} ({detail})",
     },
     "check.not_checked": {"en": "not checked", "ru": "не проверено"},
     "check.refused": {
@@ -658,6 +682,9 @@ CATALOG: dict[str, dict[str, str]] = {
     "check.installed": {"en": "{model}: installed", "ru": "{model}: установлена"},
     "check.missing": {"en": "{model}: not installed", "ru": "{model}: не установлена"},
     "check.model_not_checked": {"en": "{model}: not checked", "ru": "{model}: не проверена"},
+    "check.listed": {"en": "{model}: available", "ru": "{model}: доступна"},
+    "check.not_listed": {"en": "{model}: not available", "ru": "{model}: недоступна"},
+    "check.none_listed": {"en": "none listed", "ru": "ни одной в списке"},
     "check.available": {
         "en": "Explanations are available: Explain (local AI) on a finding, an autostart entry"
         " or a file that stays in place.",
@@ -681,12 +708,24 @@ CATALOG: dict[str, dict[str, str]] = {
         "en": "Download the model: ollama pull {model}",
         "ru": "Скачайте модель: ollama pull {model}",
     },
+    "check.install_lmstudio": {
+        "en": "Install LM Studio from https://lmstudio.ai, download a model and start its server"
+        " (Developer, Start Server).",
+        "ru": "Установите LM Studio (https://lmstudio.ai), скачайте модель и запустите её сервер"
+        " (Developer, Start Server).",
+    },
+    "check.download_lmstudio": {
+        "en": "Download the model in LM Studio: {model}",
+        "ru": "Скачайте модель в LM Studio: {model}",
+    },
     "check.again": {"en": "Check again.", "ru": "Проверьте снова."},
     "check.settings": {
-        "en": "Settings, from the environment the window started in: {url_variable} (a loopback"
-        " address, default {url}) and {model_variable} (default {model}).",
-        "ru": "Настройки берутся из окружения, в котором запущено окно: {url_variable} (адрес"
-        " loopback, по умолчанию {url}) и {model_variable} (по умолчанию {model}).",
+        "en": "Settings, from the environment the window started in: {server_variable} (ollama"
+        " or lmstudio, default ollama), {url_variable} (a loopback address, default {url}) and"
+        " {model_variable} (default {model}).",
+        "ru": "Настройки берутся из окружения, в котором запущено окно: {server_variable} (ollama"
+        " или lmstudio, по умолчанию ollama), {url_variable} (адрес loopback, по умолчанию"
+        " {url}) и {model_variable} (по умолчанию {model}).",
     },
 }
 

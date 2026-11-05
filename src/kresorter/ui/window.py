@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QMainWindow, QStackedWidget, QWidget
 
 from kresorter.environment import Environment
 from kresorter.llm.failure import SettingRefused
-from kresorter.llm.settings import model_from
+from kresorter.llm.settings import SERVER_NAMES, model_from, server_from
 from kresorter.storage.pending import Domain
 from kresorter.storage.session import SessionFailed
 from kresorter.ui.autostart import AutostartPage
@@ -146,21 +146,28 @@ class Window(QMainWindow):
 
     @property
     def llm_env(self) -> Mapping[str, str]:
-        """The local AI's settings: the environment's, with the model chosen in Settings unless
-        it names one (decision 0018, item 32)."""
+        """The local AI's settings: the environment's, with the server and the model chosen in
+        Settings unless it names them (decision 0018, item 32; decision 0019, item 12)."""
         return self.settings.llm_env
 
     def show_ai(self, checked: bool | None) -> None:
-        """The local AI's line, and its card on the Overview: its model; ``checked`` as the
-        Settings page last found it (decision 0018, items 34 and 35)."""
+        """The local AI's line, and its card on the Overview: its model, and on the card its
+        server too; ``checked`` as the Settings page last found it (decision 0018, items 34 and
+        35; decision 0019, item 12). LM Studio, with no model named, is said by its name."""
         text = self.translator.text
+        env = self.llm_env
         try:
-            model = model_from(self.llm_env)
+            server, model = SERVER_NAMES[server_from(env)], model_from(env)
         except SettingRefused as refused:
             line = text("sidebar.ai_refused", name=refused.name)
             card = text("overview.ai_refused", name=refused.name)
         else:
-            line, card = text("sidebar.ai", model=model), text("overview.ai", model=model)
+            line = text("sidebar.ai", model=server if model is None else model)
+            card = (
+                text("overview.ai_first", server=server)
+                if model is None
+                else text("overview.ai", server=server, model=model)
+            )
         self.sidebar.show_ai(line, checked=checked)
         self.overview.show_ai(card, checked)
 

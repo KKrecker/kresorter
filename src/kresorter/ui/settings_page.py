@@ -7,15 +7,18 @@ right: a change is saved and applied at once (decision 0018, items 1 and 2). On 
 machine scope of autostart: turning it on asks first, saying what is read; turning it off asks
 nothing. Each change is saved at once (``ui.settings.save``), and a change that cannot be saved says
 why and leaves the setting as it was: the file is written only when the user changes a setting. The
-page says when the settings file was not used. The local AI: its address and model as the
-environment gives them, the model chosen here unless ``KRESORTER_OLLAMA_MODEL`` names one (as a note
-says then), and Check, which runs the checks of ``kresorter llm status`` off the window's thread and
-shows each, in the window's words, Ollama and the model each with a dot in the safe or the review
-colour, then how to set up what is missing; nothing else asks the local AI. Check lists the models
-Ollama has in a choice: one chosen is saved, and Check runs again with it (decision 0018, item 32).
-The card recommends a model for the machine's memory and processors, and says how to get it (item
-33). The data directory's path (from the home folder as ``~``) is shown, read only, and under it the
-version (decision 0015, item 4).
+page says when the settings file was not used. The local AI: its server, Ollama or LM Studio,
+chosen here unless ``KRESORTER_LLM_SERVER`` names one (as a note says then, the choice disabled); a
+change is saved, forgets the model chosen, which was the other server's, and runs Check (decision
+0019, item 12). The chosen server's address and model as the environment gives them, the model
+chosen here unless the server's model variable names one (as a note says then), and Check, which
+runs the checks of ``kresorter llm status`` off the window's thread and shows each, in the window's
+words, the server and the model each with a dot in the safe or the review colour, then how to set
+up what is missing; nothing else asks the local AI. Check lists the models the server has in a
+choice: one chosen is saved, and Check runs again with it (decision 0018, item 32). The card
+recommends a model for the machine's memory and processors, by the server's name for it, and says
+how to get it there (item 33; decision 0019, item 13). The data directory's path (from the home
+folder as ``~``) is shown, read only, and under it the version (decision 0015, item 4).
 """
 
 from __future__ import annotations
@@ -33,14 +36,17 @@ from kresorter.llm.client import Status, status
 from kresorter.llm.failure import ExplanationUnavailable, SettingRefused, Unavailable
 from kresorter.llm.machine import Machine, recommended
 from kresorter.llm.settings import (
-    DEFAULT_ADDRESS,
-    DEFAULT_MODEL,
-    MODEL_VARIABLE,
-    URL_VARIABLE,
+    SERVER_NAMES,
+    SERVER_VARIABLE,
+    SERVERS,
+    Server,
     installed,
     is_model_name,
     model_from,
+    server_in,
+    variables,
     with_model,
+    with_server,
 )
 from kresorter.ui.dialogs import Confirmation
 from kresorter.ui.i18n import Translator
@@ -68,59 +74,100 @@ if TYPE_CHECKING:
 __all__ = ["Found", "SettingsPage", "check_lines"]
 
 _NOT_REACHED = frozenset({Unavailable.UNREACHABLE, Unavailable.TIMEOUT})
+_INSTALL: dict[Server, str] = {"ollama": "check.install", "lmstudio": "check.install_lmstudio"}
+_DOWNLOAD: dict[Server, str] = {"ollama": "check.pull", "lmstudio": "check.download_lmstudio"}
+# The model's line when the server has it, and when it has not.
+_FOUND: dict[Server, tuple[str, str]] = {
+    "ollama": ("check.installed", "check.missing"),
+    "lmstudio": ("check.listed", "check.not_listed"),
+}
+_RECOMMENDED: dict[Server, str] = {
+    "ollama": "settings.recommended",
+    "lmstudio": "settings.recommended_lmstudio",
+}
 
 
 def check_lines(translator: Translator, found: Status, env: Mapping[str, str]) -> list[str]:
     """What the checks found, line by line as ``kresorter llm status`` says it; when something
-    is missing, the steps that set it up."""
+    is missing, the steps that set it up, the server's (decision 0019, item 12)."""
     text = translator.text
-    ollama, install = _ollama(translator, found)
-    model, pull = _model(translator, found, env)
-    lines = [text("check.ollama", state=ollama), text("check.model", state=model)]
+    server = found.server
+    running, install = _server_line(translator, found)
+    model, download = _model_line(translator, found, env)
+    refused = isinstance(found.failure, SettingRefused) and found.failure.name == SERVER_VARIABLE
+    name = text("settings.ai") if refused else SERVER_NAMES[server]
+    lines = [text("check.server", server=name, state=running), text("check.model", state=model)]
     if found.failure is None:
         return [*lines, text("check.available")]
-    steps = [text("check.install")] if install else []
-    steps += [] if pull is None else [text("check.pull", model=pull)]
+    none_listed = found.installed is False and found.model is None  # LM Studio lists none
+    steps = [text(_INSTALL[server])] if install or none_listed else []
+    steps += [] if download is None else [text(_DOWNLOAD[server], model=download)]
     steps.append(text("check.again"))
     numbered = [text("check.step", n=n, step=step) for n, step in enumerate(steps, start=1)]
+    named = variables(server)
     settings = text(
         "check.settings",
-        url_variable=URL_VARIABLE,
-        url=DEFAULT_ADDRESS.url,
-        model_variable=MODEL_VARIABLE,
-        model=DEFAULT_MODEL,
+        server_variable=SERVER_VARIABLE,
+        url_variable=named.url,
+        url=named.address.url,
+        model_variable=named.model,
+        model=named.default_model or text("settings.first_model"),
     )
     return [*lines, text("check.unavailable"), text("check.setup"), *numbered, settings]
 
 
-def _ollama(translator: Translator, found: Status) -> tuple[str, bool]:
-    """The Ollama line, and whether installing and starting Ollama is a step."""
+def _server_line(translator: Translator, found: Status) -> tuple[str, bool]:
+    """The server's line, and whether installing and starting the server is a step."""
     text = translator.text
     url = None if found.address is None else found.address.url
     match found.failure:
-        case SettingRefused() as refused if refused.name == URL_VARIABLE:
+        case SettingRefused() as refused if refused.name in (
+            SERVER_VARIABLE,
+            variables(found.server).url,
+        ):
             return _refused(translator, refused), False
         case SettingRefused():
             return text("check.not_checked"), False
         case ExplanationUnavailable() as failed if found.installed is None:
-            key = "check.unreachable" if failed.reason in _NOT_REACHED else "check.not_ollama"
-            return text(key, url=url, detail=failed.detail), True
+            if failed.reason in _NOT_REACHED:
+                return text("check.unreachable", url=url, detail=failed.detail), True
+            server = SERVER_NAMES[found.server]
+            return text("check.not_server", url=url, server=server, detail=failed.detail), True
+        case _ if found.version is None:
+            return text("check.running_unversioned", url=url), False  # LM Studio says none
         case _:
             return text("check.running", url=url, version=found.version), False
 
 
-def _model(translator: Translator, found: Status, env: Mapping[str, str]) -> tuple[str, str | None]:
+def _model_line(
+    translator: Translator, found: Status, env: Mapping[str, str]
+) -> tuple[str, str | None]:
     """The model line, and the model to download when that is a step."""
     text = translator.text
+    has, has_not = _FOUND[found.server]
     if found.installed is not None:
         if found.installed:
-            return text("check.installed", model=found.model), None
-        return text("check.missing", model=found.model), found.model
+            return text(has, model=found.model), None
+        if found.model is None:
+            return text("check.none_listed"), None
+        return text(has_not, model=found.model), found.model
     try:
         model = model_from(env)  # read here too: the checks stop at a refused address
     except SettingRefused as refused:
+        if refused.name == SERVER_VARIABLE:
+            return text("check.not_checked"), None
         return _refused(translator, refused), None
+    if model is None:  # LM Studio's first model, which only a check finds
+        return text("check.not_checked"), None
     return text("check.model_not_checked", model=model), model
+
+
+def _in_use(server: Server, model: str | None, name: str) -> bool:
+    """Whether ``name``, as the server lists it, is ``model``: LM Studio's exactly (decision
+    0019, item 7)."""
+    if model is None:
+        return False
+    return name == model if server == "lmstudio" else installed(model, (name,))
 
 
 def _refused(translator: Translator, refused: SettingRefused) -> str:
@@ -193,20 +240,25 @@ class SettingsPage(QWidget):
         self.machine.clicked.connect(self._machine)
         self.ai_card, ai_inside = card()
         env = environment.llm_env
+        self._found_machine = environment.machine()
+        self.server_title = Label(text("settings.server"))  # a field's label, as the model's
+        self.server = Choice(look)
+        self.server.setAccessibleName(text("settings.server"))
+        self.server.addItems([SERVER_NAMES[server] for server in SERVERS])
+        self.server_title.setBuddy(self.server)
+        named = env.get(SERVER_VARIABLE)
+        overridden = text("settings.server_env", variable=SERVER_VARIABLE, server=named)
+        self.server_note = Note(self, "" if named is None else overridden, role="secondary")
         self.address = Note(self, role="secondary")
         self.model_title = Label(text("settings.model"))  # a field's label, not a card's title
         self.model = Choice(look)
         self.model.setAccessibleName(text("settings.model"))
         self.model_title.setBuddy(self.model)
-        named = env.get(MODEL_VARIABLE)
-        overridden = text("settings.model_env", variable=MODEL_VARIABLE, model=named)
-        self.model_note = Note(self, "" if named is None else overridden, role="secondary")
-        self.model_note.setHidden(named is None)
-        self.recommended = Note(self, _recommendation(translator, environment.machine()))
-        self.recommended.setProperty("role", "secondary")
+        self.model_note = Note(self, role="secondary")  # the server's model variable, when set
+        self.recommended = Note(self, role="secondary")  # for the server chosen
         self.check_button = button(look, text("settings.check"))
         self.check_button.clicked.connect(self._check)
-        self.found = (Found(), Found())  # Ollama, then the model
+        self.found = (Found(), Found())  # the server, then the model
         self.check = Note(self)
         self.data_card, data_inside = card()
         data_dir = environment.scan_context().policy.app_data_dir
@@ -217,6 +269,7 @@ class SettingsPage(QWidget):
         self._show()
         self.language.currentIndexChanged.connect(self._language)
         self.theme.currentIndexChanged.connect(self._theme)
+        self.server.currentIndexChanged.connect(self._server)
         self._list(())
         self.model.currentIndexChanged.connect(self._model)
 
@@ -226,6 +279,8 @@ class SettingsPage(QWidget):
         machine_inside.addWidget(_title(text("page.autostart")))
         machine_inside.addWidget(self.machine)
         ai_inside.addLayout(_titled(_title(text("settings.ai")), self.check_button))
+        ai_inside.addLayout(_titled(self.server_title, self.server))
+        ai_inside.addWidget(self.server_note)
         ai_inside.addWidget(self.address)
         ai_inside.addWidget(self.model_note)
         ai_inside.addLayout(_titled(self.model_title, self.model))
@@ -263,7 +318,8 @@ class SettingsPage(QWidget):
         layout.addLayout(top)
         layout.addWidget(self.area, 1)
         window.add_starter(self.check_button)
-        window.add_starter(self.model, lambda: MODEL_VARIABLE not in env)
+        window.add_starter(self.server, lambda: SERVER_VARIABLE not in env)
+        window.add_starter(self.model, lambda: variables(server_in(self.llm_env)).model not in env)
 
     @property
     def current(self) -> Settings:
@@ -272,21 +328,34 @@ class SettingsPage(QWidget):
 
     @property
     def llm_env(self) -> Mapping[str, str]:
-        """The local AI's settings: the environment's, with the model chosen here unless it
-        names one (decision 0018, item 32)."""
-        return with_model(self._window.environment.llm_env, self._settings.model)
+        """The local AI's settings: the environment's, with the server chosen here unless it
+        names one (decision 0019, item 12), and the model chosen here, which is that server's,
+        unless the environment names one or another server (decision 0018, item 32)."""
+        env = with_server(self._window.environment.llm_env, self._settings.server)
+        chosen = env[SERVER_VARIABLE] == self._settings.server
+        return with_model(env, self._settings.model if chosen else None)
 
     def _show(self) -> None:
-        """The controls as the settings are remembered."""
-        env = self.llm_env
-        model = env.get(MODEL_VARIABLE, DEFAULT_MODEL)
-        url = env.get(URL_VARIABLE, DEFAULT_ADDRESS.url)
-        self.address.setText(self._window.translator.text("settings.address", url=url, model=model))
+        """The controls as the settings are remembered, the server's address, model and
+        recommendation among them."""
+        translator, env = self._window.translator, self.llm_env
+        text = translator.text
+        server = server_in(env)
+        named = variables(server)
+        model = env.get(named.model, named.default_model)
+        url = env.get(named.url, named.address.url)
+        shown = text("settings.first_model") if model is None else model
+        self.address.setText(text("settings.address", url=url, model=shown))
+        given = self._window.environment.llm_env.get(named.model)
+        overridden = text("settings.model_env", variable=named.model, model=given)
+        self.model_note.setText("" if given is None else overridden)
+        self.recommended.setText(_recommendation(translator, self._found_machine, server))
         names = [self.model.itemText(index) for index in range(self.model.count())]
-        in_use = next((n for n, name in enumerate(names) if installed(model, (name,))), -1)
+        in_use = next((n for n, name in enumerate(names) if _in_use(server, model, name)), -1)
         for choice, index in (
             (self.language, LANGUAGE_SETTINGS.index(self._settings.language)),
             (self.theme, THEME_SETTINGS.index(self._settings.theme)),
+            (self.server, SERVERS.index(server)),
             (self.model, in_use),
         ):
             choice.blockSignals(True)
@@ -320,6 +389,17 @@ class SettingsPage(QWidget):
         self._window.look.choose(self._settings.theme)
         self._show()
 
+    def _server(self, index: int) -> None:
+        """Saved, the model chosen forgotten (it was the other server's), then checked; a server
+        that cannot be saved is not used."""
+        server = SERVERS[index]
+        self._save(replace(self._settings, server=server, model=None))
+        self._show()
+        if self._settings.server == server:
+            self._list(())  # the other server's
+            self._window.show_ai(None)
+            self._check()
+
     def _model(self, index: int) -> None:
         """Saved, then checked again; a model that cannot be saved is not used."""
         model = self.model.itemText(index)
@@ -330,7 +410,7 @@ class SettingsPage(QWidget):
             self._check()
 
     def _list(self, models: tuple[str, ...]) -> None:
-        """The models Ollama listed, those a model may be named; none, no choice."""
+        """The models the server listed, those a model may be named; none, no choice."""
         names = [name for name in models if is_model_name(name)]
         self.model.blockSignals(True)
         self.model.clear()
@@ -377,8 +457,8 @@ class SettingsPage(QWidget):
             return status(env, limits=limits)
 
         def done(found: Status) -> None:
-            ollama, model, *rest = check_lines(window.translator, found, env)
-            self.found[0].show_found(ollama, passed=found.version is not None)
+            server, model, *rest = check_lines(window.translator, found, env)
+            self.found[0].show_found(server, passed=found.running)
             self.found[1].show_found(model, passed=found.installed is True)
             self.check.setText("\n".join(rest))
             self._list(found.models)
@@ -387,8 +467,9 @@ class SettingsPage(QWidget):
         window.run(Task(window.translator.text("task.check"), work, done))
 
 
-def _recommendation(translator: Translator, machine: Machine) -> str:
-    """The model recommended for ``machine``, what that comes from, and how to get it."""
+def _recommendation(translator: Translator, machine: Machine, server: Server) -> str:
+    """The model recommended for ``machine``, what that comes from, and how to get it from
+    ``server``."""
     text = translator.text
     memory = (
         text("settings.memory_unknown")
@@ -400,8 +481,8 @@ def _recommendation(translator: Translator, machine: Machine) -> str:
         if machine.processors is None
         else translator.count("processor", machine.processors)
     )
-    model = recommended(machine)
-    return text("settings.recommended", memory=memory, processors=processors, model=model)
+    model = recommended(machine, server)
+    return text(_RECOMMENDED[server], memory=memory, processors=processors, model=model)
 
 
 def _title(text: str) -> Label:

@@ -200,10 +200,13 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
     },
     Unavailable: {
         "config": _both("The settings are refused", "Настройки отклонены"),
-        "unreachable": _both("Ollama is not running", "Ollama не запущена"),
-        "timeout": _both("Ollama did not answer in time", "Ollama не ответила вовремя"),
-        "redirect": _both("Ollama redirected the request", "Ollama перенаправила запрос"),
-        "http_status": _both("Ollama returned an error", "Ollama вернула ошибку"),
+        # Either server may be the one asked (decision 0019, item 11).
+        "unreachable": _both("The local AI is not running", "Локальный ИИ не запущен"),
+        "timeout": _both("The local AI did not answer in time", "Локальный ИИ не ответил вовремя"),
+        "redirect": _both(
+            "The local AI redirected the request", "Локальный ИИ перенаправил запрос"
+        ),
+        "http_status": _both("The local AI returned an error", "Локальный ИИ вернул ошибку"),
         "not_ollama": _both("It is not Ollama", "Это не Ollama"),
         "not_lmstudio": _both("It is not LM Studio", "Это не LM Studio"),
         "model_missing": _both("The model is not installed", "Модель не установлена"),
