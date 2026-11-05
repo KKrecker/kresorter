@@ -49,6 +49,9 @@ CATEGORIES: dict[str, dict[str, str]] = {
     "Documents": _both("Documents", "Документы"),
     "Archives": _both("Archives", "Архивы"),
     "Installers": _both("Installers", "Установщики"),
+    "Torrents": _both("Torrents", "Торренты"),  # decision 0020, item 12
+    "Fonts": _both("Fonts", "Шрифты"),
+    "3D models": _both("3D models", "3D-модели"),
 }
 
 LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {

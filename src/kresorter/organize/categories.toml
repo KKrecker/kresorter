@@ -1,4 +1,5 @@
-# Organize's categories (decision 0012, items 21-23), in the order plans list them.
+# Organize's categories (decision 0012, items 21-23, with decision 0020's item 12), in the
+# order plans list them.
 #
 #   name         the directory a file of this kind goes to, one level below the folder;
 #                English and fixed in step 5
@@ -7,28 +8,41 @@
 #
 # Every extension has an example in tests/unit/test_organize_categories.py. There is no
 # "Other": a file whose extension is not here stays where it is (unknown_kind). Web pages
-# (html, htm) are deliberately absent: a saved page loads what is beside it.
+# (html, htm) are deliberately absent: a saved page loads what is beside it; so are code, data
+# and settings (py, json, ini, bat, ...) and virtual machines' disks, often part of what is
+# beside them. Subtitles are videos' and lyrics audio's, so that a film and its subtitles, a
+# song and its lyrics, go together.
 
 [[category]]
 name = "Images"
 extensions = [
     "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tif", "tiff", "svg",
     "cr2", "nef", "arw", "dng",
+    "avif", "jxl", "ico", "cr3", "raf", "orf", "rw2", "psd", "xcf", "kra",
 ]
 
 [[category]]
 name = "Videos"
-extensions = ["mp4", "mkv", "avi", "mov", "webm", "m4v", "wmv", "mpg", "mpeg"]
+extensions = [
+    "mp4", "mkv", "avi", "mov", "webm", "m4v", "wmv", "mpg", "mpeg",
+    "3gp", "flv", "m2ts", "mts", "vob", "ogv",
+    "srt", "ass", "ssa", "vtt",
+]
 
 [[category]]
 name = "Audio"
-extensions = ["mp3", "flac", "wav", "ogg", "oga", "opus", "m4a", "aac", "wma"]
+extensions = [
+    "mp3", "flac", "wav", "ogg", "oga", "opus", "m4a", "aac", "wma",
+    "aiff", "aif", "mid", "midi", "ape", "amr", "mka",
+    "lrc",
+]
 
 [[category]]
 name = "Documents"
 extensions = [
     "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "xls", "xlsx", "ods", "csv",
     "ppt", "pptx", "odp", "epub",
+    "djvu", "fb2", "mobi", "azw3", "xps", "oxps", "pages", "numbers",
 ]
 
 [[category]]
@@ -36,8 +50,24 @@ name = "Archives"
 extensions = [
     "zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst",
     "tar.gz", "tar.bz2", "tar.xz", "tar.zst", "iso",
+    "cab", "lz", "lzma", "zipx", "tar.lz",
 ]
 
 [[category]]
 name = "Installers"
-extensions = ["exe", "msi", "dmg", "pkg", "deb", "rpm", "appimage", "flatpakref"]
+extensions = [
+    "exe", "msi", "dmg", "pkg", "deb", "rpm", "appimage", "flatpakref",
+    "msix", "msixbundle", "appx", "appxbundle", "apk", "xapk",
+]
+
+[[category]]
+name = "Torrents"
+extensions = ["torrent"]
+
+[[category]]
+name = "Fonts"
+extensions = ["ttf", "otf", "woff", "woff2"]
+
+[[category]]
+name = "3D models"
+extensions = ["stl", "3mf", "step", "stp", "fbx", "glb", "gltf", "blend"]
