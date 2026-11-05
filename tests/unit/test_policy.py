@@ -89,6 +89,31 @@ def test_windows_blacklist(win: PathPolicy, path: str, expected: Verdict) -> Non
     assert win.check_path(PureWindowsPath(path)) == expected
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        r"C:\Windows\SoftwareDistribution\Download\a.cab",
+        r"C:\Windows\Temp\a.tmp",
+        r"C:\Windows\Prefetch\APP.EXE-1234.pf",
+        r"C:\Windows\WinSxS\x\a.dll",
+        r"C:\Windows\MEMORY.DMP",
+        r"C:\Windows\Minidump\a.dmp",
+        r"C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows"
+        r"\DeliveryOptimization\Cache\a",
+        r"C:\ProgramData\Microsoft\Windows\WER\ReportArchive\a.wer",
+        r"C:\Windows.old\Users\Alice\a.txt",
+        r"C:\$Windows.~BT\Sources\a",
+        r"C:\$Windows.~WS\Sources\a",
+        r"c:\windows.OLD",
+        r"C:\hiberfil.sys",
+        r"C:\swapfile.sys",
+    ],
+)
+def test_what_windows_cleans_itself_stays_blocked(win: PathPolicy, path: str) -> None:
+    # [0020.16] They need an administrator, some are in use, and Windows cleans them safely.
+    assert win.check_path(PureWindowsPath(path)) == blocked(BlockReason.SYSTEM)
+
+
 def test_program_files_taken_from_environment() -> None:
     policy = PathPolicy.for_windows({**WIN_ENV, "ProgramFiles": r"D:\Apps"})
 
