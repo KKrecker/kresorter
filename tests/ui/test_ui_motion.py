@@ -4,6 +4,7 @@ what can be clicked shows the pointer over it, and a scan shows that it works; w
 alone keep the motion of the window as it ships."""
 
 import threading
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -67,13 +68,18 @@ def _slow_scan(monkeypatch: pytest.MonkeyPatch, outcome: str = "done") -> thread
     released = threading.Event()
 
     def slow(
-        paths: list[str], context: ScanContext, thresholds: Thresholds, *, progress: Progress
+        paths: list[str],
+        context: ScanContext,
+        thresholds: Thresholds,
+        *,
+        junk_only: Sequence[Path],
+        progress: Progress,
     ) -> tuple[ScanReport, AnalysisReport]:
         progress(1500)
         released.wait(10)
         if outcome == "failed":
             raise OSError("the disk went away")
-        return analyze_paths(paths, context, thresholds, progress=progress)
+        return analyze_paths(paths, context, thresholds, junk_only=junk_only, progress=progress)
 
     monkeypatch.setattr(overview, "analyze_paths", slow)
     return released

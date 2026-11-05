@@ -1,11 +1,12 @@
 """The Overview page: the scan card, what the last scan found, and a card each for Quarantine,
 Organize, Autostart and the local AI (decision 0014, items 19 and 48; 0018, item 35).
 
-The folders are the safe zones at first, each a chip with its path from the home folder (``~``);
-the user adds folders of their own, and removes them again with their chip's remove button,
-never a safe zone. Scan now reads only, in a worker: it walks the folders, hashes what may be
-duplicated and rates every file. The scan card then says when the scan ran, the files it read,
-the duplicate groups and the paths skipped, and the page says when files in use cannot be
+The folders are the safe zones at first, each a chip with its path from the home folder (``~``),
+and on Windows the programs' caches, one chip for their folders, read for junk only (0020 item
+15); the user adds folders of their own, and removes them again with their chip's remove
+button, never a safe zone. Scan now reads only, in a worker: it walks the folders, hashes what
+may be duplicated and rates every file. The scan card then says when the scan ran, the files it
+read, the duplicate groups and the paths skipped, and the page says when files in use cannot be
 recognized on this system. A card per level shows its size, its files and their strongest
 reasons, and opens Findings with that level only; the findings go to the Findings page. The
 cards of Quarantine, Organize and Autostart say what the window last read there, or what the
@@ -30,6 +31,7 @@ from kresorter.analysis.report import AnalysisReport
 from kresorter.analysis.run import analyze_paths
 from kresorter.analysis.score import Evidence, Level
 from kresorter.analysis.size_age import Thresholds
+from kresorter.core.policy import CACHES
 from kresorter.core.scanner import Progress, ScanReport
 from kresorter.environment import Environment
 from kresorter.organize.planner import Plan
@@ -88,36 +90,45 @@ def _lower(label: str) -> str:
 
 @dataclass(frozen=True)
 class Scanned:
-    """What one scan of ``roots`` found; ``checked``: open files are recognized on this system;
-    ``at``: when the scan started, in seconds since the epoch."""
+    """What one scan of ``roots`` found, and of the programs' caches when ``caches``;
+    ``checked``: open files are recognized on this system; ``at``: when the scan started, in
+    seconds since the epoch."""
 
     report: ScanReport
     analysis: AnalysisReport
     checked: bool
     at: float
     roots: list[Path]
+    caches: bool = False
 
 
-def scan(environment: Environment, roots: list[Path], read: Progress) -> Scanned:
-    """In the worker: the context of the system, the scan and the rating; ``read`` counts the
-    files read so far."""
+def scan(
+    environment: Environment, roots: list[Path], junk_only: list[Path], read: Progress
+) -> Scanned:
+    """In the worker: the context of the system, the scan of ``roots``, and of ``junk_only``
+    for junk only, and the rating; ``read`` counts the files read so far."""
     at = time.time()
     context = environment.scan_context()
     paths = [str(root) for root in roots]
-    report, analysis = analyze_paths(paths, context, Thresholds(), progress=read)
-    return Scanned(report, analysis, context.open_files_checked, at, list(roots))
+    report, analysis = analyze_paths(
+        paths, context, Thresholds(), junk_only=junk_only, progress=read
+    )
+    return Scanned(report, analysis, context.open_files_checked, at, list(roots), bool(junk_only))
 
 
 class FolderChip(QFrame):
     """A folder to scan: the folder icon and its path, and a remove button (``remove``, named
-    ``removal``): a safe zone's leaves it out (decision 0018, item 17)."""
+    ``removal``): a safe zone's leaves it out (decision 0018, item 17). Its tooltip is its
+    path, or ``tip``: the programs' caches' names their folders (decision 0020, item 15)."""
 
-    def __init__(self, look: Look, path: Path, shown: str, removal: str) -> None:
+    def __init__(
+        self, look: Look, path: Path, shown: str, removal: str, tip: str | None = None
+    ) -> None:
         super().__init__()
         self.path = path
         self.setProperty("role", "chip")
         self.setAttribute(Qt.WidgetAttribute.WA_Hover)  # its border shows the pointer over it
-        self.setToolTip(tooltip(str(path)))
+        self.setToolTip(tooltip(str(path) if tip is None else tip))
         self.setFixedHeight(36)
         self.icon = Icon(look, "folder", text_ink, size=16)
         self.label = Label(shown)
@@ -220,9 +231,11 @@ class OverviewPage(QWidget):
         translator = window.translator
         text = translator.text
         look = window.look
-        self._zones = [
-            Path(zone) for zone in window.environment.scan_context().policy.default_roots()
-        ]
+        policy = window.environment.scan_context().policy
+        self._caches = [Path(folder) for folder in policy.cache_zone()]
+        # The programs' caches stand as one zone, after the safe zones (0020, item 15).
+        caches = [Path(CACHES)] if self._caches else []
+        self._zones = [*(Path(zone) for zone in policy.default_roots()), *caches]
         self._skipped = set(window.settings.current.skipped_zones)  # by name (0018, item 17)
         self._added: list[Path] = []
         self._chips: list[FolderChip] = []
@@ -237,7 +250,7 @@ class OverviewPage(QWidget):
         self.scan_text.setWordWrap(True)
         self.scan_button = button(look, text("overview.scan"), role="primary", icon="refresh-cw")
         self.scan_button.clicked.connect(self.start_scan)
-        window.add_starter(self.scan_button, lambda: bool(self.roots()))
+        window.add_starter(self.scan_button, lambda: bool(self.roots() or self.junk_only()))
         self.add_button = button(look, text("overview.add"), role="plain", icon="plus")
         self.add_button.clicked.connect(self._add)
         self.last = Note(self, text("overview.none"), role="caption")
@@ -303,7 +316,11 @@ class OverviewPage(QWidget):
 
     def roots(self) -> list[Path]:
         """The safe zones not left out, then the folders added."""
-        return [*self._shown_zones(), *self._added]
+        return [*(z for z in self._shown_zones() if not self._is_caches(z)), *self._added]
+
+    def junk_only(self) -> list[Path]:
+        """The folders of the programs' caches unless they are left out, read for junk only."""
+        return list(self._caches) if any(map(self._is_caches, self._shown_zones())) else []
 
     def chips(self) -> list[FolderChip]:
         return list(self._chips)
@@ -315,13 +332,25 @@ class OverviewPage(QWidget):
     def _shown_zones(self) -> list[Path]:
         return [zone for zone in self._zones if zone.name not in self._skipped]
 
+    def _is_caches(self, zone: Path) -> bool:
+        return bool(self._caches) and zone == self._zones[-1]
+
+    def _shown(self, folder: Path) -> str:
+        """A folder from the home folder; the programs' caches by their name."""
+        if self._is_caches(folder):
+            return self._window.translator.text("overview.caches")
+        return shown_path(folder, Path.home())
+
     def _chip(self, folder: Path, *, zone: bool) -> None:
         """A chip with its remove button: a zone's leaves it out, an added folder's removes it.
         In the row, a zone's sits among the zones in their order, before the folders added."""
         translator = self._window.translator
-        shown = shown_path(folder, Path.home())
+        shown = self._shown(folder)
         removal = translator.text("overview.skip" if zone else "overview.remove", folder=shown)
-        made = FolderChip(self._window.look, folder, shown, removal)
+        tip = None
+        if zone and self._is_caches(folder):
+            tip = "\n".join([translator.text("overview.caches_tip"), *map(str, self._caches)])
+        made = FolderChip(self._window.look, folder, shown, removal, tip)
         leave = self._skip if zone else self._remove
         made.remove.clicked.connect(lambda _=False: leave(made))
         index = self._shown_zones().index(folder) if zone else len(self._chips)
@@ -331,7 +360,7 @@ class OverviewPage(QWidget):
     def _zone_link(self, zone: Path) -> None:
         """The link that puts ``zone`` back, after Add folder, among the others in the order of
         the zones (decision 0018, item 18)."""
-        shown = shown_path(zone, Path.home())
+        shown = self._shown(zone)
         text = self._window.translator.text
         made = link(text("overview.zone_link", folder=shown))
         made.setToolTip(tooltip(text("overview.put_back", folder=shown)))
@@ -393,7 +422,7 @@ class OverviewPage(QWidget):
         """Scan the folders shown, as Scan now does."""
         window, roots, read = self._window, self.roots(), Read()
         title = window.translator.text("task.scan")
-        work = partial(scan, window.environment, roots, read)
+        work = partial(scan, window.environment, roots, self.junk_only(), read)
         if window.run(Task(title, work, self._scanned, read=read)):
             self.scan_bar.run()
 
@@ -422,7 +451,9 @@ class OverviewPage(QWidget):
             shown.files.setText(_files(translator, analysis, total.level, total.files))
         self.level_cards.show()
         self.unreliable.setHidden(scanned.checked)
-        self._window.findings.show_analysis(analysis, scanned.roots, scanned.at)
+        self._window.findings.show_analysis(
+            analysis, scanned.roots, scanned.at, caches=scanned.caches
+        )
 
     def _open_level(self, level: Level) -> None:
         self._window.findings.show_only(level)

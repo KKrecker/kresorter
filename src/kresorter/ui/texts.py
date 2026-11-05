@@ -82,6 +82,8 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "Убрать {folder} из сканирования",
     },
     "overview.zone_link": {"en": "+ {folder}", "ru": "+ {folder}"},
+    "overview.caches": {"en": "Programs' caches", "ru": "Кеши программ"},
+    "overview.caches_tip": {"en": "Read for junk only:", "ru": "Только поиск мусора:"},
     "overview.put_back": {"en": "Scan {folder} again", "ru": "Снова сканировать {folder}"},
     "overview.scan_title": {"en": "Scan", "ru": "Сканирование"},
     "overview.read_only": {
@@ -157,6 +159,7 @@ CATALOG: dict[str, dict[str, str]] = {
     "selected.files": {"en": "{files} selected", "ru": "Выбрано: {files}"},
     "selected.size": {"en": "· {size}", "ru": "· {size}"},
     "findings.tree": {"en": "Findings", "ru": "Находки"},
+    "findings.caches": {"en": "programs' caches", "ru": "кешей программ"},
     "findings.scan_of": {
         "en": "Scan of {folders}, {moment}",
         "ru": "Сканирование {folders}, {moment}",

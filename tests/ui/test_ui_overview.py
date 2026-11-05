@@ -6,6 +6,7 @@ import dataclasses
 import json
 import threading
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -474,11 +475,16 @@ def test_while_a_scan_runs_the_status_line_counts_the_files_read_at_most_ten_tim
     released = threading.Event()
 
     def slow(
-        paths: list[str], context: ScanContext, thresholds: Thresholds, *, progress: Progress
+        paths: list[str],
+        context: ScanContext,
+        thresholds: Thresholds,
+        *,
+        junk_only: Sequence[Path],
+        progress: Progress,
     ) -> tuple[ScanReport, AnalysisReport]:
         progress(1500)
         released.wait(10)
-        return analyze_paths(paths, context, thresholds, progress=progress)
+        return analyze_paths(paths, context, thresholds, junk_only=junk_only, progress=progress)
 
     monkeypatch.setattr(overview, "analyze_paths", slow)
     window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")

@@ -89,9 +89,12 @@ def _children(group: QTreeWidgetItem) -> list[QTreeWidgetItem]:
     return [item for index in range(group.childCount()) if (item := group.child(index)) is not None]
 
 
-def folders(translator: Translator, roots: list[Path]) -> str:
-    """The folders scanned, from the home folder as ``~``, the last after "and"."""
+def folders(translator: Translator, roots: list[Path], *, caches: bool = False) -> str:
+    """The folders scanned, from the home folder as ``~``, then the programs' caches when
+    ``caches`` (decision 0020, item 15), the last after "and"."""
     shown = [shown_path(root, Path.home()) for root in roots]
+    if caches:
+        shown.append(translator.text("findings.caches"))
     if len(shown) < 2:
         return "".join(shown)
     return translator.text("list.and", first=", ".join(shown[:-1]), last=shown[-1])
@@ -279,15 +282,16 @@ class FindingsPage(QWidget):
 
     # --- what is listed ------------------------------------------------------------------------
 
-    def show_analysis(self, analysis: AnalysisReport, roots: list[Path], at: float) -> None:
-        """List the findings of a new analysis of ``roots``, made at ``at``: what it proposes
-        at the Safe level selected."""
+    def show_analysis(
+        self, analysis: AnalysisReport, roots: list[Path], at: float, *, caches: bool = False
+    ) -> None:
+        """List the findings of a new analysis of ``roots``, and of the programs' caches when
+        ``caches``, made at ``at``: what it proposes at the Safe level selected."""
         translator = self._window.translator
         self._roots = list(roots)
+        scanned = folders(translator, self._roots, caches=caches)
         self.head.subtitle.setText(
-            translator.text(
-                "findings.scan_of", folders=folders(translator, self._roots), moment=moment(at)
-            )
+            translator.text("findings.scan_of", folders=scanned, moment=moment(at))
         )
         self._syncing = True
         self.tree.clear()

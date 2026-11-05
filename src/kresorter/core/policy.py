@@ -7,7 +7,8 @@ Two separate mechanisms (decision 0002):
   Temp is deliberately absent from them but is *not* blacklisted.
 
 What keeps a sign-in, a saved password or the open tabs is blacklisted too, wherever it is
-(``sessions.toml``, decision 0020, item 13).
+(``sessions.toml``, decision 0020, item 13). On Windows the programs' caches are a zone of
+their own (``cache_zone``), read for junk only (decision 0020, item 15).
 
 The policy is pure: it never touches the filesystem. Paths must already be resolved
 (symlinks are handled by the walker); ``..`` is collapsed lexically.
@@ -59,6 +60,34 @@ class _ProfileRules:
 
 
 APP_NAME = "kresorter"
+CACHES = "caches"  # the name of the zone of the programs' caches (decision 0020, item 15)
+
+# The folders of the programs' caches on Windows, from the home: where the junk rules find
+# them under AppData\Local and AppData\LocalLow, but the temporary files (decision 0002).
+_WINDOWS_CACHES = (
+    r"AppData\Local\Google\Chrome\User Data",
+    r"AppData\Local\Microsoft\Edge\User Data",
+    r"AppData\Local\BraveSoftware\Brave-Browser\User Data",
+    r"AppData\Local\Vivaldi\User Data",
+    r"AppData\Local\Yandex\YandexBrowser\User Data",
+    r"AppData\Local\Chromium\User Data",
+    r"AppData\Local\Opera Software",
+    r"AppData\Local\Mozilla\Firefox\Profiles",
+    r"AppData\Local\Microsoft\Windows\INetCache",
+    r"AppData\Local\Microsoft\Windows\Explorer",
+    r"AppData\Local\Microsoft\Windows\WER\ReportArchive",
+    r"AppData\Local\Microsoft\Windows\WER\ReportQueue",
+    r"AppData\Local\CrashDumps",
+    r"AppData\Local\NVIDIA\DXCache",
+    r"AppData\Local\NVIDIA\GLCache",
+    r"AppData\LocalLow\NVIDIA\PerDriverVersion",
+    r"AppData\Local\AMD\DxCache",
+    r"AppData\Local\AMD\DxcCache",
+    r"AppData\Local\AMD\GLCache",
+    r"AppData\Local\AMD\VkCache",
+    r"AppData\LocalLow\Intel\ShaderCache",
+    r"AppData\Local\D3DSCache",
+)
 
 
 def check_open(path: PurePath, open_files: OpenFileChecker) -> Verdict:
@@ -114,6 +143,7 @@ class PathPolicy:
         app_data_dir: PurePath,
         program_dirs: Sequence[PurePath] = (),
         sessions: Iterable[str] = (),
+        cache_zone: Sequence[PurePath] = (),
     ) -> None:
         self._flavor = flavor
         self._case_sensitive = case_sensitive
@@ -136,6 +166,7 @@ class PathPolicy:
             blocked_name_prefixes=tuple(self._fold(n) for n in name_prefixes),
         )
         self._default_roots = tuple(default_roots)
+        self._cache_zone = tuple(cache_zone)
         self._sessions = SessionPaths(sessions, self._fold)
 
     # --- construction ------------------------------------------------------------------------
@@ -186,6 +217,7 @@ class PathPolicy:
             app_data_dir=local_root / APP_NAME,
             program_dirs=program_dirs,
             sessions=session_patterns(),
+            cache_zone=[home / folder for folder in _WINDOWS_CACHES],
         )
 
     @classmethod
@@ -284,6 +316,17 @@ class PathPolicy:
     def default_roots(self) -> tuple[PurePath, ...]:
         """Safe zones scanned when the user selects nothing. Temp is never among them."""
         return self._default_roots
+
+    def cache_zone(self) -> tuple[PurePath, ...]:
+        """The programs' caches: the folders where the junk rules find them, read for junk
+        only, a zone of the window (decision 0020, item 15); none but on Windows."""
+        return self._cache_zone
+
+    def zone_names(self) -> tuple[str, ...]:
+        """The names the zones are remembered by when left out (decision 0018, item 17): each
+        safe zone's last part, then ``caches`` when there are programs' caches."""
+        names = tuple(root.name for root in self._default_roots)
+        return (*names, CACHES) if self._cache_zone else names
 
     # --- helpers -------------------------------------------------------------------------------
 

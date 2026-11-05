@@ -2,7 +2,8 @@
 
 The window remembers only ``settings.json`` in the data directory: a JSON object with ``language``
 (``system``, ``en`` or ``ru``), ``include_machine`` (a boolean), ``skipped_zones``, the names of the
-safe zones left out of the scan (each a zone's last part, once; decision 0018, item 17), ``theme``
+safe zones left out of the scan (each a zone's last part, once; decision 0018, item 17; the
+programs' caches as ``caches``, decision 0020, item 15), ``theme``
 (``system``, ``light`` or ``dark``; item 1), ``server``, the local AI's server (``ollama`` or
 ``lmstudio``; left out, and not written, for Ollama; decision 0019, item 12) and ``model``, the
 model chosen for that server (a name decision 0013's item 9 accepts; left out, and not written,
@@ -28,7 +29,7 @@ import os
 import stat
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Literal
 
 from kresorter.core.scanner import ScanContext
@@ -121,7 +122,7 @@ def load(context: ScanContext) -> Loaded:
         return Loaded(DEFAULTS, Unused.NOT_JSON, str(error) or type(error).__name__)
     if not isinstance(found, dict):
         return Loaded(DEFAULTS, Unused.NOT_AN_OBJECT)
-    return _settings(found, tuple(PurePath(z).name for z in context.policy.default_roots()))
+    return _settings(found, context.policy.zone_names())
 
 
 def _read(path: Path) -> bytes | None:

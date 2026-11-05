@@ -19,12 +19,15 @@ def analyze_paths(
     context: ScanContext,
     thresholds: Thresholds,
     *,
+    junk_only: Sequence[Path] = (),
     progress: Progress = unreported,
 ) -> tuple[ScanReport, AnalysisReport]:
-    """Scan ``paths`` (default: the safe zones) and rate what was found; ``progress``: the
-    scan's (decision 0018, item 16)."""
+    """Scan ``paths`` (default: the safe zones) and the folders of ``junk_only`` that exist,
+    for junk only (decision 0020, item 15), and rate what was found; ``progress``: the scan's
+    (decision 0018, item 16)."""
     roots = [Path(p) for p in paths or context.policy.default_roots()]
-    scanned = scan(roots, context, hash_duplicates=True, progress=progress)
+    caches = [folder for folder in junk_only if folder.is_dir()]
+    scanned = scan(roots, context, junk_only=caches, hash_duplicates=True, progress=progress)
     analysis = analyze(
         scanned,
         classifier=context.classifier,

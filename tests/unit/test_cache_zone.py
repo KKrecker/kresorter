@@ -146,8 +146,8 @@ def test_a_folder_of_the_zone_in_a_folder_scanned_is_read_as_that_one(tmp_path: 
     report = scan([root], context(tmp_path), junk_only=[root / "caches"])
 
     assert report.junk_only == frozenset()
-    assert entries(report) == [copy, photo]
-    assert [group.paths for group in report.duplicates] == [(copy, photo)]
+    assert entries(report) == [photo, copy]
+    assert [sorted(group.paths) for group in report.duplicates] == [sorted([photo, copy])]
 
 
 def test_a_folder_scanned_in_the_zone_is_read_whole_and_once(tmp_path: Path) -> None:
@@ -161,6 +161,19 @@ def test_a_folder_scanned_in_the_zone_is_read_whole_and_once(tmp_path: Path) -> 
     assert report.files_scanned == 2
     assert report.junk_only == frozenset({copy})
     assert entries(report) == [mine]
+
+
+def test_a_folder_scanned_that_is_gone_leaves_the_zone_read_for_junk_only(
+    tmp_path: Path,
+) -> None:
+    # [0020.15] a root that is not there holds no file of the zone
+    caches = tmp_path / "caches"
+    copy = write(caches / "copy.jpg", b"same")
+
+    report = scan([tmp_path / "gone"], context(tmp_path), junk_only=[caches])
+
+    assert report.junk_only == frozenset({copy})
+    assert entries(report) == []
 
 
 def test_a_file_read_for_junk_only_is_not_rated_by_size_or_age(tmp_path: Path) -> None:

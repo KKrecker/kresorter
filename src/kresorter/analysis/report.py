@@ -86,7 +86,8 @@ def analyze(
         for candidate in decision.remove:
             reasons[candidate.entry.path].append(duplicate_reason(decision))
             candidates[candidate.entry.path] = candidate
-    for finding in find_large_and_old(entries.values(), now_ns=now_ns, thresholds=thresholds):
+    # A file read for junk only is not rated by size or age (decision 0020, item 15).
+    for finding in find_large_and_old(report.compared, now_ns=now_ns, thresholds=thresholds):
         reasons[finding.entry.path].extend(size_age_reasons(finding))
     findings: list[Finding] = []
     for path, found in reasons.items():
