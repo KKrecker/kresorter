@@ -434,6 +434,21 @@ NAMES = [
     "home",
     "Windows",
     "Temp",
+    # sessions (decision 0020, item 13)
+    "Cookies",
+    "COOKIES",
+    "Cookies-journal",
+    "Network",
+    "Local State",
+    "Preferences",
+    "Cache",
+    "tdata",
+    "key_datas",
+    "ssfn123",
+    "INetCookies",
+    "Microsoft.AAD.BrokerPlugin_cw5n1h2txyewy",
+    "Keychains",
+    ".netrc",
 ]
 
 
@@ -459,6 +474,13 @@ def directory_cases() -> list[tuple[PathPolicy, list[PurePath]]]:
         w(r"C:\Program Files"),
         w(r"C:\Temp"),
         w(r"D:\Local"),
+        w(r"C:\Users\Alice\AppData\Local\Google\Chrome\User Data"),
+        w(r"C:\Users\Alice\AppData\Local\Google\Chrome\User Data\Default"),
+        w(r"C:\Users\Alice\AppData\Local\Google\Chrome\User Data\Default\Network"),
+        w(r"C:\Users\Alice\AppData\Local\Microsoft"),
+        w(r"C:\Users\Alice\AppData\Local\Packages"),
+        w(r"D:\Games\Steam"),
+        w(r"D:\Telegram\tdata"),
     ]
     p = PurePosixPath
     linux = PathPolicy.for_posix(
@@ -481,6 +503,9 @@ def directory_cases() -> list[tuple[PathPolicy, list[PurePath]]]:
         p("/usr"),
         p("/var"),
         p("/var/lib"),
+        p("/home/alice/.config"),
+        p("/home/alice/.config/google-chrome/Default"),
+        p("/home/alice/.mozilla/firefox/x.default"),
     ]
     mac_folders: list[PurePath] = [
         p("/"),
@@ -490,6 +515,7 @@ def directory_cases() -> list[tuple[PathPolicy, list[PurePath]]]:
         p("/Users/alice/Library/Application Support"),
         p("/Users/alice/Downloads"),
         p("/Applications"),
+        p("/Users/alice/Library/Application Support/Google/Chrome/Default"),
     ]
     return [(windows, windows_folders), (linux, linux_folders), (mac, mac_folders)]
 
@@ -498,7 +524,8 @@ def directory_cases() -> list[tuple[PathPolicy, list[PurePath]]]:
 def test_a_file_in_a_directory_is_checked_by_its_name_as_by_its_path(
     policy: PathPolicy, folders: list[PurePath]
 ) -> None:
-    # [0018.14] The directory once, then each name alone: the answer of check_path.
+    # [0018.14] The directory once, then each name alone: the answer of check_path; sessions
+    # too, a folder held by one and the names that are one [0020.13].
     for folder in folders:
         names = policy.in_directory(folder)
         assert [names.check_name(n) for n in NAMES] == [

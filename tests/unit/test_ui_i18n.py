@@ -206,6 +206,12 @@ def test_kresorter_s_own_program_has_a_label_of_its_own() -> None:
     assert labels == ["kresorter's own program", "Программа kresorter"]
 
 
+def test_a_session_has_a_label_of_its_own() -> None:
+    # [0020.13] what keeps a sign-in, a saved password or the open tabs
+    labels = [Translator(language).label(BlockReason.SESSION) for language in LANGUAGES]
+    assert labels == ["Sign-ins and sessions", "Входы и сеансы"]
+
+
 def test_an_unknown_key_is_an_error() -> None:
     # [0014.28] a key the catalog lacks is a mistake of the window, never shown as a key
     with pytest.raises(KeyError):
