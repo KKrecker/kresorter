@@ -41,6 +41,20 @@ dirs = ["User Data/*/Cache", "User Data/*/Code Cache", "User Data/*/GPUCache"]
 platforms = ["windows"]
 
 [[rule]]
+id = "chromium-shader-caches"
+category = "browser_cache"
+description = "Chromium-based browser's shader caches (Chrome, Edge, Brave); rebuilt as pages are drawn."
+dirs = [
+    "User Data/ShaderCache",
+    "User Data/GrShaderCache",
+    "User Data/GraphiteDawnCache",
+    "User Data/*/DawnCache",
+    "User Data/*/DawnGraphiteCache",
+    "User Data/*/DawnWebGPUCache",
+]
+platforms = ["windows"]
+
+[[rule]]
 id = "opera-cache"
 category = "browser_cache"
 description = "Opera browser cache (Opera, Opera GX); re-downloaded as needed."
@@ -96,6 +110,34 @@ id = "crash-dumps"
 category = "crash_dump"
 description = "Application crash dump; only useful for debugging a past crash."
 dirs = ["AppData/Local/CrashDumps"]
+platforms = ["windows"]
+
+[[rule]]
+id = "windows-error-reports"
+category = "crash_dump"
+description = "Windows Error Reporting's reports of crashes and hangs, sent or queued; only useful for debugging them."
+dirs = [
+    "AppData/Local/Microsoft/Windows/WER/ReportArchive",
+    "AppData/Local/Microsoft/Windows/WER/ReportQueue",
+]
+platforms = ["windows"]
+
+[[rule]]
+id = "gpu-shader-caches"
+category = "cache"
+description = "Graphics drivers' shader caches (NVIDIA, AMD, Intel, DirectX); rebuilt by the driver, a game may stutter while it is."
+dirs = [
+    "AppData/Local/NVIDIA/DXCache",
+    "AppData/Local/NVIDIA/GLCache",
+    "AppData/LocalLow/NVIDIA/PerDriverVersion/DXCache",
+    "AppData/LocalLow/NVIDIA/PerDriverVersion/GLCache",
+    "AppData/Local/AMD/DxCache",
+    "AppData/Local/AMD/DxcCache",
+    "AppData/Local/AMD/GLCache",
+    "AppData/Local/AMD/VkCache",
+    "AppData/LocalLow/Intel/ShaderCache",
+    "AppData/Local/D3DSCache",
+]
 platforms = ["windows"]
 
 [[rule]]
