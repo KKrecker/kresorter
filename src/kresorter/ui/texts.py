@@ -651,18 +651,18 @@ CATALOG: dict[str, dict[str, str]] = {
         " переменная не задана.",
     },
     "settings.recommended": {
-        "en": "Recommended for this computer ({memory}, {processors}): {model}; Qwen 2.5 writes"
+        "en": "Recommended for this computer ({memory}, {processors}): {model}; Qwen3 writes"
         " Russian as well as English. To get it: ollama pull {model} (kresorter installs nothing"
         " itself).",
-        "ru": "Рекомендуется для этого компьютера ({memory}, {processors}): {model}; Qwen 2.5"
+        "ru": "Рекомендуется для этого компьютера ({memory}, {processors}): {model}; Qwen3"
         " пишет и по-русски, и по-английски. Чтобы получить её: ollama pull {model} (kresorter"
         " сам ничего не устанавливает).",
     },
     "settings.recommended_lmstudio": {
-        "en": "Recommended for this computer ({memory}, {processors}): {model}; Qwen 2.5 writes"
+        "en": "Recommended for this computer ({memory}, {processors}): {model}; Qwen3 writes"
         " Russian as well as English. To get it: find {model} in LM Studio's Discover tab and"
         " download it (kresorter installs nothing itself).",
-        "ru": "Рекомендуется для этого компьютера ({memory}, {processors}): {model}; Qwen 2.5"
+        "ru": "Рекомендуется для этого компьютера ({memory}, {processors}): {model}; Qwen3"
         " пишет и по-русски, и по-английски. Чтобы получить её: найдите {model} на вкладке"
         " Discover в LM Studio и скачайте её (kresorter сам ничего не устанавливает).",
     },

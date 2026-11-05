@@ -1,11 +1,12 @@
 """The machine's memory and processors, and the model recommended for them (decision 0018,
-item 33).
+item 33; decision 0020, item 11).
 
-``qwen2.5``, for its languages, Russian among them: sized by the memory, one size smaller with
-fewer than four processors; for LM Studio, the same model as LM Studio names it (decision 0019,
-item 13). The memory is ``GlobalMemoryStatusEx``'s on Windows and ``os.sysconf``'s elsewhere; a
-memory or a number of processors the system does not say is taken for the least. kresorter
-recommends; it installs nothing.
+Qwen3, for its languages, Russian among them, and for its instruct models, which do not think
+(under 8 GiB the 1.7B, which is told not to): sized by the memory, one size smaller with fewer
+than four processors; for LM Studio, the same model as LM Studio names it (decision 0019,
+item 13). The memory is ``GlobalMemoryStatusEx``'s
+on Windows and ``os.sysconf``'s elsewhere; a memory or a number of processors the system does
+not say is taken for the least. kresorter recommends; it installs nothing.
 """
 
 from __future__ import annotations
@@ -29,15 +30,11 @@ __all__ = [
 ]
 
 GIB = 1 << 30
-RECOMMENDED = ("qwen2.5:1.5b", "qwen2.5:3b", "qwen2.5:7b", "qwen2.5:14b")
-LMSTUDIO_RECOMMENDED = (
-    "qwen2.5-1.5b-instruct",
-    "qwen2.5-3b-instruct",
-    "qwen2.5-7b-instruct",
-    "qwen2.5-14b-instruct",
-)
+# The 30B is a mixture of experts with 3B active: on a processor, about as fast as a 3B model.
+RECOMMENDED = ("qwen3:1.7b", "qwen3:4b-instruct", "qwen3:30b-instruct")
+LMSTUDIO_RECOMMENDED = ("qwen/qwen3-1.7b", "qwen/qwen3-4b-2507", "qwen/qwen3-30b-a3b-2507")
 _NAMES: dict[Server, tuple[str, ...]] = {"ollama": RECOMMENDED, "lmstudio": LMSTUDIO_RECOMMENDED}
-_SIZES = (8 * GIB, 16 * GIB, 32 * GIB)  # under each, the model of its place
+_SIZES = (8 * GIB, 32 * GIB)  # under each, the model of its place
 _FEW_PROCESSORS = 4
 
 
