@@ -1,0 +1,26 @@
+name: bench
+
+on:
+  push:
+    branches: [bench-scan]
+
+jobs:
+  bench:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: python -m pip install -e .
+      - name: Defender
+        shell: pwsh
+        run: |
+          $s = Get-MpComputerStatus
+          echo "::notice title=Defender::RealTimeProtectionEnabled=$($s.RealTimeProtectionEnabled) AntivirusEnabled=$($s.AntivirusEnabled) OnAccess=$($s.OnAccessProtectionEnabled)"
+      - name: Bench
+        run: python bench/scan_bench.py C:\hostedtoolcache\windows
