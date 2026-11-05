@@ -7,7 +7,7 @@ in git's history and in the [roadmap](docs/roadmap.md).
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-11-03
+## [0.1.0] - 2026-11-05
 
 The first release, an alpha: the console commands and the window, on Windows and Linux.
 
@@ -42,9 +42,16 @@ The first release, an alpha: the console commands and the window, on Windows and
 - `kresorter recover`: the work an interruption left (a quarantine, an organize batch, an
   autostart change) closed by what is on the disk or in the registry, never redone or undone;
   every command that acts does it for its own work first.
-- `kresorter llm status`: whether a local Ollama can give the advisory explanations of
-  `analyze --explain` and of the window's Explain; it is asked on loopback only, and what it
-  says is only ever shown.
+- `kresorter llm status`: whether the local AI, Ollama or LM Studio, can give the advisory
+  explanations of `analyze --explain` and of the window's Explain, and the steps left to set it
+  up; it is asked on loopback only, and what it says is only ever shown.
+- LM Studio as well as Ollama: `KRESORTER_LLM_SERVER` set to `lmstudio`, with
+  `KRESORTER_LMSTUDIO_URL` (by default `http://127.0.0.1:1234`) and `KRESORTER_LMSTUDIO_MODEL`
+  (by default the first model it lists that is not an embedding model), or the server chosen
+  in the window. It is asked for its models and for an answer only, never to download, load or
+  unload a model, and it is sent the same facts as Ollama.
+- The AI explanations in the window's language, English or Russian, and in English on the
+  console; a reasoning model's thinking is left out of the answer.
 - `kresorter --version`.
 - One journal and one lock for everything that acts: each action is journaled before the disk
   is touched, shows what it will do and acts only once confirmed (`--yes`, or the window's
@@ -56,11 +63,12 @@ The first release, an alpha: the console commands and the window, on Windows and
 - The window, `kresorter-ui` (or `python -m kresorter.ui`) with the extra `ui`: a sidebar of
   six pages, in English or Russian, light or dark as the system is or as chosen, running what
   the commands run on the same journal and lock; every action opens a dialog first, with
-  Cancel as its default button. A name is shown as it is written, never as formatting.
+  Cancel as its default button. A name is shown as it is written, never as formatting. Its
+  icon, Kresorter's mark, is in the title bar, on the taskbar and in every dialog.
 - The **Overview** page: the folders to scan, a safe zone left out and put back as you choose,
   and Scan now, which only reads and shows its progress; a card per safety level with its
   files, size and strongest reasons, and a card each for Quarantine, Organize, Autostart and
-  Local AI, the model in use and whether the last Check found it.
+  Local AI, the server and the model in use and whether the last Check found it.
 - The **Findings** page: the findings grouped by their strongest reason, with a chip per level,
   a search and the detail of the file chosen; only the Safe ones are selected at first, and
   Move to quarantine moves the selection.
@@ -73,15 +81,22 @@ The first release, an alpha: the console commands and the window, on Windows and
 - The **Quarantine** page: the quarantined files, with Select all and Clear selection, Restore,
   and Delete permanently.
 - The **Settings** page: the language, applied at once with Restart now; Appearance, System,
-  Light or Dark; on Windows the machine-wide autostart entries; the local AI with its Check,
-  the model chosen among those Ollama has and the one recommended for the computer; the data
-  folder and the version.
+  Light or Dark; on Windows the machine-wide autostart entries; the local AI with its Server,
+  Ollama or LM Studio, its Check, the model chosen among those the server has and the one
+  recommended for the computer; the data folder, the version and the licence: Kresorter's, the
+  MIT licence, and the Windows build's Qt and PySide6, under the LGPL-3.0.
 - `kresorter-ui --self-test REPORT`: opens the window, shows each page, closes it and writes a
   line per page to `REPORT`, changing nothing; on a failure, the error and exit code 1.
 - For Windows, `Kresorter-0.1.0-setup.exe`, for the current user with no administrator rights,
   and `Kresorter-0.1.0-portable.zip`, which runs from any folder: the window, with its
-  licences and Qt's beside it. Neither is signed, so SmartScreen warns before the first run.
-- On PyPI, one wheel for every system and Python 3.11 to 3.14: `pipx install "kresorter[ui]"`
-  for the window and the commands, `pipx install kresorter` for the commands only.
+  licences and Qt's beside it; the installer shows the licence before it installs. Neither is
+  signed, so SmartScreen warns before the first run.
+- The GitHub release `Kresorter 0.1.0`: `Kresorter-0.1.0-setup.exe`,
+  `Kresorter-0.1.0-portable.zip`, `kresorter-0.1.0-py3-none-any.whl`, one wheel for every
+  system and Python 3.11 to 3.14, the sdist `kresorter-0.1.0.tar.gz` and `SHA256SUMS.txt`, to
+  check each file against. `pipx install "kresorter[ui]"` installs the window and the commands,
+  `pipx install kresorter` the commands only, from PyPI, or from the wheel's path when PyPI
+  does not have it.
+- The README in English and in Russian, `README.ru.md`, each with a switch to the other.
 - Uninstalling leaves the data directory, with the files still in the quarantine; the README
   says how to restore or purge them first.

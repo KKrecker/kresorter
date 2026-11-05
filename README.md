@@ -17,8 +17,8 @@ Open source, local-only, no telemetry.
 - **No direct deletion.** All removal goes through the quarantine API; `os.remove`, `shutil.rmtree`
   and friends are banned in code *and* tests (enforced by ruff and a test).
 - **Safe zones by default.** Program Files, user profiles and open files are blacklisted.
-- **Local only.** No telemetry; the optional AI explanations come from Ollama on your own
-  machine, over loopback only, and are only ever shown.
+- **Local only.** No telemetry; the optional AI explanations come from Ollama or LM Studio on
+  your own machine, over loopback only, and are only ever shown.
 
 ## Install
 
@@ -34,6 +34,8 @@ From the [releases](https://github.com/KKrecker/kresorter/releases), download on
 
 Both are the window, and both keep their data in `%LOCALAPPDATA%\kresorter`. The console
 commands come with pipx, as on Linux: `pipx install kresorter`, with Python 3.11 or newer.
+Each release also has the wheel, `kresorter-<version>-py3-none-any.whl`, and the sdist,
+`kresorter-<version>.tar.gz`, which pipx and pip install, and `SHA256SUMS.txt`.
 
 The installer and `Kresorter.exe` are not signed yet, so SmartScreen stops them the first time
 ("Windows protected your PC"): choose **More info**, then **Run anyway**. Before that, check
@@ -51,6 +53,14 @@ With [pipx](https://pipx.pypa.io) and Python 3.11 or newer:
 ```bash
 pipx install "kresorter[ui]"   # the window, kresorter-ui, and the commands
 pipx install kresorter         # or the commands only
+```
+
+pipx installs the wheel of a [release](https://github.com/KKrecker/kresorter/releases) the same
+way, from the folder you downloaded it to, when PyPI does not have the version:
+
+```bash
+pipx install "./kresorter-<version>-py3-none-any.whl[ui]"   # the window and the commands
+pipx install ./kresorter-<version>-py3-none-any.whl         # or the commands only
 ```
 
 The window needs a few of Qt's system libraries; [Desktop app](#desktop-app-optional) names
@@ -195,19 +205,22 @@ kresorter organize move ~/Downloads --explain  # the plan, then why files stay; 
 
 `--explain` adds plain-language explanations of what kresorter has already decided: what a
 cache or a kind of file is, what an autostart program does, why a file stays. They are written
-by a language model running in [Ollama](https://ollama.com) on your machine; they are advisory
-and may be wrong. Levels, plans, refusals, the command's own output and the exit code are those
-of the run without `--explain`; an answer is only shown, never run or acted on, and nothing is
-stored. No command contacts Ollama without `--explain` or `llm status`, and without Ollama
-everything works as usual: a run that gets no explanation prints one line on stderr naming the
-cause. A run asks about at most 20 subjects, one request each, and results with the same facts
-are one subject (a thousand `__pycache__` files are one question). With `--json`, the report
-gains `explanations`, `explanations_model`, `explanations_not_explained` and
+by a language model running on your machine, in [Ollama](https://ollama.com) or in
+[LM Studio](https://lmstudio.ai); they are advisory and may be wrong. An explanation is in the
+window's language, English or Russian, when the window asks, and in English on the console, as
+the commands' output is. Levels, plans, refusals, the command's own output and the exit code
+are those of the run without `--explain`; an answer is only shown, never run or acted on, and
+nothing is stored. No command contacts the local AI without `--explain` or `llm status`, and
+without it everything works as usual: a run that gets no explanation prints one line on stderr
+naming the cause. A run asks about at most 20 subjects, one request each, and results with the
+same facts are one subject (a thousand `__pycache__` files are one question). With `--json`, the
+report gains `explanations`, `explanations_model`, `explanations_not_explained` and
 `explanations_unavailable`.
 
-Ollama and the model are installed by you, never by kresorter: kresorter launches no program,
-so it does not install, update, start or configure them. `kresorter llm status` says what it
-found and what is left to do (exit code 0 when everything is in place, 1 otherwise):
+Ollama and the model are installed by you, never by kresorter, and so are LM Studio and its
+models: kresorter launches no program, so it does not install, update, start or configure them.
+`kresorter llm status` says what it found and what is left to do (exit code 0 when everything
+is in place, 1 otherwise), here for Ollama:
 
 ```text
 Ollama: not reachable at http://127.0.0.1:11434 ([Errno 111] Connection refused)
@@ -222,16 +235,38 @@ Settings: KRESORTER_LLM_SERVER (ollama or lmstudio, default ollama),
   KRESORTER_OLLAMA_MODEL (default llama3.2)
 ```
 
-Both settings are environment variables. `KRESORTER_OLLAMA_URL`, by default
-`http://127.0.0.1:11434`, is `http://HOST[:PORT]` where HOST is `localhost`, an address in
-`127.0.0.0/8` or `[::1]` (an Ollama listening only on `::1` needs `http://[::1]:11434`);
-anything else is refused, proxy settings are ignored and redirects are not followed.
-`KRESORTER_OLLAMA_MODEL`, by default `llama3.2`, names a model you pulled. In the window, the
-Settings page can choose the model among those Ollama has (see
-[Desktop app](#desktop-app-optional)); the commands use `KRESORTER_OLLAMA_MODEL` only.
+For LM Studio, with `KRESORTER_LLM_SERVER=lmstudio`, it says:
 
-Each explanation is about one subject, and its facts are all that is sent; the explanation is
-labelled with them as `name=value`:
+```text
+LM Studio: not reachable at http://127.0.0.1:1234 ([Errno 111] Connection refused)
+Model: not checked
+AI explanations: unavailable; kresorter works as usual without them
+To set them up (kresorter installs nothing itself):
+  1. Install LM Studio from https://lmstudio.ai, download a model and start its server (Developer, Start Server)
+  2. Check again: kresorter llm status
+Settings: KRESORTER_LLM_SERVER (ollama or lmstudio, default ollama),
+  KRESORTER_LMSTUDIO_URL (a loopback address, default http://127.0.0.1:1234),
+  KRESORTER_LMSTUDIO_MODEL (default the first model LM Studio lists)
+```
+
+The settings are environment variables. `KRESORTER_LLM_SERVER` is `ollama`, the default, or
+`lmstudio`; anything else is refused. `KRESORTER_OLLAMA_URL`, by default
+`http://127.0.0.1:11434`, and `KRESORTER_LMSTUDIO_URL`, by default `http://127.0.0.1:1234`, are
+`http://HOST[:PORT]` where HOST is `localhost`, an address in `127.0.0.0/8` or `[::1]` (an
+Ollama listening only on `::1` needs `http://[::1]:11434`); anything else is refused, proxy
+settings are ignored and redirects are not followed. `KRESORTER_OLLAMA_MODEL`, by default
+`llama3.2`, names a model you pulled; `KRESORTER_LMSTUDIO_MODEL` names one LM Studio has
+downloaded, by default the first it lists that is not an embedding model (no `embed` in its
+name). In the window, the Settings page chooses the server, and the model among those the
+server has (see [Desktop app](#desktop-app-optional)); the commands use the variables only.
+
+LM Studio is asked two things only, through the API it shares with OpenAI's: `GET /v1/models`,
+the models it has, and `POST /v1/chat/completions`, an answer; never one that downloads, loads
+or unloads a model, so the model is downloaded in LM Studio, and its server started (Developer,
+Start Server), by you.
+
+Each explanation is about one subject, and its facts are all that is sent, the same facts, to
+either server; the explanation is labelled with them as `name=value`:
 
 - `finding` (`analyze`): `level`, `reasons` (a junk reason with its rule, as in
   `junk_cache:python-bytecode`), `extension` (the file name's lower-cased suffix, `.pdf`)
@@ -283,7 +318,8 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
   left out with its remove button and put back with its own link (`+ ~/.cache`); the window
   remembers it. Then a card per level with its files, size and strongest reasons, which opens
   Findings with that level only, and a card each for Quarantine, Organize, Autostart and Local
-  AI: the model in use and whether the last Check found it available, which opens Settings.
+  AI: the server and the model in use, and whether the last Check found it available, which
+  opens Settings.
 - **Findings**: grouped by their strongest reason, with a chip per level and a search, and at
   the right the detail of the file chosen, with why it was found. Only what is proposed at the
   Safe level is selected at first; a Review finding is selected only by its own check box, the
@@ -310,12 +346,17 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
 - **Settings**: a card each for the language (once a new one is saved, Restart now reopens the
   window in it, on the same page), Appearance (System, Light or Dark), applied at once, on
   Windows the machine-wide autostart entries (off until you turn them on), the local AI with
-  its Check, and the data folder. The Check lists the models Ollama has, to choose the one
-  every explanation and grouping uses; `KRESORTER_OLLAMA_MODEL`, when set, wins, and the card
-  says so. The card recommends a model for the computer's memory and processors, Qwen 2.5 for
-  its Russian: `qwen2.5:1.5b` under 8 GiB, `qwen2.5:3b` under 16 GiB, `qwen2.5:7b` under
-  32 GiB, `qwen2.5:14b` otherwise, one size smaller with fewer than four processors; you get it
-  with `ollama pull` and the name, kresorter installs nothing.
+  its Check, and the data folder, with the version and the licence. On the local AI's card,
+  Server: Ollama or LM Studio; a change forgets the model chosen and checks again, and the
+  address, the models, the recommendation and the steps shown are the server's. The Check lists
+  the models the server has, to choose the one every explanation and grouping uses;
+  `KRESORTER_LLM_SERVER` and the server's model variable (`KRESORTER_OLLAMA_MODEL`,
+  `KRESORTER_LMSTUDIO_MODEL`), when set, win, and the card says so. The card recommends a model
+  for the computer's memory and processors, Qwen 2.5 for its Russian: `qwen2.5:1.5b` under
+  8 GiB, `qwen2.5:3b` under 16 GiB, `qwen2.5:7b` under 32 GiB, `qwen2.5:14b` otherwise, one
+  size smaller with fewer than four processors; you get it with `ollama pull` and the name, or
+  in LM Studio's Discover tab as `qwen2.5-1.5b-instruct`, `qwen2.5-3b-instruct`,
+  `qwen2.5-7b-instruct` or `qwen2.5-14b-instruct`; kresorter installs nothing.
 
 ![Findings: the Safe files chosen, grouped by their strongest reason, and the detail of one at the right with why it was found](docs/screenshots/findings.png)
 
@@ -337,16 +378,17 @@ organize, undo, disable, enable, recover) first opens a dialog that shows what i
 Cancel as its default button. The window runs what the commands run, on the same journal and
 the same lock: what one moved the other can restore or undo, and when the window finds
 interrupted work it offers Recover, as `kresorter recover` does. Explain (local AI), under a
-finding, an autostart entry or a file that stays in place, asks Ollama about that one result
-only when you press it (see [AI explanations](#ai-explanations-optional)).
+finding, an autostart entry or a file that stays in place, asks the local AI about that one
+result only when you press it (see [AI explanations](#ai-explanations-optional)).
 
 The window is in English or Russian: the system's language by default (Russian when it is
 Russian, English otherwise), or the one chosen on the Settings page, at once with Restart now
 or from the next time it opens. It keeps one file, `settings.json` in the data directory (see
 [Recovery](#recovery)), by default
 `{"language": "system", "include_machine": false, "skipped_zones": [], "theme": "system"}`,
-with `model` once a model is chosen; it is written only when you change a setting, and a
-broken file, one over 64 KiB or a link in its place is not used, as the Settings page says.
+with `server` once LM Studio is chosen and `model` once a model is; it is written only when
+you change a setting, and a broken file, one over 64 KiB or a link in its place is not used, as
+the Settings page says.
 No finding, path, plan, group or explanation is kept.
 
 ## Uninstalling
@@ -381,7 +423,11 @@ Decisions are logged in [`docs/decisions/`](docs/decisions/); the plan is in [`d
 
 A release is a tag `vX.Y.Z` pushed by the owner, after the runs on clean machines are recorded
 in `docs/releases/X.Y.Z.md` ([the form](docs/releases/README.md)): the release job checks the
-tag, the changelog and that record before it publishes anything.
+tag, the changelog, whose heading dates the day of the tagged commit, and that record before
+it publishes anything. It publishes the GitHub release `Kresorter X.Y.Z`, with the installer,
+the portable zip, the wheel, the sdist and `SHA256SUMS.txt`, its text the changelog's entry;
+then PyPI, in a job of its own, only when the repository's variable `PUBLISH_TO_PYPI` is
+`true`.
 
 ## License
 

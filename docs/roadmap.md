@@ -354,6 +354,42 @@ Scanner core and `kresorter scan` (read-only report).
 - **The recommendation is a rule of thumb** for memory and processors; it reads no graphics
   card.
 
+### Decision 0019: done (the owner's requests, second round)
+- [Decision 0019](decisions/0019-owners-requests-2.md): the owner's six requests after using
+  the Windows build, by its plan of ten steps, each a test and then its fix.
+- The answers' language: the instruction names it, the window's (`system` resolved) or English
+  on the console, and asks to speak of the item, not of the JSON object; a reasoning model's
+  `<think>` block is dropped before the answer is cleaned.
+- The icon: `ui.brand` draws the mark and makes of it the application's icon, 16 to 256 px, set
+  before the first window opens; the ICO of `Kresorter.exe` and of the installer is made from
+  the same drawing.
+- LM Studio beside Ollama (`llm.lmstudio`): `KRESORTER_LLM_SERVER`, `KRESORTER_LMSTUDIO_URL` and
+  `KRESORTER_LMSTUDIO_MODEL`; exactly two requests, `GET /v1/models` and
+  `POST /v1/chat/completions`, a grouping's answer bound by a JSON schema; `llm status` and the
+  explanations' header name the server; in the window, the Server choice on the Settings page,
+  saved in `settings.json` as `server`, and the recommendation as LM Studio names it.
+- The README in Russian, `README.ru.md`, kept with `README.md` by a test: the switch under each
+  title, the same headings, code blocks, images and link targets.
+- The release: the GitHub release `Kresorter X.Y.Z` first, PyPI after it only when the
+  repository's variable `PUBLISH_TO_PYPI` is `true`; the changelog dated the day of the tagged
+  commit; 0.1.0 in the files' names and the version resources.
+- The licence shown: the installer's `LicenseFile`, the Settings page under the version, and the
+  README's License section in both languages.
+- 3669 tests, 100 % line and branch coverage.
+
+### Accepted limitations of decision 0019
+- Everything of decision 0018 still holds.
+- **A small model may still answer in another language**: the instruction asks; the answer is
+  advisory and says it may be wrong.
+- **LM Studio's first model is a guess** when none is chosen: an embedding model whose id does
+  not say `embed` is taken, and its answer is refused as `http_status` or `bad_response`.
+- **LM Studio says no version**: its line says only that it runs.
+- **The executable is not signed**: Windows SmartScreen may warn the first time; signing needs
+  a code-signing certificate, which the project does not have.
+- **The screenshots are the English window's**, in `README.ru.md` too.
+- **PyPI is the owner's to turn on**: until it is, the wheel and the sdist come from the GitHub
+  release.
+
 ### Left for later
 - B9 (d): no index on `autostart_changes(location)` (skipped, audit decision 5).
 - B11: CI on macOS, and live `WinRegistry` tests.
