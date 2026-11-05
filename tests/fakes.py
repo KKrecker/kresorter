@@ -54,10 +54,12 @@ def make_policy(
     *blocked: Path,
     default_roots: Iterable[Path] = (),
     app_data_dir: Path | None = None,
+    cache_zone: Iterable[Path] = (),
 ) -> PathPolicy:
     """Policy rooted in ``tmp_path``: blocks ``blocked`` (as SYSTEM), no real system paths.
 
-    The app data directory defaults to ``tmp_path / "appdata"`` (blocked as APP_DATA).
+    The app data directory defaults to ``tmp_path / "appdata"`` (blocked as APP_DATA); the
+    programs' caches are ``cache_zone``, none by default.
     """
     return PathPolicy(
         flavor=type(PurePath(tmp_path)),
@@ -67,6 +69,7 @@ def make_policy(
         profile=(tmp_path / "users", tmp_path / "users" / "me", [], []),
         default_roots=list(default_roots),
         app_data_dir=app_data_dir or tmp_path / "appdata",
+        cache_zone=list(cache_zone),
     )
 
 

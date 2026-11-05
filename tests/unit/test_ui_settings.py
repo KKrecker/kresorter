@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from fakes import make_policy
 from kresorter.core.scanner import ScanContext
 from kresorter.storage.session import SessionFailure
 from kresorter.ui.settings import (
@@ -331,6 +332,25 @@ def test_a_name_of_no_zone_is_a_wrong_value(
     # [0018.17] Not the other names either: the file is not used at all.
     _write(data_dir, json.dumps({"language": "ru", "skipped_zones": value}).encode())
     assert load(context) == Loaded(DEFAULTS, Unused.WRONG_VALUE, detail)
+
+
+def test_the_programs_caches_are_remembered_by_their_name_where_they_are_a_zone(
+    tmp_path: Path, zone: Path, data_dir: Path
+) -> None:
+    # [0020.15] caches, after the safe zones; a wrong value where there are none
+    base = scan_context(tmp_path, zone, data_dir)
+    policy = make_policy(
+        tmp_path,
+        tmp_path / "system",
+        default_roots=[zone],
+        app_data_dir=data_dir,
+        cache_zone=[tmp_path / "Local" / "Chrome"],
+    )
+    with_caches = dataclasses.replace(base, policy=policy)
+    settings = Settings(skipped_zones=("zone", "caches"))
+    assert save(with_caches, settings) is None
+    assert load(with_caches) == Loaded(settings)
+    assert load(base) == Loaded(DEFAULTS, Unused.WRONG_VALUE, 'skipped_zones=["zone", "caches"]')
 
 
 def test_a_zone_s_path_is_a_wrong_value(context: ScanContext, data_dir: Path, zone: Path) -> None:

@@ -694,3 +694,103 @@ def test_a_zone_left_out_that_is_added_as_a_folder_is_put_back(
     assert window.overview.roots() == [zone]
     assert window.overview.zone_links() == []
     assert window.settings.current.skipped_zones == ()
+
+
+# --- the programs' caches [0020.15] ---------------------------------------------------------------
+
+
+def _caches(tmp_path: Path, zone: Path, data_dir: Path) -> tuple[Environment, list[Path]]:
+    """A system with a zone of programs' caches, as Windows has: one folder made, one not."""
+    caches = [tmp_path / "Local" / "Chrome", tmp_path / "Local" / "NVIDIA"]
+    caches[0].mkdir(parents=True)
+    base = environment(tmp_path, zone, data_dir)
+
+    def context() -> ScanContext:
+        policy = make_policy(
+            tmp_path,
+            tmp_path / "system",
+            default_roots=[zone],
+            app_data_dir=data_dir,
+            cache_zone=caches,
+        )
+        return dataclasses.replace(base.scan_context(), policy=policy)
+
+    return dataclasses.replace(base, scan_context=context), caches
+
+
+def test_the_programs_caches_are_a_chip_after_the_safe_zones(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path
+) -> None:
+    # [0020.15] by its name; its folders in its tooltip
+    env, caches = _caches(tmp_path, zone, data_dir)
+    window = make_window(qtbot, env)
+    first, chip = _chips(window)
+    assert first.path == zone
+    assert chip.label.text() == "Programs' caches"
+    assert chip.toolTip() == "\n".join(["Read for junk only:", *(str(c) for c in caches)])
+    assert chip.remove.accessibleName() == "Leave Programs' caches out of the scan"
+    assert window.overview.roots() == [zone]
+    assert window.overview.junk_only() == caches
+
+
+def test_the_programs_caches_are_read_for_junk_only(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path
+) -> None:
+    # [0020.15] where its folders are; the Findings page says it read them
+    env, caches = _caches(tmp_path, zone, data_dir)
+    junk = write(caches[0] / "__pycache__" / "m.cpython-313.pyc", b"bytecode")
+    write(caches[0] / "photo.jpg", b"same")
+    write(zone / "photo.jpg", b"same")
+    window = make_window(qtbot, env)
+    scanned(qtbot, window)
+    found = window.overview.scanned
+    assert found is not None
+    assert found.report.junk_only_roots == (caches[0],)
+    assert [finding.entry.path for finding in found.analysis.findings] == [junk]
+    subtitle = window.findings.head.subtitle.text()
+    assert subtitle == f"Scan of {_shown('zone')} and programs' caches, {_moment(found.at)}"
+
+
+def test_the_programs_caches_left_out_are_remembered_and_put_back(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path
+) -> None:
+    # [0020.15] like any zone, by the name caches
+    env, caches = _caches(tmp_path, zone, data_dir)
+    write(caches[0] / "__pycache__" / "m.cpython-313.pyc", b"bytecode")
+    window = make_window(qtbot, env)
+    _, chip = _chips(window)
+    chip.remove.click()
+    assert _links(window) == ["+ Programs' caches"]
+    assert _skipped(data_dir) == ["caches"]
+    assert window.overview.junk_only() == []
+    scanned(qtbot, window)
+    found = window.overview.scanned
+    assert found is not None
+    assert (found.report.junk_only_roots, found.analysis.findings) == ((), ())
+    subtitle = window.findings.head.subtitle.text()
+    assert subtitle == f"Scan of {_shown('zone')}, {_moment(found.at)}"
+    [link] = window.overview.zone_links()
+    assert link.toolTip() == "Scan Programs' caches again"
+    link.click()
+    assert [c.label.text() for c in _chips(window)] == [_shown("zone"), "Programs' caches"]
+    assert _skipped(data_dir) == []
+
+
+def test_the_programs_caches_alone_are_scanned_and_said_so_in_russian(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, home: Path
+) -> None:
+    # [0020.15]
+    env, caches = _caches(tmp_path, zone, data_dir)
+    settled(data_dir, skipped_zones=["zone"])
+    window = make_window(qtbot, env, language="ru")
+    [chip] = _chips(window)
+    assert chip.label.text() == "Кеши программ"
+    assert chip.toolTip() == "\n".join(["Только поиск мусора:", *(str(c) for c in caches)])
+    assert chip.remove.accessibleName() == "Убрать Кеши программ из сканирования"
+    assert window.overview.roots() == []
+    assert window.overview.scan_button.isEnabled()
+    scanned(qtbot, window)
+    found = window.overview.scanned
+    assert found is not None
+    subtitle = window.findings.head.subtitle.text()
+    assert subtitle == f"Сканирование кешей программ, {_moment(found.at)}"
