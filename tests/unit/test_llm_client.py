@@ -579,7 +579,7 @@ def test_an_answer_with_nothing_left_is_empty(text: str) -> None:
 
 
 def test_the_reasons_are_pinned() -> None:
-    # [0013.23]
+    # [0013.23] [0019.9] LM Studio's after Ollama's
     assert [reason.value for reason in Unavailable] == [
         "config",
         "unreachable",
@@ -587,6 +587,7 @@ def test_the_reasons_are_pinned() -> None:
         "redirect",
         "http_status",
         "not_ollama",
+        "not_lmstudio",
         "model_missing",
         "too_large",
         "bad_response",

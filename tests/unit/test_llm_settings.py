@@ -1,19 +1,30 @@
-"""Where Ollama is and which model explains: loopback addresses only, names never resolved."""
+"""Where Ollama or LM Studio is and which model explains: loopback addresses only, names never
+resolved (decisions 0013 and 0019)."""
 
 import socket
 from typing import Any
 
 import pytest
 
-from kresorter.llm.failure import ExplanationUnavailable, Unavailable
+from kresorter.llm.failure import ExplanationUnavailable, SettingRefused, Unavailable
 from kresorter.llm.settings import (
     DEFAULT_ADDRESS,
+    LMSTUDIO_ADDRESS,
+    LMSTUDIO_MODEL_VARIABLE,
+    LMSTUDIO_PORT,
+    LMSTUDIO_URL_VARIABLE,
+    SERVER_VARIABLE,
+    SERVERS,
     Address,
+    Variables,
     address_from,
     installed,
     is_model_name,
     model_from,
+    server_from,
+    variables,
     with_model,
+    with_server,
 )
 
 
@@ -184,3 +195,145 @@ def test_the_model_chosen_is_used_unless_the_environment_names_one() -> None:
     named = {**url, "KRESORTER_OLLAMA_MODEL": "llama3.2"}
     assert model_from(with_model(named, "qwen2.5:3b")) == "llama3.2"
     assert url == {"KRESORTER_OLLAMA_URL": "http://127.0.0.1:9"}
+
+
+# --- two local servers, Ollama and LM Studio (decision 0019, items 5-7) --------------------------
+
+LMSTUDIO = {"KRESORTER_LLM_SERVER": "lmstudio"}
+
+
+def test_the_server_is_ollama_unless_the_environment_names_lm_studio() -> None:
+    # [0019.5]
+    assert SERVERS == ("ollama", "lmstudio")
+    assert SERVER_VARIABLE == "KRESORTER_LLM_SERVER"
+    assert server_from({}) == "ollama"
+    assert server_from({"KRESORTER_LLM_SERVER": "ollama"}) == "ollama"
+    assert server_from(LMSTUDIO) == "lmstudio"
+
+
+@pytest.mark.parametrize(
+    "value", ["", "LMStudio", "lm-studio", "lm studio", "Ollama", " ollama", "llamacpp", "openai"]
+)
+def test_any_other_server_is_refused(value: str) -> None:
+    # [0019.5] a config refusal, which names the variable, before any address is read
+    for read in (server_from, address_from, model_from):
+        with pytest.raises(SettingRefused) as refused:
+            read({"KRESORTER_LLM_SERVER": value, "KRESORTER_OLLAMA_URL": "http://10.0.0.1"})
+        assert refused.value.reason is Unavailable.CONFIG
+        assert refused.value.name == "KRESORTER_LLM_SERVER"
+        assert refused.value.detail.startswith(f"KRESORTER_LLM_SERVER={value!r}: ")
+
+
+def test_lm_studios_address_is_its_own_on_loopback() -> None:
+    # [0019.6] port 1234; Ollama's variable is not read for it, nor its own for Ollama
+    assert LMSTUDIO_URL_VARIABLE == "KRESORTER_LMSTUDIO_URL"
+    assert LMSTUDIO_PORT == 1234
+    assert address_from(LMSTUDIO) == LMSTUDIO_ADDRESS == Address("127.0.0.1", 1234)
+    ollama_named = {**LMSTUDIO, "KRESORTER_OLLAMA_URL": "http://127.0.0.1:9"}
+    assert address_from(ollama_named) == LMSTUDIO_ADDRESS
+    assert address_from({"KRESORTER_LMSTUDIO_URL": "http://127.0.0.1:9"}) == DEFAULT_ADDRESS
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("http://127.0.0.1:1234", Address("127.0.0.1", 1234)),
+        ("http://127.0.0.1:1234/", Address("127.0.0.1", 1234)),
+        ("http://localhost", Address("127.0.0.1", 1234)),
+        ("http://127.0.0.1", Address("127.0.0.1", 1234)),
+        ("http://localhost:8080", Address("127.0.0.1", 8080)),
+        ("http://[::1]", Address("::1", 1234)),
+        ("http://127.8.9.10:1", Address("127.8.9.10", 1)),
+    ],
+)
+def test_lm_studios_accepted_addresses(value: str, expected: Address) -> None:
+    # [0019.6] the form of 0013 item 8, 1234 when the port is left out
+    assert address_from({**LMSTUDIO, "KRESORTER_LMSTUDIO_URL": value}) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://127.0.0.1:1234",
+        "http://0.0.0.0:1234",
+        "http://10.0.0.1:1234",
+        "http://example.com:1234",
+        "http://127.0.0.1:0",
+        "http://127.0.0.1:1234/v1",
+        "127.0.0.1:1234",
+        "",
+    ],
+)
+def test_lm_studios_refused_addresses(value: str) -> None:
+    # [0019.6] the checks of 0013 item 8, which name LM Studio's variable
+    with pytest.raises(SettingRefused) as refused:
+        address_from({**LMSTUDIO, "KRESORTER_LMSTUDIO_URL": value})
+    assert refused.value.reason is Unavailable.CONFIG
+    assert refused.value.name == "KRESORTER_LMSTUDIO_URL"
+    assert refused.value.detail.startswith(f"KRESORTER_LMSTUDIO_URL={value!r}: ")
+
+
+def test_lm_studio_has_no_model_unless_one_is_named() -> None:
+    # [0019.7] None: the first that LM Studio lists is taken; Ollama's variable is not read
+    assert LMSTUDIO_MODEL_VARIABLE == "KRESORTER_LMSTUDIO_MODEL"
+    assert model_from(LMSTUDIO) is None
+    assert model_from({**LMSTUDIO, "KRESORTER_OLLAMA_MODEL": "qwen2.5:7b"}) is None
+    named = {**LMSTUDIO, "KRESORTER_LMSTUDIO_MODEL": "qwen2.5-7b-instruct"}
+    assert model_from(named) == "qwen2.5-7b-instruct"
+    assert model_from({"KRESORTER_LMSTUDIO_MODEL": "qwen2.5-7b-instruct"}) == "llama3.2"
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["qwen2.5-7b-instruct", "qwen2.5-7b-instruct@q4_k_m", "qwen/qwen3-8b", "lmstudio-community/x"],
+)
+def test_lm_studios_accepted_model_names(name: str) -> None:
+    # [0019.7] LM Studio names a quantization after @; the same names for either server
+    assert is_model_name(name)
+    assert model_from({**LMSTUDIO, "KRESORTER_LMSTUDIO_MODEL": name}) == name
+    assert model_from({"KRESORTER_OLLAMA_MODEL": name}) == name
+
+
+@pytest.mark.parametrize("name", ["", "@q4", "a b", "a@b c", "a" * 101, "qw\u0435n", "a\nb"])
+def test_lm_studios_refused_model_names(name: str) -> None:
+    # [0019.7]
+    with pytest.raises(SettingRefused) as refused:
+        model_from({**LMSTUDIO, "KRESORTER_LMSTUDIO_MODEL": name})
+    assert refused.value.reason is Unavailable.CONFIG
+    assert refused.value.detail.startswith(f"KRESORTER_LMSTUDIO_MODEL={name!r}: ")
+
+
+def test_the_model_chosen_is_the_servers_unless_the_environment_names_one() -> None:
+    # [0019.7] the window's choice, for the server in use: its variable, when set, wins
+    chosen = with_model(LMSTUDIO, "qwen2.5-7b-instruct")
+    assert chosen == {**LMSTUDIO, "KRESORTER_LMSTUDIO_MODEL": "qwen2.5-7b-instruct"}
+    assert model_from(chosen) == "qwen2.5-7b-instruct"
+    named = {**LMSTUDIO, "KRESORTER_LMSTUDIO_MODEL": "llama-3.2-1b-instruct"}
+    assert with_model(named, "qwen2.5-7b-instruct") == named
+    assert with_model(LMSTUDIO, None) == LMSTUDIO
+    assert with_model({}, "qwen2.5:3b") == {"KRESORTER_OLLAMA_MODEL": "qwen2.5:3b"}
+    refused = {"KRESORTER_LLM_SERVER": "openai"}
+    assert with_model(refused, "x") == {**refused, "KRESORTER_OLLAMA_MODEL": "x"}  # still refused
+    assert LMSTUDIO == {"KRESORTER_LLM_SERVER": "lmstudio"}
+
+
+def test_the_server_chosen_is_used_unless_the_environment_names_one() -> None:
+    # [0019.5] the window's choice: KRESORTER_LLM_SERVER, when set, wins
+    assert with_server({}, "lmstudio") == LMSTUDIO
+    assert server_from(with_server({}, "lmstudio")) == "lmstudio"
+    assert with_server({"KRESORTER_LLM_SERVER": "ollama"}, "lmstudio") == {
+        "KRESORTER_LLM_SERVER": "ollama"
+    }
+    assert with_server({"KRESORTER_OLLAMA_URL": "http://127.0.0.1:9"}, None) == {
+        "KRESORTER_OLLAMA_URL": "http://127.0.0.1:9"
+    }
+
+
+def test_each_servers_variables() -> None:
+    # [0019.5] [0019.6] [0019.7] what the console and the window name for each
+    assert variables("ollama") == Variables(
+        "ollama", "KRESORTER_OLLAMA_URL", "KRESORTER_OLLAMA_MODEL", DEFAULT_ADDRESS, "llama3.2"
+    )
+    assert variables("lmstudio") == Variables(
+        "lmstudio", "KRESORTER_LMSTUDIO_URL", "KRESORTER_LMSTUDIO_MODEL", LMSTUDIO_ADDRESS, None
+    )

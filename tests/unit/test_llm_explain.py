@@ -19,6 +19,7 @@ from kresorter.llm.prompt import Language
 from kresorter.llm.settings import Address
 from kresorter.llm.subjects import Subject
 from kresorter.llm.transport import Limits
+from support import lmstudio as lms
 from support.ollama import Answer, ScriptedOllama, after, as_json, head
 
 VERSION = as_json({"version": "0.6.2"})
@@ -196,3 +197,36 @@ def test_nothing_to_explain_leaves_a_working_ollama_alone() -> None:
         run = explain([], env_for(ollama.address))
     assert ollama.connections == 0
     assert run == Explanations(model=None, explained=(), not_explained=0, unavailable=None)
+
+
+# --- LM Studio (decision 0019) -------------------------------------------------------------------
+
+
+def test_with_lm_studio_the_models_are_listed_once_then_each_subject_is_a_chat() -> None:
+    # [0019.8] [0019.7] the first model listed that is not an embedding model, in each body
+    asked = [subject(n) for n in range(2)]
+    with ScriptedOllama(lms.MODELS, lms.completed("One."), lms.completed("Two.")) as server:
+        run = explain(asked, lms.env_for(server.address), language="ru")
+    assert server.paths() == [lms.LISTED, lms.CHAT, lms.CHAT]
+    assert (run.model, texts(run), run.unavailable) == (lms.MODEL, ["One.", "Two."], None)
+    bodies = [json.loads(received.body) for received in server.received[1:]]
+    assert [sent["model"] for sent in bodies] == [lms.MODEL, lms.MODEL]
+    assert [json.loads(sent["messages"][1]["content"])["extension"] for sent in bodies] == [
+        ".x0",
+        ".x1",
+    ]
+    assert bodies[0]["messages"][0]["content"].endswith("Write the answer in Russian.")
+
+
+def test_with_lm_studio_a_failed_check_asks_nothing_more() -> None:
+    # [0019.9] [0013.13]
+    with ScriptedOllama(lms.models(lms.EMBEDDING)) as server:
+        run = explain([subject(0)], lms.env_for(server.address))
+    assert run.unavailable is not None
+    assert (run.model, run.unavailable.reason) == (None, Unavailable.MODEL_MISSING)
+    assert server.paths() == [lms.LISTED]
+    with ScriptedOllama(lms.MODELS, lms.completed(None)) as server:
+        failed = explain([subject(0), subject(1)], lms.env_for(server.address))
+    assert failed.unavailable is not None
+    assert failed.unavailable.reason is Unavailable.BAD_RESPONSE
+    assert server.paths() == [lms.LISTED, lms.CHAT]

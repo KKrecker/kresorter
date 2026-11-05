@@ -13,6 +13,7 @@ import pytest
 from kresorter.llm.client import GENERATE
 from kresorter.llm.failure import ExplanationUnavailable, Unavailable
 from kresorter.llm.group import (
+    GROUP_FORMAT,
     GROUP_INSTRUCTION,
     GROUP_OPTIONS,
     LANGUAGES,
@@ -30,6 +31,7 @@ from kresorter.llm.group import (
 from kresorter.llm.transport import LIMITS, Limits
 from kresorter.organize.names import fold
 from kresorter.organize.planner import Move, Plan, Stay, StayReason
+from support import lmstudio as lms
 from support.ollama import (
     TAGS,
     VERSION,
@@ -380,3 +382,91 @@ def test_a_check_that_fails_sends_no_generate() -> None:
     assert found.unavailable is not None
     assert found.unavailable.reason is Unavailable.MODEL_MISSING
     assert ollama.paths() == CHECKS
+
+
+# --- with LM Studio (decision 0019, item 8) ------------------------------------------------------
+
+GROUP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "groups": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "folder": {"type": "string"},
+                    "files": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["folder", "files"],
+            },
+        }
+    },
+    "required": ["groups"],
+}
+
+
+def test_with_lm_studio_grouping_lists_the_models_then_sends_one_chat() -> None:
+    # [0019.8] its own instruction and prompt, 4096 tokens, the answer's shape a JSON schema
+    with ScriptedOllama(lms.MODELS, lms.completed(GROUPED)) as server:
+        found = group(PLAN, lms.env_for(server.address), "ru")
+    assert found == Grouping(
+        lms.MODEL, {"a.pdf": "Taxes", "b.pdf": "Taxes"}, ("a.pdf", "b.pdf", "c.txt"), None
+    )
+    assert server.paths() == [lms.LISTED, lms.CHAT]
+    sent = json.loads(server.received[-1].body)
+    assert list(sent) == [
+        "model",
+        "messages",
+        "temperature",
+        "seed",
+        "max_tokens",
+        "stream",
+        "response_format",
+    ]
+    prompt = json.dumps({"language": "Russian", "files": ["a.pdf", "b.pdf", "c.txt"]})
+    assert sent == {
+        "model": lms.MODEL,
+        "messages": [
+            {"role": "system", "content": GROUP_INSTRUCTION},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0,
+        "seed": 0,
+        "max_tokens": 4096,
+        "stream": False,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "groups", "schema": GROUP_SCHEMA},
+        },
+    }
+    assert sent["response_format"] == GROUP_FORMAT
+
+
+def test_with_lm_studio_the_body_is_at_most_32_kib_too() -> None:
+    # [0019.8] [0018.30]
+    names = [f"{n:03d}" + '"' * 97 for n in range(100)]
+    with ScriptedOllama(lms.MODELS, lms.completed(_answer())) as server:
+        found = group(_plan(names, [], []), lms.env_for(server.address), "en")
+    sent = server.received[-1].body
+    assert len(sent) <= 32 * 1024
+    files = json.loads(json.loads(sent)["messages"][1]["content"])["files"]
+    assert 2 <= len(files) < 100
+    assert tuple(files) == found.sent == tuple(names[: len(files)])
+    longer = group_body(lms.MODEL, [*files, names[len(files)]], "en", server="lmstudio")
+    assert len(longer) > 32 * 1024
+
+
+@pytest.mark.parametrize(
+    ("answer", "reason"),
+    [
+        (lms.completed("not json"), Unavailable.BAD_RESPONSE),
+        (lms.completed(None), Unavailable.BAD_RESPONSE),
+        (as_json({"error": "model not loaded"}, 400), Unavailable.HTTP_STATUS),
+    ],
+)
+def test_with_lm_studio_a_grouping_that_fails_says_why(answer: Answer, reason: Unavailable) -> None:
+    # [0019.9]
+    with ScriptedOllama(lms.MODELS, answer) as server:
+        found = group(PLAN, lms.env_for(server.address), "en")
+    assert found.unavailable is not None
+    assert (found.model, found.groups, found.unavailable.reason) == (lms.MODEL, {}, reason)
