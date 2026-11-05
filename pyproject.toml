@@ -80,6 +80,9 @@ addopts = "-ra --strict-markers --cov=kresorter --cov-branch --cov-report=term-m
 qt_api = "pyside6"
 # A deprecation fails the tests when it is announced (pre-step-8 audit, A3).
 filterwarnings = ["error"]
+# A test still running after two minutes has every thread's stack written out: the log of a
+# hang says where it waits (CI run 42003708808).
+faulthandler_timeout = 120
 
 [tool.coverage.run]
 source = ["kresorter"]

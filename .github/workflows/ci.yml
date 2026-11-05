@@ -14,6 +14,9 @@ jobs:
     # Linux and Windows for every Python, the repository being public (decision 0015, item 20;
     # pre-step-5 audit, B11).
     runs-on: ${{ matrix.os }}
+    # A hung job ends within half an hour, not after GitHub's six hours: a check takes about
+    # ten minutes (CI run 42003708808, the tests of Windows 3.13 hung).
+    timeout-minutes: 30
     env:
       # The window's tests need no display, on either system (decision 0014, item 10).
       QT_QPA_PLATFORM: offscreen
@@ -46,6 +49,7 @@ jobs:
     # and the wheel run (decision 0015, items 21 and 22). The Windows build takes this wheel.
     needs: check
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
@@ -77,6 +81,7 @@ jobs:
     # to 15 and 21), with the Python 3.13 of item 12; then each is run (item 22).
     needs: build
     runs-on: windows-latest
+    timeout-minutes: 30
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
@@ -123,6 +128,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build, windows]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
@@ -158,6 +164,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_TO_PYPI == 'true'
     needs: release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: pypi
     permissions:
       id-token: write
