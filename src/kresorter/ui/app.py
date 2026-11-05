@@ -1,7 +1,8 @@
 """The application and its window (decision 0014); while it runs, an uncaught error is a
 dialog (decision 0015, item 25). With a report, the window's self-test instead (item 17). A
 restart closes the window and opens it again, in the same process, with the settings read again,
-on the same page; a window closed otherwise ends the application (decision 0018, item 4)."""
+on the same page; a window closed otherwise ends the application (decision 0018, item 4). Each
+window and dialog shows the application's icon, the mark (decision 0019, item 3)."""
 
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from PySide6.QtCore import QLocale
 from PySide6.QtWidgets import QApplication
 
 from kresorter.environment import Environment
+from kresorter.ui.brand import app_icon
 from kresorter.ui.errors import ErrorHook, show_error
 from kresorter.ui.i18n import Translator, language_for
 from kresorter.ui.selftest import self_test
@@ -27,6 +29,7 @@ def run(argv: Sequence[str], environment: Environment, report: Path | None = Non
     """Show the window in the language of the settings and run until it is closed, opening it
     again after each restart; with ``report``, its self-test."""
     application = QApplication.instance() or QApplication(list(argv))
+    QApplication.setWindowIcon(app_icon())  # every window's and dialog's, before the first
     if report is not None:
         return self_test(application, environment, report)
     previous = sys.excepthook

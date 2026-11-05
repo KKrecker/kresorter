@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
 )
 
-from kresorter.ui import icons
+from kresorter.ui import brand, icons
 from kresorter.ui.i18n import Translator
 from kresorter.ui.parts import Icon, Label, Note, divider, dot, hbox, mark, vbox
 from kresorter.ui.theme import Look, Palette
@@ -127,9 +127,11 @@ class Sidebar(QFrame):
         self._names = [*pages, *apart]
         self._row = -1
         text = translator.text
-        self.mark = Icon(look, "shield-check", _primary_text, size=16, tile=_accent, side=28)
-        brand = Label(text("app.title"))
-        brand.setObjectName("brand")
+        self.mark = Icon(
+            look, brand.SHIELD, _primary_text, size=brand.GLYPH, tile=_accent, side=brand.TILE
+        )
+        title = Label(text("app.title"))
+        title.setObjectName("brand")
         self.lists = (_Pages(self, look), _Pages(self, look))
         self.lists[0].setAccessibleName(text("sidebar.pages"))
         self.lists[1].setAccessibleName(text("page.settings"))
@@ -145,7 +147,7 @@ class Sidebar(QFrame):
 
         mark = hbox(spacing=12, margins=(4, 0, 0, 0))
         mark.addWidget(self.mark)
-        mark.addWidget(brand, 1)
+        mark.addWidget(title, 1)
         layout = vbox(self, margins=(12, 16, 12, 16), spacing=0)
         layout.addLayout(mark)
         layout.addSpacing(24)

@@ -3,7 +3,7 @@
 PyInstaller runs the spec on Windows, with the Python 3.13 of CI, in a virtual environment that
 has Kresorter's wheel with the extra ``ui`` and the tools of ``requirements.txt``. The spec takes
 from here the package, from that wheel (the source tree and an editable install are refused),
-with its data files and every module; the icon, the sidebar's mark drawn from its SVG; the
+with its data files and every module; the icon, the mark ``kresorter.ui.brand`` draws; the
 version resource, from ``__version__``; then, once PyInstaller has made the folder, the
 licences put in it and the portable zip of it. The tests run each part on any system.
 """
@@ -24,12 +24,11 @@ from pathlib import Path
 from string import Template
 
 from PySide6 import QtCore
-from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QRectF, Qt
-from PySide6.QtGui import QColor, QImage, QImageWriter, QPainter
+from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+from PySide6.QtGui import QImage, QImageWriter
 
 from kresorter import __version__
-from kresorter.ui import icons
-from kresorter.ui.theme import LIGHT
+from kresorter.ui.brand import SIDES, mark
 
 __all__ = [
     "BUNDLED",
@@ -64,10 +63,6 @@ BUNDLED = ("PySide6_Essentials", "shiboken6", "pyinstaller")
 # Imported by name (importlib), which PyInstaller does not follow, or, for Qt's SVG module, by
 # Qt itself, which draws the icons from SVG.
 BY_NAME = ("ctypes", "msvcrt", "winreg", "PySide6.QtWidgets", "PySide6.QtSvg")
-# The sidebar's mark (kresorter.ui.sidebar): a 28 px tile of the accent with corners of 8 px,
-# the 16 px shield in its middle, in the primary button's text.
-TILE, RADIUS, GLYPH, MARK = 28, 8, 16, "shield-check"
-SIDES = (16, 20, 24, 32, 40, 48, 64, 256)  # those Windows shows, at each scale
 DESCRIPTION = "Safe file cleanup"
 AUTHOR = "KKrecker"
 COPYRIGHT = "Copyright (c) 2026 KKrecker"
@@ -124,24 +119,6 @@ def hidden_imports(package: Path) -> list[str]:
 # --- the icon -----------------------------------------------------------------------------------
 
 
-def mark(side: int) -> QImage:
-    """The sidebar's mark, ``side`` px square, as the sidebar draws it at 28 px."""
-    image = QImage(side, side, QImage.Format.Format_ARGB32_Premultiplied)
-    image.fill(Qt.GlobalColor.transparent)
-    scale = side / TILE
-    painter = QPainter(image)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.scale(scale, scale)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(QColor(LIGHT.accent))
-    painter.drawRoundedRect(QRectF(0, 0, TILE, TILE), RADIUS, RADIUS)
-    offset = (TILE - GLYPH) / 2
-    glyph = icons.image(MARK, LIGHT.primary_text, GLYPH, scale)
-    painter.drawImage(QRectF(offset, offset, GLYPH, GLYPH), glyph)
-    painter.end()
-    return image
-
-
 def png(image: QImage) -> bytes:
     data = QByteArray()
     buffer = QBuffer(data)
@@ -151,8 +128,29 @@ def png(image: QImage) -> bytes:
     return bytes(data.data())
 
 
+def bitmap(image: QImage) -> bytes:
+    """An icon's image as Windows' icon guidelines have it under 256 px: uncompressed, 32 bits a
+    pixel with its alpha (blue, green, red, alpha), the bottom row first, twice its height in its
+    header for the mask that follows, a bit a pixel, set where the pixel is transparent."""
+    plain = image.convertToFormat(QImage.Format.Format_ARGB32)
+    width, height = plain.width(), plain.height()
+    row = (width + 31) // 32 * 4
+    colours, mask = bytearray(), bytearray()
+    for y in reversed(range(height)):
+        values = [plain.pixel(x, y) for x in range(width)]
+        colours += struct.pack(f"<{width}I", *values)
+        bits = bytearray(row)
+        for x, value in enumerate(values):
+            if value >> 24 == 0:
+                bits[x // 8] |= 0x80 >> (x % 8)
+        mask += bits
+    size = len(colours) + len(mask)
+    header = struct.pack("<IiiHHIIiiII", 40, width, 2 * height, 1, 32, 0, size, 0, 0, 0, 0)
+    return header + bytes(colours) + bytes(mask)
+
+
 def ico(images: Sequence[tuple[int, bytes]]) -> bytes:
-    """An ICO file of PNG images (Windows Vista and later), each with its side."""
+    """An ICO file of images, each with its side, 32 bits a pixel."""
     entries, blobs = [], []
     offset = 6 + 16 * len(images)
     for side, blob in images:
@@ -164,9 +162,11 @@ def ico(images: Sequence[tuple[int, bytes]]) -> bytes:
 
 
 def icon(path: Path) -> Path:
-    """``kresorter.ico``: the mark at each of ``SIDES``."""
+    """``kresorter.ico``: ``ui.brand``'s mark at each of ``SIDES``, a bitmap under 256 px and a
+    PNG at 256 (decision 0019, item 4)."""
+    images = [(side, (png if side >= 256 else bitmap)(mark(side))) for side in SIDES]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(ico([(side, png(mark(side))) for side in SIDES]))
+    path.write_bytes(ico(images))
     return path
 
 

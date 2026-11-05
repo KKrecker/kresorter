@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QSize
-from PySide6.QtGui import QIcon, QImage
+from PySide6.QtGui import QColor, QIcon, QImage, QPainter
 from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 
@@ -36,6 +36,16 @@ def _pixels(image: QImage) -> list[int]:
     return [plain.pixel(x, y) for y in range(plain.height()) for x in range(plain.width())]
 
 
+def _on(colour: str, image: QImage) -> QImage:
+    """``image`` drawn on ``colour``, its transparent corners left out."""
+    ground = QImage(image.size(), QImage.Format.Format_ARGB32_Premultiplied)
+    ground.fill(QColor(colour))
+    painter = QPainter(ground)
+    painter.drawImage(0, 0, image)
+    painter.end()
+    return ground
+
+
 def _sides(icon: QIcon) -> list[int]:
     return sorted(size.width() for size in icon.availableSizes())
 
@@ -51,7 +61,8 @@ def test_the_mark_is_the_shield_on_the_accents_tile_at_any_side(
     assert drawn.pixelColor(0, 0).alpha() == 0
     assert drawn.pixelColor(side // 2, 0).name() == LIGHT.accent.lower()
     assert drawn.pixelColor(side // 2, 0).alpha() == 255
-    assert drawn_in(drawn, LIGHT.primary_text, LIGHT.accent)
+    within = 64 if side < 24 else 2  # a small shield's thin strokes never reach their colour
+    assert drawn_in(_on(LIGHT.accent, drawn), LIGHT.primary_text, LIGHT.accent, within=within)
 
 
 def test_the_mark_is_the_sidebars(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path) -> None:
