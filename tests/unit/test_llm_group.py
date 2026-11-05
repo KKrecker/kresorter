@@ -1,6 +1,6 @@
 """Grouping a plan's files by meaning (decision 0018, items 24-27, 30 and 31), in numbered
 batches a small context holds, with the answer's schema, without thinking (decision 0020,
-items 1-7 and 9).
+items 1-9).
 
 The model gets the names only, numbered, and its answer is untrusted input: a file is taken
 only if it was sent in that batch and is named once in its answer, by its number or its name;
@@ -614,7 +614,8 @@ def test_grouping_has_a_deadline_of_its_own() -> None:
     ],
 )
 def test_a_grouping_that_fails_says_why(answer: Answer, reason: Unavailable) -> None:
-    # [0018.31] [0018.30] An answer of at most 64 KiB, as every answer.
+    # [0018.31] [0018.30] [0020.8] An answer of at most 64 KiB, as every answer; when the first
+    # batch fails, there is no group.
     with ScriptedOllama(VERSION, TAGS, answer) as ollama:
         found = group(PLAN, _env(ollama), "en")
     assert found.model == "llama3.2"
@@ -638,15 +639,31 @@ def test_an_answer_cut_at_its_length_says_so() -> None:
         assert group(PLAN, _env(ollama), "en").groups == {"a.pdf": "Taxes", "b.pdf": "Taxes"}
 
 
-def test_a_later_batch_that_fails_fails_the_grouping() -> None:
-    # [0018.31] What every batch sent is said.
-    names = [f"n{n:02d}.pdf" for n in range(41)]
-    answers = (generated(GROUPED), generated("No."))
+def test_a_later_batch_that_fails_keeps_the_groups_before_it() -> None:
+    # [0020.8] The batches after it are not sent; what every batch sent is said, and why the
+    # grouping stopped.
+    names = [f"n{n:02d}.pdf" for n in range(81)]
+    answers = (generated(GROUPED), generated("No."), generated(GROUPED))
     with ScriptedOllama(VERSION, TAGS, *answers) as ollama:
         found = group(_plan(names, [], []), _env(ollama), "en")
-    assert found.unavailable is not None
-    assert found.unavailable.reason is Unavailable.BAD_RESPONSE
-    assert (found.groups, found.sent) == ({}, tuple(names))
+    assert ollama.paths() == [*CHECKS, GENERATE, GENERATE]
+    assert (found.groups, found.sent) == (
+        {"n00.pdf": "Taxes", "n01.pdf": "Taxes"},
+        tuple(names[:80]),
+    )
+    assert _why(found) == (Unavailable.BAD_RESPONSE, 'the answer is not {"groups": [...]}: "No."')
+
+
+def test_each_batch_has_the_deadline_of_its_own() -> None:
+    # [0020.8] Three answers of 0.6 s each within a deadline of 1.5 s.
+    data = json.dumps({"response": GROUPED, "done": True}).encode()
+    slow = after(0.6, head(200, length=len(data)) + data)
+    names = [f"n{n:02d}.pdf" for n in range(82)]
+    with ScriptedOllama(VERSION, TAGS, slow) as ollama:
+        found = group(_plan(names, [], []), _env(ollama), "en", limits=Limits(group_seconds=1.5))
+    assert ollama.paths() == [*CHECKS, GENERATE, GENERATE, GENERATE]
+    assert found.unavailable is None
+    assert len(found.groups) == 6
 
 
 def test_a_check_that_fails_sends_no_generate() -> None:

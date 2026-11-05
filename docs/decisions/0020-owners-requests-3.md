@@ -102,8 +102,10 @@ hashing any cheaper. Kresorter keeps listing directories; the time goes from whe
    `"folders"` when the files belong there; each file in one group at most, the files that
    fit none left out; a folder's name a few plain words in the language given, at most 40
    characters.
-10. **The note says what was grouped**: `The local AI grouped N of M files into K folders.`,
-    under the plan made with the groups.
+10. **The note says what was grouped**, under the plan made with the groups: `The local AI
+    (<model>) grouped N of M files into K folders: the groups may be wrong.`, M the names to
+    group (0018 item 25, at most 400); after a batch that failed, `..., then stopped:
+    <reason>.`
 
 ## The model (request 1, a larger model)
 

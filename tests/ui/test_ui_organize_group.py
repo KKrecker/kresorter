@@ -1,4 +1,5 @@
-"""Group by meaning (local AI) on the Organize page (decision 0018, items 24, 28, 29 and 31).
+"""Group by meaning (local AI) on the Organize page (decision 0018, items 24, 28, 29 and 31;
+decision 0020, items 8 and 10).
 
 Asked only once a plan is shown and the button pressed; the groups make a new plan through the
 planner, shown as a plan that says where its groups come from; By kind goes back. Sort makes the
@@ -41,8 +42,8 @@ BY_MEANING = [
     ("Trip to Rome", "2 files · 20 B", "Trip to Rome", "rome-1.jpg, rome-2.jpg"),
 ]
 NOTE = (
-    "Grouped by meaning by the local AI (llama3.2): the groups may be wrong. By kind goes back"
-    " to the plan by kind."
+    "The local AI (llama3.2) grouped 4 of 5 files into 2 folders: the groups may be wrong. By"
+    " kind goes back to the plan by kind."
 )
 
 
@@ -209,7 +210,7 @@ def test_a_grouping_that_fails_says_why_and_leaves_the_plan_by_kind(
     script: tuple[Answer, ...],
     why: str,
 ) -> None:
-    # [0018.31] In the words of 0013 item 23.
+    # [0018.31] [0020.8] In the words of 0013 item 23; the first batch failed.
     with ScriptedOllama(*script) as ollama:
         window, _ = _window(qtbot, tmp_path, zone, data_dir, ollama, folder)
         _group(qtbot, window)
@@ -220,6 +221,33 @@ def test_a_grouping_that_fails_says_why_and_leaves_the_plan_by_kind(
     assert _cards(window) == BY_KIND
     assert page.kind_button.isHidden()
     assert not page.group_button.isHidden()
+
+
+def test_a_grouping_that_stopped_shows_the_groups_before_it_and_says_why(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, folder: Path
+) -> None:
+    # [0020.8] [0020.10] 41 files to group: the second batch's answer cannot be read.
+    for n in range(36):
+        write(folder / f"a{n:02d}.xyz", b"a")
+    rome = {"groups": [{"folder": "Trip to Rome", "files": ["rome-1.jpg", "rome-2.jpg"]}]}
+    script = (VERSION, TAGS, generated(json.dumps(rome)), generated("No."))
+    with ScriptedOllama(*script) as ollama:
+        window, _ = _window(qtbot, tmp_path, zone, data_dir, ollama, folder)
+        _group(qtbot, window)
+        asked = ollama.paths()
+
+    page = window.organize
+    assert asked == [*CHECKS, GENERATE, GENERATE]
+    assert _cards(window) == [
+        ("Trip to Rome", "2 files · 20 B", "Trip to Rome", "rome-1.jpg, rome-2.jpg"),
+        BY_KIND[1],
+    ]
+    assert page.grouped.text() == (
+        "The local AI (llama3.2) grouped 2 of 41 files into 1 folder, then stopped: The answer"
+        ' cannot be read: the answer is not {"groups": [...]}: "No.". The groups may be wrong.'
+        " By kind goes back to the plan by kind."
+    )
+    assert not page.kind_button.isHidden()
 
 
 def test_a_grouping_that_found_no_group_leaves_the_plan_by_kind(
@@ -301,7 +329,7 @@ def test_sort_keeps_the_groups_without_asking_again_and_its_batch_is_undone_as_a
 def test_group_by_meaning_in_russian(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, folder: Path
 ) -> None:
-    # [0018.25] [0018.28] The folder names asked in the window's language.
+    # [0018.25] [0018.28] [0020.10] The folder names asked in the window's language.
     with ScriptedOllama(VERSION, TAGS, GROUPED) as ollama:
         window, _ = _window(qtbot, tmp_path, zone, data_dir, ollama, folder, language="ru")
         page = window.organize
@@ -314,6 +342,6 @@ def test_group_by_meaning_in_russian(
     assert json.loads(prompt)["language"] == "Russian"
     assert page.kind_button.text() == "По типу"
     assert page.grouped.text() == (
-        "Сгруппировано по смыслу локальным ИИ (llama3.2): группы могут быть неверными. «По типу»"
-        " возвращает план по типам."
+        "Локальный ИИ (llama3.2) сгруппировал 4 из 5 файлов в 2 папки: группы могут быть"
+        " неверными. «По типу» возвращает план по типам."
     )
