@@ -142,22 +142,39 @@ hashing any cheaper. Kresorter keeps listing directories; the time goes from whe
 ## Cleaned, without losing a session (request 2)
 
 13. **A session is never touched.** What keeps a sign-in, a saved password or the open tabs
-    is blocked by the policy like a system file (a new reason, `session`): never a candidate,
-    not even named by hand, and its directories are not listed. In a Chromium profile
-    (Chrome, Edge, Brave, Vivaldi, Opera, Yandex): `Network`, `Cookies`, `Login Data`,
-    `Login Data For Account`, `Web Data`, `Local Storage`, `Session Storage`, `Sessions`,
-    `IndexedDB`, `Service Worker`, `Extensions`, `Local Extension Settings`, `Extension
-    State`, `Sync Extension Settings`, `Preferences`, `Secure Preferences`, `Bookmarks`,
-    `History`, `Current Session`, `Current Tabs`, `Last Session`, `Last Tabs`, and the user
-    data's `Local State`, which holds the key its cookies and passwords are encrypted with;
-    in a Firefox profile: `cookies.sqlite`, `logins.json`, `key4.db`, `cert9.db`,
-    `places.sqlite`, `formhistory.sqlite`, `permissions.sqlite`, `sessionstore.jsonlz4`,
-    `sessionstore-backups`, `storage`, `webappsstore.sqlite`, `prefs.js`, `extensions`; on
-    Windows: `Microsoft/Windows/INetCookies`, `Microsoft/Windows/WebCache`,
-    `Microsoft/Credentials`, `Microsoft/Protect`, `Microsoft/Vault`, `Microsoft/TokenBroker`,
-    `Microsoft/IdentityCache`, `Packages/Microsoft.AAD.BrokerPlugin_*`; and Telegram
-    Desktop's `tdata`, Steam's `config`. The list is data (`core/sessions.toml`), each entry
-    with an example a test checks.
+    is blocked by the policy like a system file (a new reason, `session`, shown as "Sign-ins
+    and sessions", "Входы и сеансы"): never a candidate, not even named by hand, and its
+    folders are not listed. The list is data (`core/sessions.toml`): names, or folder names
+    one inside the other, that end a path anywhere, on every system (a copy of a profile on
+    another disk keeps its sign-ins too), `*` and `?` matching within one name; each entry
+    with examples a test checks, every name in one. In a Chromium profile (Chrome, Edge,
+    Brave, Vivaldi, Opera, Yandex, an app's WebView2, an app built on Chromium under
+    `.config` or `Application Support`): `Network`, `Cookies`, `Cookies-journal`,
+    `Extension Cookies*`, `Login Data*`, `Web Data*`, `Account Web Data*`, Yandex's
+    `Ya Passman Data*` and `Ya Credit Cards*`, `Local Storage`, `Session Storage`,
+    `Sessions`, `Current Session`, `Current Tabs`, `Last Session`, `Last Tabs`, `IndexedDB`,
+    `Service Worker`, `WebStorage`, `Storage`, `databases`, `File System`, `Extensions`,
+    `Local Extension Settings`, `Sync Extension Settings`, `Extension State`, `Sync Data`,
+    `Preferences`, `Secure Preferences`, `Bookmarks*`, `History*`; anywhere, `Local State`,
+    which holds the key the cookies and passwords are encrypted with. In a Firefox,
+    Thunderbird, LibreWolf or Waterfox profile: `cookies.sqlite*`, `logins*`, `key?.db`,
+    `cert9.db`, `signedInUser.json`, `places.sqlite*`, `formhistory.sqlite*`,
+    `permissions.sqlite*`, `sessionstore*`, `containers.json`, `storage*`,
+    `webappsstore.sqlite*`, `prefs.js`, `extension*`. Windows': `INetCookies`,
+    `Microsoft/Windows/Cookies`, `Microsoft/Windows/WebCache`, `Microsoft/Credentials`,
+    `Microsoft/Protect`, `Microsoft/Vault`, `Microsoft/Crypto`, `Microsoft/TokenBroker`,
+    `Microsoft/IdentityCache`, `Microsoft/OneAuth`, `Packages/Microsoft.AAD.BrokerPlugin_*`.
+    macOS': `Library/Keychains`, `Library/Accounts`, `Library/Cookies`,
+    `Library/HTTPStorages`, `Library/Safari`. Linux's: `share/keyrings`, `share/kwalletd`,
+    `.password-store`, `.pki/nssdb`. Telegram Desktop's `tdata`, wherever it is (a portable
+    copy keeps it beside itself). Steam's `config`, `local.vdf` and `ssfn*`, the Epic Games
+    Launcher's `Saved/Config`. Keys and tokens: `.ssh`, `.gnupg`, `.aws/credentials`,
+    `.aws/sso`, `.azure`, `gcloud`, `.docker/config.json`, `.kube/config`, `.netrc`,
+    `_netrc`, `.git-credentials`, GitHub CLI's `hosts.yml`, Hugging Face's `token` and
+    `stored_tokens`. A pattern writes out at least one name in full: by it the policy finds
+    the patterns a path's names may end, a folder's once, never trying every pattern on every
+    file. A browser's cache (`Cache`, `Code Cache`, `GPUCache`, `cache2`) stays junk of its
+    own, for review (decision 0018, item 20).
 14. **More caches.** New rules, on Windows: the graphics drivers' shader caches (NVIDIA
     `AppData/Local/NVIDIA/DXCache`, `GLCache`, `AppData/LocalLow/NVIDIA/PerDriverVersion/DXCache`,
     `GLCache`; AMD `AppData/Local/AMD/DxCache`, `DxcCache`, `GLCache`, `VkCache`; Intel

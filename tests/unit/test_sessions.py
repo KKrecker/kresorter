@@ -11,7 +11,7 @@ from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 import pytest
 
 from fakes import FakeOpenFiles
-from kresorter.core.heuristics import JunkClassifier, default_rules
+from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
 from kresorter.core.models import FileEntry, Skipped, SkipReason
 from kresorter.core.policy import BlockReason, PathPolicy, Verdict
 from kresorter.core.sessions import (
@@ -41,8 +41,8 @@ MAC = PathPolicy.for_posix(home=PurePosixPath("/Users/alice"), platform="darwin"
 LOCAL = r"C:\Users\Alice\AppData\Local"
 CHROME = LOCAL + r"\Google\Chrome\User Data\Default"
 
-# Every under and every path of every session, in an example (enforced below): on Windows
-# outside AppData\Roaming, and in a home outside its .ssh and .gnupg, which are blocked whole.
+# Every under and every path of every session, in an example (enforced below), where nothing
+# else blocks it: on Windows outside AppData\Roaming, in a home outside its .ssh and .gnupg.
 EXAMPLES: dict[str, list[str]] = {
     "chromium-profile": [
         CHROME + r"\Network\Cookies",
@@ -103,12 +103,12 @@ EXAMPLES: dict[str, list[str]] = {
     "windows-sign-in": [
         LOCAL + r"\Microsoft\Windows\INetCookies\ESE\container.dat",
         LOCAL + r"\Packages\Microsoft.Windows.Photos_8wekyb3d8bbwe\AC\INetCookies\x.cookie",
-        r"C:\Windows.old\Users\Alice\AppData\Roaming\Microsoft\Windows\Cookies\index.dat",
+        r"D:\Backup\Alice\AppData\Roaming\Microsoft\Windows\Cookies\index.dat",
         LOCAL + r"\Microsoft\Windows\WebCache\WebCacheV01.dat",
         LOCAL + r"\Microsoft\Credentials\DFBE70A7E5CC19A398EBF1B96859CE5D",
-        r"C:\Windows.old\Users\Alice\AppData\Roaming\Microsoft\Protect\S-1-5-21\key",
+        r"D:\Backup\Alice\AppData\Roaming\Microsoft\Protect\S-1-5-21\key",
         LOCAL + r"\Microsoft\Vault\4BF4C442-9B8A-41A0-B380-DD4A704DDB28\Policy.vpol",
-        r"C:\Windows.old\Users\Alice\AppData\Roaming\Microsoft\Crypto\Keys\x",
+        r"D:\Backup\Alice\AppData\Roaming\Microsoft\Crypto\Keys\x",
         LOCAL + r"\Microsoft\TokenBroker\Cache\x.tbres",
         LOCAL + r"\Microsoft\IdentityCache\x",
         LOCAL + r"\Microsoft\OneAuth\accounts\x",
@@ -151,7 +151,7 @@ EXAMPLES: dict[str, list[str]] = {
         r"C:\Users\Alice\_netrc",
         "/Users/alice/.git-credentials",
         "/home/alice/.config/gh/hosts.yml",
-        r"C:\Windows.old\Users\Alice\AppData\Roaming\GitHub CLI\hosts.yml",
+        r"D:\Backup\Alice\AppData\Roaming\GitHub CLI\hosts.yml",
         "/home/alice/.cache/huggingface/token",
         r"C:\Users\Alice\.cache\huggingface\stored_tokens",
     ],
@@ -228,7 +228,7 @@ def test_every_path_and_every_under_has_an_example(session: str) -> None:
 )
 def test_a_browser_s_cache_stays_junk(example: str) -> None:
     policy, path, _ = system_of(example)
-    platform = "windows" if policy is WIN else "darwin" if policy is MAC else "linux"
+    platform: Platform = "windows" if policy is WIN else "darwin" if policy is MAC else "linux"
     assert policy.check_path(path) == ALLOWED
     assert JunkClassifier(default_rules(), platform=platform).classify(path) is not None
 
@@ -312,9 +312,8 @@ def test_the_walker_leaves_a_profile_s_sessions_out_and_lists_its_cache(tmp_path
         profile / "GPUCache" / "data_0",
         profile / "Visited Links",
     ]
-    assert sorted(
-        (e.path, e.reason, e.block_reason) for e in events if isinstance(e, Skipped)
-    ) == [
+    skipped = [(e.path, e.reason, e.block_reason) for e in events if isinstance(e, Skipped)]
+    assert sorted(skipped) == [
         (path, SkipReason.BLOCKED, BlockReason.SESSION)
         for path in sorted(
             [profile / "Cookies-journal", profile / "Network", profile / "Preferences", tdata]

@@ -6,6 +6,9 @@ Two separate mechanisms (decision 0002):
 * **Default safe zones** (``default_roots``): scanned when the user selects nothing.
   Temp is deliberately absent from them but is *not* blacklisted.
 
+What keeps a sign-in, a saved password or the open tabs is blacklisted too, wherever it is
+(``sessions.toml``, decision 0020, item 13).
+
 The policy is pure: it never touches the filesystem. Paths must already be resolved
 (symlinks are handled by the walker); ``..`` is collapsed lexically.
 """
@@ -19,6 +22,7 @@ from pathlib import PurePath, PurePosixPath, PureWindowsPath
 from typing import Literal
 
 from kresorter.core.open_files import OpenFileChecker
+from kresorter.core.sessions import SessionPaths, session_patterns
 
 Parts = tuple[str, ...]
 
@@ -30,6 +34,7 @@ class BlockReason(StrEnum):
     OPEN_FILE = "open_file"
     APP_DATA = "app_data"  # kresorter's own data dir: vault and journal (decision 0004)
     APP_PROGRAM = "app_program"  # the folders it runs from (decision 0015, item 16)
+    SESSION = "session"  # a sign-in, a saved password, the open tabs (decision 0020, item 13)
 
 
 @dataclass(frozen=True)
@@ -108,6 +113,7 @@ class PathPolicy:
         default_roots: Sequence[PurePath],
         app_data_dir: PurePath,
         program_dirs: Sequence[PurePath] = (),
+        sessions: Iterable[str] = (),
     ) -> None:
         self._flavor = flavor
         self._case_sensitive = case_sensitive
@@ -130,6 +136,7 @@ class PathPolicy:
             blocked_name_prefixes=tuple(self._fold(n) for n in name_prefixes),
         )
         self._default_roots = tuple(default_roots)
+        self._sessions = SessionPaths(sessions, self._fold)
 
     # --- construction ------------------------------------------------------------------------
 
@@ -178,6 +185,7 @@ class PathPolicy:
             default_roots=[home / ".cache", home / "Downloads"],
             app_data_dir=local_root / APP_NAME,
             program_dirs=program_dirs,
+            sessions=session_patterns(),
         )
 
     @classmethod
@@ -216,6 +224,7 @@ class PathPolicy:
             default_roots=[home / ".cache", home / "Downloads"],
             app_data_dir=data_root / APP_NAME,
             program_dirs=program_dirs,
+            sessions=session_patterns(),
         )
 
     # --- public API ----------------------------------------------------------------------------
@@ -229,9 +238,17 @@ class PathPolicy:
         answer ``check_path`` gives on their paths (decision 0018, item 14). Raises ValueError
         for a non-absolute directory."""
         separators = ("\\", "/", ":") if self._flavor is PureWindowsPath else ("/",)
-        return DirectoryPolicy(
-            self._check_parts, self._normalize(directory), self._fold, separators
-        )
+        parts = self._normalize(directory)
+        held = self._sessions.holds(parts[1:])
+        is_session = self._sessions.names_in(parts[1:])
+
+        def check(named: Parts) -> Verdict:
+            verdict = self._check_unsessioned(named)
+            if verdict.allowed and (held or is_session(named[-1])):
+                return _blocked(BlockReason.SESSION)
+            return verdict
+
+        return DirectoryPolicy(check, parts, self._fold, separators)
 
     def check_file(self, path: PurePath, open_files: OpenFileChecker) -> Verdict:
         """Blacklist check, then open-file check. A failing checker counts as "open"."""
@@ -239,6 +256,13 @@ class PathPolicy:
         return check_open(path, open_files) if verdict.allowed else verdict
 
     def _check_parts(self, parts: Parts) -> Verdict:
+        verdict = self._check_unsessioned(parts)
+        if verdict.allowed and self._sessions.holds(parts[1:]):
+            return _blocked(BlockReason.SESSION)
+        return verdict
+
+    def _check_unsessioned(self, parts: Parts) -> Verdict:
+        """Every rule but the sessions', which come last."""
         for prefix, reason in self._prefix_rules:
             if _is_under(parts, prefix):
                 return _blocked(reason)

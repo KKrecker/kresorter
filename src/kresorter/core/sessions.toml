@@ -1,0 +1,182 @@
+# Sessions: what keeps a sign-in, a saved password or the open tabs (decision 0020, item 13).
+# Data, not code; interpreted by kresorter.core.sessions. The policy blocks them like a
+# system file, with a reason of their own (`session`): never a candidate, not even named by
+# hand, and a folder of them is not listed.
+#
+# Fields:
+#   id      unique, stable identifier
+#   what    short human explanation of what it keeps
+#   paths   a name, or folder names one inside the other ending in a name, that ends a path
+#           anywhere: what it names is blocked, and all inside it; "*" and "?" match within
+#           one name, and each path writes out at least one name in full
+#   under   optional: each path is joined under each of these, which are written the same way
+#
+# Every system's paths are matched on all of them (a copy of a profile on another disk keeps
+# its sign-ins too), without case on Windows and macOS. Every path and every under must have
+# an example in tests/unit/test_sessions.py (enforced by a test).
+#
+# Deliberately NOT here: the browsers' caches (Cache, Code Cache, GPUCache, cache2): junk of
+# their own, for review (decision 0018, item 20).
+
+[[session]]
+id = "chromium-profile"
+what = "A Chromium browser's profile (Chrome, Edge, Brave, Vivaldi, Opera, Yandex) or an app built on it: its cookies, passwords, tabs, history, bookmarks, extensions and site data."
+under = [
+    # a profile in a browser's user data (Default, Profile 1, ...), or a profile of its own
+    # (Opera's, and an app's built on Chromium: Discord, Slack, ...)
+    "User Data/*",  # Windows: Chrome, Edge, Brave, Vivaldi, Yandex, Chromium
+    "EBWebView/*",  # Windows: an app's WebView2
+    "Opera Software/*",  # Windows: Opera, Opera GX
+    "chromium/*",  # Linux, Snap: Chromium
+    "BraveSoftware/*/*",  # Linux; macOS: Brave
+    ".config/*",  # Linux: Opera, apps
+    ".config/*/*",  # Linux: Chrome, Chromium, Edge, Vivaldi, Yandex
+    ".var/app/*/config/*",  # Linux, Flatpak: apps
+    ".var/app/*/config/*/*",  # Linux, Flatpak: browsers
+    "Application Support/*",  # macOS: Opera, apps
+    "Application Support/*/*",  # macOS: Chromium, Edge, Vivaldi
+    "Application Support/*/*/*",  # macOS: Chrome, Yandex
+]
+paths = [
+    "Network",  # cookies, since Chrome 96
+    "Cookies",
+    "Cookies-journal",
+    "Extension Cookies*",
+    "Login Data*",  # saved passwords, also "For Account"
+    "Web Data*",  # autofill, cards, the sign-in's tokens
+    "Account Web Data*",
+    "Ya Passman Data*",  # Yandex's passwords
+    "Ya Credit Cards*",
+    "Local Storage",
+    "Session Storage",
+    "Sessions",  # the open tabs, since Chrome 100
+    "Current Session",
+    "Current Tabs",
+    "Last Session",
+    "Last Tabs",
+    "IndexedDB",
+    "Service Worker",
+    "WebStorage",
+    "Storage",
+    "databases",
+    "File System",
+    "Extensions",
+    "Local Extension Settings",
+    "Sync Extension Settings",
+    "Extension State",
+    "Sync Data",
+    "Preferences",
+    "Secure Preferences",
+    "Bookmarks*",
+    "History*",
+]
+
+[[session]]
+id = "chromium-local-state"
+what = "A Chromium browser's Local State, beside its profiles: the key their cookies and passwords are encrypted with."
+paths = ["Local State"]
+
+[[session]]
+id = "firefox-profile"
+what = "A Firefox or Thunderbird profile: its cookies, passwords and their key, tabs, history, bookmarks, extensions and site data."
+under = [
+    "Firefox/Profiles/*",  # Windows; macOS
+    ".mozilla/firefox/*",  # Linux
+    "Thunderbird/Profiles/*",  # Windows; macOS
+    ".thunderbird/*",  # Linux
+    "LibreWolf/Profiles/*",  # Windows; macOS
+    ".librewolf/*",  # Linux
+    "Waterfox/Profiles/*",  # Windows; macOS
+    ".waterfox/*",  # Linux
+]
+paths = [
+    "cookies.sqlite*",
+    "logins*",  # logins.json, logins-backup.json
+    "key?.db",  # the passwords' key
+    "cert9.db",
+    "signedInUser.json",  # the Mozilla account
+    "places.sqlite*",  # bookmarks and history
+    "formhistory.sqlite*",
+    "permissions.sqlite*",
+    "sessionstore*",  # the open tabs
+    "containers.json",
+    "storage*",  # site data
+    "webappsstore.sqlite*",
+    "prefs.js",
+    "extension*",
+]
+
+[[session]]
+id = "windows-sign-in"
+what = "Windows' sign-ins: its accounts' tokens, saved credentials and their keys, and the cookies of Internet Explorer and the apps."
+paths = [
+    "INetCookies",
+    "Microsoft/Windows/Cookies",
+    "Microsoft/Windows/WebCache",
+    "Microsoft/Credentials",
+    "Microsoft/Protect",
+    "Microsoft/Vault",
+    "Microsoft/Crypto",
+    "Microsoft/TokenBroker",
+    "Microsoft/IdentityCache",
+    "Microsoft/OneAuth",
+    "Packages/Microsoft.AAD.BrokerPlugin_*",
+]
+
+[[session]]
+id = "macos-sign-in"
+what = "macOS' keychains, accounts and cookies, and Safari's tabs, history and bookmarks."
+paths = [
+    "Library/Keychains",
+    "Library/Accounts",
+    "Library/Cookies",
+    "Library/HTTPStorages",
+    "Library/Safari",
+]
+
+[[session]]
+id = "linux-sign-in"
+what = "The keyrings of GNOME and KDE, the passwords of pass, the certificates of the browsers."
+paths = [
+    "share/keyrings",
+    "share/kwalletd",
+    ".password-store",
+    ".pki/nssdb",
+]
+
+[[session]]
+id = "telegram"
+what = "Telegram Desktop's tdata: its session, beside the program in a portable copy too."
+paths = ["tdata"]
+
+[[session]]
+id = "game-launchers"
+what = "The sign-ins of Steam and the Epic Games Launcher."
+paths = [
+    "Steam/config",
+    ".steam/*/config",  # Linux: Debian's Steam
+    "Steam/local.vdf",
+    "Steam/ssfn*",
+    "EpicGamesLauncher/Saved/Config",
+]
+
+[[session]]
+id = "keys-and-tokens"
+what = "Keys and tokens of the command line: SSH and GnuPG keys, the clouds' and the code hosts' sign-ins."
+paths = [
+    ".ssh",
+    ".gnupg",
+    ".aws/credentials",
+    ".aws/sso",
+    ".azure",
+    "gcloud",
+    ".docker/config.json",
+    ".kube/config",
+    ".netrc",
+    "_netrc",
+    ".git-credentials",
+    "gh/hosts.yml",
+    "GitHub CLI/hosts.yml",
+    "huggingface/token",
+    "huggingface/stored_tokens",
+]
