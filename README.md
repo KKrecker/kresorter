@@ -387,3 +387,9 @@ Kresorter is under the MIT licence, held by KKrecker: [`LICENSE`](LICENSE). The 
 are Lucide's, under the ISC licence:
 [`src/kresorter/ui/icons/LICENSE`](src/kresorter/ui/icons/LICENSE). Both files are in the wheel
 and the sdist.
+
+The Windows build (the installer and the portable zip) carries Python, under the PSF licence, and
+Qt and PySide6, under the LGPL-3.0, as files of their own that can be replaced:
+`THIRD-PARTY-NOTICES.txt`, beside `Kresorter.exe`, names each part, its licence and where its
+source is, and the folder `licenses` holds their texts. The installer shows `LICENSE` before it
+installs, and the Settings page says the licence under the version.

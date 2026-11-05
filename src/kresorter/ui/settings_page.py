@@ -18,7 +18,8 @@ up what is missing; nothing else asks the local AI. Check lists the models the s
 choice: one chosen is saved, and Check runs again with it (decision 0018, item 32). The card
 recommends a model for the machine's memory and processors, by the server's name for it, and says
 how to get it there (item 33; decision 0019, item 13). The data directory's path (from the home
-folder as ``~``) is shown, read only, and under it the version (decision 0015, item 4).
+folder as ``~``) is shown, read only, and under it the version (decision 0015, item 4) and the
+licence: MIT, and the LGPL-3.0 of Qt and PySide6 in the Windows build (decision 0019, item 20).
 """
 
 from __future__ import annotations
@@ -265,6 +266,7 @@ class SettingsPage(QWidget):
         self.data_dir = Note(self, shown_path(Path(data_dir), Path.home()), role="secondary")
         self.data_dir.setToolTip(tooltip(str(data_dir)))
         self.version = Note(self, text("settings.version", version=__version__), role="secondary")
+        self.licence = Note(self, text("settings.licence"), role="secondary")
         self.result = Note(self.controls)
         self._show()
         self.language.currentIndexChanged.connect(self._language)
@@ -291,6 +293,7 @@ class SettingsPage(QWidget):
         data_inside.addWidget(_title(text("settings.data_dir")))
         data_inside.addWidget(self.data_dir)
         data_inside.addWidget(self.version)
+        data_inside.addWidget(self.licence)
         inside = vbox(self.controls, margins=(32, 16, 32, 32), spacing=16)
         for part in (
             self.unused,

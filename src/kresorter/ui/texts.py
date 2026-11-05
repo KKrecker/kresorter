@@ -613,6 +613,14 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "settings.data_dir": {"en": "Data folder", "ru": "Папка данных"},
     "settings.version": {"en": "Kresorter {version}", "ru": "Kresorter {version}"},
+    "settings.licence": {
+        "en": "Kresorter is under the MIT licence. Its Windows build carries Qt and PySide6 under"
+        " the LGPL-3.0; THIRD-PARTY-NOTICES.txt in the program's folder names each part and its"
+        " licence.",
+        "ru": "Kresorter распространяется под лицензией MIT. Сборка для Windows содержит Qt и"
+        " PySide6 под лицензией LGPL-3.0; файл THIRD-PARTY-NOTICES.txt в папке программы"
+        " называет каждую часть и её лицензию.",
+    },
     "settings.address": {
         "en": "Address: {url} · Model: {model}",
         "ru": "Адрес: {url} · Модель: {model}",

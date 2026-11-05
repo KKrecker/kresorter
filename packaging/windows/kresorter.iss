@@ -3,8 +3,9 @@
 ;
 ;     iscc /DAppVersion=0.1.0 packaging\windows\kresorter.iss
 ;
-; It installs for the current user, with no administrator rights, into
-; %LOCALAPPDATA%\Programs\Kresorter. Its uninstaller removes what it installed and nothing
+; It shows LICENSE, the MIT licence, before it installs (decision 0019, item 20), and installs for
+; the current user, with no administrator rights, into %LOCALAPPDATA%\Programs\Kresorter. Its
+; uninstaller removes what it installed and nothing
 ; else: Kresorter's data directory, with the journal and the quarantined files, stays.
 
 #ifndef AppVersion
@@ -34,6 +35,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#Root}dist
 OutputBaseFilename=Kresorter-{#AppVersion}-setup
 SetupIconFile={#Icon}
+LicenseFile={#Root}LICENSE
 UninstallDisplayName=Kresorter
 UninstallDisplayIcon={app}\Kresorter.exe
 WizardStyle=modern
