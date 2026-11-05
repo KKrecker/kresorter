@@ -120,8 +120,10 @@ def make_window(
 
 def wait_idle(qtbot: QtBot, window: Window) -> None:
     """Until no task runs, then what its end posted, the layouts of what it showed among them,
-    which a slow runner may not have done yet when the wait sees it (Windows, CI run 16)."""
-    qtbot.waitUntil(lambda: window.tasks.running is None, timeout=10_000)
+    which a slow runner may not have done yet when the wait sees it (Windows, CI run 16). Up to
+    30 s: a Windows runner once took over 10 s to plan a folder of four files, which the same
+    code had planned in time on the run before (CI run 42105180083)."""
+    qtbot.waitUntil(lambda: window.tasks.running is None, timeout=30_000)
     QApplication.sendPostedEvents()
 
 
