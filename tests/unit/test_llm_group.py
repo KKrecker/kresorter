@@ -302,6 +302,14 @@ def test_grouping_checks_then_sends_one_generate() -> None:
     }
 
 
+def test_a_grouping_after_a_reasoning_model_s_thinking() -> None:
+    # [0019.2] The thinking is not the answer: the groups after it are read.
+    thought = '<think>{"groups": [{"folder": "Rm", "files": ["a.pdf", "c.txt"]}]}</think>\n'
+    with ScriptedOllama(VERSION, TAGS, generated(thought + GROUPED)) as ollama:
+        found = group(PLAN, _env(ollama), "en")
+    assert found.groups == {"a.pdf": "Taxes", "b.pdf": "Taxes"}
+
+
 def test_a_plan_with_fewer_than_two_files_to_group_sends_nothing() -> None:
     # [0018.24] No setting read, no connection.
     with ScriptedOllama(VERSION) as ollama:

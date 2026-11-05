@@ -341,6 +341,28 @@ def test_the_answer_s_label_in_russian(
     assert _said(page) == (ANSWER, "llama3.2 через Ollama · может ошибаться")
 
 
+@pytest.mark.parametrize(("language", "named"), [("en", "English"), ("ru", "Russian")])
+def test_the_answer_is_asked_in_the_window_s_language(
+    qtbot: QtBot,
+    tmp_path: Path,
+    zone: Path,
+    data_dir: Path,
+    ollama: ScriptedOllama,
+    language: Language,
+    named: str,
+) -> None:
+    # [0019.1] The language the window's texts are in.
+    tree = junk_tree(zone)
+    window = _window(qtbot, tmp_path, zone, data_dir, ollama.address, language=language)
+    page = window.findings
+    scanned(qtbot, window)
+    page.tree.setCurrentItem(page.item(tree["m"]))
+    page.explain.button.click()
+    wait_idle(qtbot, window)
+    (asked,) = (r for r in ollama.received if (r.method, r.path) == GENERATE)
+    assert json.loads(asked.body)["system"].endswith(f" Write the answer in {named}.")
+
+
 # --- an autostart entry --------------------------------------------------------------------------
 
 

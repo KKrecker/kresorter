@@ -15,6 +15,7 @@ import pytest
 
 from kresorter.llm.explain import BUDGET, Explained, Explanations, explain
 from kresorter.llm.failure import Unavailable
+from kresorter.llm.prompt import Language
 from kresorter.llm.settings import Address
 from kresorter.llm.subjects import Subject
 from kresorter.llm.transport import Limits
@@ -66,6 +67,19 @@ def test_the_model_asked_is_the_setting() -> None:
         run = explain([subject(0)], env_for(ollama.address, KRESORTER_OLLAMA_MODEL="qwen2.5:7b"))
     assert (run.model, texts(run)) == ("qwen2.5:7b", ["Qwen's answer."])
     assert b'"model": "qwen2.5:7b"' in ollama.received[2].body
+
+
+@pytest.mark.parametrize(("language", "named"), [("en", "English"), ("ru", "Russian")])
+def test_each_subject_is_asked_in_the_language_given(language: Language, named: str) -> None:
+    # [0019.1] English when none is given, as the console asks.
+    with ScriptedOllama(VERSION, TAGS, answer("One."), VERSION, TAGS, answer("Two.")) as ollama:
+        explain([subject(0)], env_for(ollama.address), language=language)
+        explain([subject(1)], env_for(ollama.address))
+    systems = [json.loads(received.body)["system"] for received in ollama.received[2::3]]
+    assert [system.rsplit(". ", 1)[-1] for system in systems] == [
+        f"Write the answer in {named}.",
+        "Write the answer in English.",
+    ]
 
 
 def test_at_most_20_requests_per_run() -> None:
