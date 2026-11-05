@@ -18,7 +18,7 @@ __all__ = [
     "threads_for",
 ]
 
-CHECK_THREADS = 8  # a directory's share-mode checks side by side (decision 0018, item 12)
+CHECK_THREADS = 8  # a scan's share-mode checks side by side (decision 0018, item 12)
 
 _WINDOWS = ("windows", "win32")  # the system a scan context is made for, and sys.platform
 
@@ -34,12 +34,13 @@ def checker_for_platform(platform: str = sys.platform) -> OpenFileChecker:
 
 
 def for_scan(checker: OpenFileChecker) -> OpenFileChecker:
-    """What a scan asks: on Linux every process's open files listed once, at its start (decision
-    0018, item 11); any other checker answers per file itself."""
+    """What a scan asks: on Linux every process's open files listed once, when it asks about
+    its junk and its copies (decision 0018, item 11; decision 0020, item 17); any other checker
+    answers per file itself."""
     return checker.snapshot() if isinstance(checker, ProcFdChecker) else checker
 
 
 def threads_for(checker: OpenFileChecker) -> int:
-    """How many of a directory's files a scan checks at once: the share-mode check asks the
-    kernel for each file, side by side in up to ``CHECK_THREADS``; any other, one at a time."""
+    """How many of its files a scan checks at once: the share-mode check asks the kernel for
+    each file, side by side in up to ``CHECK_THREADS``; any other, one at a time."""
     return CHECK_THREADS if isinstance(checker, ShareModeChecker) else 1

@@ -31,6 +31,7 @@ from kresorter.analysis.report import AnalysisReport
 from kresorter.analysis.run import analyze_paths
 from kresorter.analysis.score import Evidence, Level
 from kresorter.analysis.size_age import Thresholds
+from kresorter.core.hashing import Digests
 from kresorter.core.policy import CACHES
 from kresorter.core.scanner import Progress, ScanReport
 from kresorter.environment import Environment
@@ -103,7 +104,11 @@ class Scanned:
 
 
 def scan(
-    environment: Environment, roots: list[Path], junk_only: list[Path], read: Progress
+    environment: Environment,
+    roots: list[Path],
+    junk_only: list[Path],
+    read: Progress,
+    digests: Digests,
 ) -> Scanned:
     """In the worker: the context of the system, the scan of ``roots``, and of ``junk_only``
     for junk only, and the rating; ``read`` counts the files read so far."""
@@ -111,7 +116,7 @@ def scan(
     context = environment.scan_context()
     paths = [str(root) for root in roots]
     report, analysis = analyze_paths(
-        paths, context, Thresholds(), junk_only=junk_only, progress=read
+        paths, context, Thresholds(), junk_only=junk_only, digests=digests, progress=read
     )
     return Scanned(report, analysis, context.open_files_checked, at, list(roots), bool(junk_only))
 
@@ -422,7 +427,7 @@ class OverviewPage(QWidget):
         """Scan the folders shown, as Scan now does."""
         window, roots, read = self._window, self.roots(), Read()
         title = window.translator.text("task.scan")
-        work = partial(scan, window.environment, roots, self.junk_only(), read)
+        work = partial(scan, window.environment, roots, self.junk_only(), read, window.digests)
         if window.run(Task(title, work, self._scanned, read=read)):
             self.scan_bar.run()
 
@@ -452,7 +457,7 @@ class OverviewPage(QWidget):
         self.level_cards.show()
         self.unreliable.setHidden(scanned.checked)
         self._window.findings.show_analysis(
-            analysis, scanned.roots, scanned.at, caches=scanned.caches
+            analysis, scanned.roots, scanned.at, caches=scanned.caches, times=scanned.report.times
         )
 
     def _open_level(self, level: Level) -> None:

@@ -4,7 +4,9 @@ Pipeline (cheapest first): group by size -> hash a prefix -> full hash only on p
 collisions. Every file is re-checked against its scan record before and after reading; a file
 that changed is reported as CHANGED instead of being hashed as-is. The prefixes, then the full
 digests, are computed side by side in up to ``HASH_THREADS`` threads; what is yielded, and its
-order, is that of one file after another (decision 0018, item 15).
+order, is that of one file after another (decision 0018, item 15). The digests of the files
+hashed may be kept (``Digests``): asked again about a file whose size and ``mtime_ns`` are those
+it was hashed with, the hashing reads it no more (decision 0020, item 18).
 """
 
 from __future__ import annotations
@@ -31,6 +33,30 @@ HASH_THREADS = 4
 class HashedFile:
     entry: FileEntry
     digest: str
+
+
+class Digests:
+    """The prefix and full digests of the files hashed, each kept with its file's path, size
+    and ``mtime_ns``: one version of a file each, a changed one's replacing it. In memory only,
+    as long as whoever made it keeps it (the window, decision 0020, item 18)."""
+
+    def __init__(self) -> None:
+        self._known: dict[Path, tuple[int, int, dict[int | None, str]]] = {}
+
+    def get(self, entry: FileEntry, limit: int | None) -> str | None:
+        """The digest of ``entry``'s first ``limit`` bytes (``None``: all), when it is kept for
+        its size and ``mtime_ns``."""
+        known = self._known.get(entry.path)
+        if known is None or known[:2] != (entry.size, entry.mtime_ns):
+            return None
+        return known[2].get(limit)
+
+    def keep(self, entry: FileEntry, limit: int | None, digest: str) -> None:
+        known = self._known.get(entry.path)
+        if known is None or known[:2] != (entry.size, entry.mtime_ns):
+            known = (entry.size, entry.mtime_ns, {})
+            self._known[entry.path] = known
+        known[2][limit] = digest
 
 
 def hash_file(path: Path, *, limit: int | None = None, chunk_size: int = DEFAULT_CHUNK) -> str:
@@ -62,15 +88,21 @@ def group_by_size(entries: Iterable[FileEntry], *, min_size: int = 1) -> dict[in
 
 
 def hash_duplicate_candidates(
-    entries: Iterable[FileEntry], *, partial_bytes: int = DEFAULT_PARTIAL
+    entries: Iterable[FileEntry],
+    *,
+    partial_bytes: int = DEFAULT_PARTIAL,
+    digests: Digests | None = None,
 ) -> Iterator[HashedFile | Skipped]:
     """Yield full digests for files that may be duplicates, and Skipped for unreadable/changed.
 
-    Files whose size or prefix is unique are dropped silently: they cannot be duplicates.
+    Files whose size or prefix is unique are dropped silently: they cannot be duplicates. The
+    digests read are kept in ``digests``, and those kept there are not read again.
     """
+    kept = Digests() if digests is None else digests
     groups = list(group_by_size(entries).items())
     with ThreadPoolExecutor(HASH_THREADS) as pool:
-        prefixes = _hashes(pool, [e for _, group in groups for e in group], partial_bytes)
+        hashes = partial(_hashes, pool, kept=kept)
+        prefixes = hashes([e for _, group in groups for e in group], partial_bytes)
         stages = [_prefix_stage(group, prefixes) for _, group in groups]
         large = [
             hashed.entry
@@ -79,7 +111,7 @@ def hash_duplicate_candidates(
             for collision in collisions
             for hashed in collision
         ]
-        fulls = _hashes(pool, large, None)
+        fulls = hashes(large, None)
     for (size, _), (skipped, collisions) in zip(groups, stages, strict=True):
         yield from skipped
         for collision in collisions:
@@ -92,14 +124,21 @@ def hash_duplicate_candidates(
 
 
 def _hashes(
-    pool: ThreadPoolExecutor, entries: list[FileEntry], limit: int | None
+    pool: ThreadPoolExecutor, entries: list[FileEntry], limit: int | None, *, kept: Digests
 ) -> dict[FileEntry, str | Skipped]:
-    """Each entry's digest (or why it has none), side by side: the prefixes, each as short as
-    the next, in one slice of the entries per thread, a full digest in a task of its own."""
-    size = 1 if limit is None else max(1, -(-len(entries) // HASH_THREADS))
-    batches = [entries[i : i + size] for i in range(0, len(entries), size)]
+    """Each entry's digest (or why it has none): those kept as they are, the others side by
+    side: the prefixes, each as short as the next, in one slice of the entries per thread, a
+    full digest in a task of its own; each digest read is kept."""
+    known = {entry: kept.get(entry, limit) for entry in entries}
+    unread = [entry for entry, digest in known.items() if digest is None]
+    size = 1 if limit is None else max(1, -(-len(unread) // HASH_THREADS))
+    batches = [unread[i : i + size] for i in range(0, len(unread), size)]
     results = chain.from_iterable(pool.map(partial(_hash_batch, limit=limit), batches))
-    return dict(zip(entries, results, strict=True))
+    read = dict(zip(unread, results, strict=True))
+    for entry, result in read.items():
+        if isinstance(result, str):
+            kept.keep(entry, limit, result)
+    return {entry: digest if digest is not None else read[entry] for entry, digest in known.items()}
 
 
 def _hash_batch(entries: list[FileEntry], limit: int | None) -> list[str | Skipped]:

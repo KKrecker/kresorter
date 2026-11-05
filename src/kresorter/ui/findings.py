@@ -27,6 +27,7 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QTreeWidget, QTreeWidgetItem,
 
 from kresorter.analysis.report import AnalysisReport, Finding
 from kresorter.analysis.score import Evidence, Level
+from kresorter.core.scanner import ScanTimes
 from kresorter.quarantine.service import QuarantineResult
 from kresorter.storage.pending import Domain
 from kresorter.storage.session import SessionFailed
@@ -98,6 +99,18 @@ def folders(translator: Translator, roots: list[Path], *, caches: bool = False) 
     if len(shown) < 2:
         return "".join(shown)
     return translator.text("list.and", first=", ".join(shown[:-1]), last=shown[-1])
+
+
+def took(translator: Translator, times: ScanTimes) -> str:
+    """How long a scan took, and what took it (decision 0020, item 19)."""
+    seconds = translator.seconds
+    return translator.text(
+        "findings.took",
+        total=seconds(times.total),
+        listing=seconds(times.listing),
+        checks=seconds(times.open_checks),
+        duplicates=seconds(times.duplicates),
+    )
 
 
 def found_in(path: Path, roots: list[Path]) -> Path:
@@ -226,6 +239,8 @@ class FindingsPage(QWidget):
         self.detail = FindingDetail(window)
         self.explain = self.detail.explain
         self.result = Note(self)
+        self.took = Note(self, role="secondary")
+        self.took.hide()
         self.chosen = Label()
         self.chosen.setProperty("role", "strong")
         self.chosen_size = Label()
@@ -271,6 +286,7 @@ class FindingsPage(QWidget):
         inside.addWidget(self.head)
         inside.addLayout(filters)
         inside.addWidget(self.tree, 1)
+        inside.addWidget(self.took)
         inside.addWidget(self.result)
         column.addLayout(inside, 1)
         column.addWidget(self.bar)
@@ -283,16 +299,26 @@ class FindingsPage(QWidget):
     # --- what is listed ------------------------------------------------------------------------
 
     def show_analysis(
-        self, analysis: AnalysisReport, roots: list[Path], at: float, *, caches: bool = False
+        self,
+        analysis: AnalysisReport,
+        roots: list[Path],
+        at: float,
+        *,
+        caches: bool = False,
+        times: ScanTimes | None = None,
     ) -> None:
         """List the findings of a new analysis of ``roots``, and of the programs' caches when
-        ``caches``, made at ``at``: what it proposes at the Safe level selected."""
+        ``caches``, made at ``at``: what it proposes at the Safe level selected; and how long
+        the scan took, when its ``times`` are known (decision 0020, item 19)."""
         translator = self._window.translator
         self._roots = list(roots)
         scanned = folders(translator, self._roots, caches=caches)
         self.head.subtitle.setText(
             translator.text("findings.scan_of", folders=scanned, moment=moment(at))
         )
+        self.took.setHidden(times is None)
+        if times is not None:
+            self.took.setText(took(translator, times))
         self._syncing = True
         self.tree.clear()
         self._findings = {str(finding.entry.path): finding for finding in analysis.findings}

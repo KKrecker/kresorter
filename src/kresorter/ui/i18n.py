@@ -16,7 +16,7 @@ from string import Formatter
 from typing import Literal, TypeVar
 
 from kresorter.ui.labels import CATEGORIES, LABELS
-from kresorter.ui.texts import CATALOG, DECIMAL, PLURALS, UNITS
+from kresorter.ui.texts import CATALOG, DECIMAL, PLURALS, SECOND, UNITS
 
 __all__ = [
     "CATALOG",
@@ -131,6 +131,10 @@ class Translator:
         """A value's label, and its detail, as it is, when there is one."""
         label = self.label(value)
         return self.text("detail.reason", reason=label, detail=detail) if detail else label
+
+    def seconds(self, s: float) -> str:
+        """Seconds with one decimal, as the language writes them (decision 0020, item 19)."""
+        return f"{s:.1f}".replace(".", DECIMAL[self.language]) + f" {SECOND[self.language]}"
 
     def size(self, n: int) -> str:
         """Bytes as such, larger sizes in binary multiples with one decimal, as the CLI writes

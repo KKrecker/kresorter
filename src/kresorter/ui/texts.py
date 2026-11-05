@@ -165,6 +165,12 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "Сканирование {folders}, {moment}",
     },
     "list.and": {"en": "{first} and {last}", "ru": "{first} и {last}"},
+    "findings.took": {
+        "en": "Scanned in {total}: listing {listing}, open-file checks {checks}, "
+        "duplicates {duplicates}.",
+        "ru": "Сканирование заняло {total}: список файлов {listing}, "
+        "проверка открытых файлов {checks}, дубликаты {duplicates}.",
+    },
     "findings.rescan": {"en": "Rescan", "ru": "Сканировать снова"},
     "findings.chip": {"en": "{level} {n}", "ru": "{level} {n}"},
     "findings.name": {"en": "Name", "ru": "Имя"},
@@ -752,6 +758,7 @@ UNITS: dict[str, tuple[str, ...]] = {
     "ru": ("Б", "КиБ", "МиБ", "ГиБ", "ТиБ"),
 }
 DECIMAL: dict[str, str] = {"en": ".", "ru": ","}
+SECOND: dict[str, str] = {"en": "s", "ru": "с"}
 
 PLURALS: dict[str, dict[str, tuple[str, ...]]] = {
     "file": {"en": ("{n} file", "{n} files"), "ru": ("{n} файл", "{n} файла", "{n} файлов")},

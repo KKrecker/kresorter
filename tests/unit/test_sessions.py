@@ -306,7 +306,7 @@ def test_the_walker_leaves_a_profile_s_sessions_out_and_lists_its_cache(tmp_path
         path.write_bytes(b"x")
 
     policy = PathPolicy.for_posix(home=PurePosixPath(home), platform="linux")
-    events = list(walk([home], policy, FakeOpenFiles()))
+    events = list(walk([home], policy))
 
     assert sorted(e.path for e in events if isinstance(e, FileEntry)) == [
         profile / "GPUCache" / "data_0",

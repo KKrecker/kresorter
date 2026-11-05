@@ -9,6 +9,7 @@ from pathlib import Path
 
 from kresorter.analysis.report import AnalysisReport, analyze
 from kresorter.analysis.size_age import Thresholds
+from kresorter.core.hashing import Digests
 from kresorter.core.scanner import Progress, ScanContext, ScanReport, scan, unreported
 
 __all__ = ["analyze_paths"]
@@ -20,14 +21,17 @@ def analyze_paths(
     thresholds: Thresholds,
     *,
     junk_only: Sequence[Path] = (),
+    digests: Digests | None = None,
     progress: Progress = unreported,
 ) -> tuple[ScanReport, AnalysisReport]:
     """Scan ``paths`` (default: the safe zones) and the folders of ``junk_only`` that exist,
-    for junk only (decision 0020, item 15), and rate what was found; ``progress``: the scan's
-    (decision 0018, item 16)."""
+    for junk only (decision 0020, item 15), and rate what was found; ``digests`` and
+    ``progress``: the scan's (decision 0020, item 18; decision 0018, item 16)."""
     roots = [Path(p) for p in paths or context.policy.default_roots()]
     caches = [folder for folder in junk_only if folder.is_dir()]
-    scanned = scan(roots, context, junk_only=caches, hash_duplicates=True, progress=progress)
+    scanned = scan(
+        roots, context, junk_only=caches, hash_duplicates=True, digests=digests, progress=progress
+    )
     analysis = analyze(
         scanned,
         classifier=context.classifier,

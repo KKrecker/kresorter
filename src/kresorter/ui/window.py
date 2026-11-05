@@ -24,6 +24,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMainWindow, QStackedWidget, QWidget
 
+from kresorter.core.hashing import Digests
 from kresorter.environment import Environment
 from kresorter.llm.failure import SettingRefused
 from kresorter.llm.settings import SERVER_NAMES, model_from, server_from
@@ -81,6 +82,7 @@ class Window(QMainWindow):
         self.restart_page: str | None = None  # the page to open again once a restart closed it
 
         self.tasks = Tasks(self)
+        self.digests = Digests()  # the files hashed, kept while it is open (0020, item 18)
         self.tasks.busy.connect(self._busy)
         self.progress_timer = QTimer(self)  # the files read, at most ten times a second
         self.progress_timer.setInterval(PROGRESS_MS)
