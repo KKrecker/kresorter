@@ -117,23 +117,21 @@ jobs:
         run: python packaging/trial.py installer dist
 
   release:
-    # A tag vX.Y.Z, and nothing else, publishes what both builds made: PyPI by trusted
-    # publishing, with no token, then the GitHub release (decision 0015, item 23). The tag is
-    # checked before anything is published.
+    # A tag vX.Y.Z, and nothing else, publishes what both builds made: the GitHub release first
+    # (decision 0015, item 23; decision 0019, item 17). The tag is checked before anything is
+    # published, with the day of the commit it tags, which the changelog dates (0019 item 18).
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build, windows]
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
-      id-token: write
       contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: The tag is __version__ and the changelog's latest, and the runs are recorded
-        run: python packaging/release.py check "$GITHUB_REF_NAME"
+      - name: The tag is __version__ and the changelog's latest, of its day, and the runs are recorded
+        run: python packaging/release.py check "$GITHUB_REF_NAME" --day "$(git log -1 --format=%cs)"
       - name: The wheel and the sdist
         uses: actions/download-artifact@v4
         with:
@@ -148,11 +146,28 @@ jobs:
         run: |
           python packaging/release.py sums dist windows > SHA256SUMS.txt
           python packaging/release.py notes "$GITHUB_REF_NAME" > notes.md
-      - name: PyPI, by trusted publishing
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/
       - name: The GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" dist/* windows/* SHA256SUMS.txt --title "Kresorter ${GITHUB_REF_NAME#v}" --notes-file notes.md
+
+  pypi:
+    # Then PyPI, by trusted publishing with no token, only once the owner has set it up and set
+    # the repository's variable PUBLISH_TO_PYPI to true: a PyPI not set up never holds the
+    # GitHub release back (decision 0019, item 17).
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_TO_PYPI == 'true'
+    needs: release
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: The wheel and the sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+      - name: PyPI, by trusted publishing
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

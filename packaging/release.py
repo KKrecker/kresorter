@@ -1,8 +1,10 @@
 """The release job's checks and files (decision 0015, items 23 and 28):
 ``python packaging/release.py``.
 
-``check TAG``: the tag is ``v`` and ``__version__``, that version is the changelog's latest, the
-first heading ``## [X.Y.Z] - YYYY-MM-DD`` (item 18), and ``docs/releases/X.Y.Z.md`` records the
+``check TAG [--day YYYY-MM-DD]``: the tag is ``v`` and ``__version__``, that version is the
+changelog's latest, the first heading ``## [X.Y.Z] - YYYY-MM-DD`` (item 18), dated ``--day`` when it
+is given, the day of the commit the tag is on (decision 0019, item 18), and
+``docs/releases/X.Y.Z.md`` records the
 owner's runs on clean machines (item 28, the form in ``docs/releases/README.md``): a run
 ``## Windows 10 ...``, one ``## Windows 11 ...`` and one ``## Ubuntu NN.NN LTS``, each with a
 line ``- **Label**: text`` for every label of ``LABELS``, the Windows ones naming the installer
@@ -31,6 +33,7 @@ __all__ = [
     "WINDOWS",
     "ReleaseError",
     "check",
+    "dated",
     "latest",
     "main",
     "notes",
@@ -41,7 +44,9 @@ __all__ = [
 ]
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADING = re.compile(r"^## \[(?P<version>\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}$", re.MULTILINE)
+HEADING = re.compile(
+    r"^## \[(?P<version>\d+\.\d+\.\d+)\] - (?P<day>\d{4}-\d{2}-\d{2})$", re.MULTILINE
+)
 RECORDS = Path("docs", "releases")
 # Each system a record has a run on: its name, how a run's heading starts, and what the run's
 # Installed names, ``{version}`` the version's.
@@ -82,11 +87,21 @@ def version(source: str) -> str:
     raise ReleaseError("the package's __init__.py has no __version__")
 
 
-def latest(changelog: str) -> str:
+def _heading(changelog: str) -> re.Match[str]:
+    """The changelog's first heading of a version."""
     found = HEADING.search(changelog)
     if found is None:
         raise ReleaseError("the changelog has no version yet")
-    return found["version"]
+    return found
+
+
+def latest(changelog: str) -> str:
+    return _heading(changelog)["version"]
+
+
+def dated(changelog: str) -> str:
+    """The day of the changelog's latest version."""
+    return _heading(changelog)["day"]
 
 
 def check(tag: str, source: str, changelog: str) -> str:
@@ -174,8 +189,10 @@ def sums(folders: Sequence[Path]) -> str:
 def main(argv: Sequence[str] | None = None, root: Path = ROOT) -> int:
     parser = argparse.ArgumentParser(prog="release.py", description="The release job's steps.")
     steps = parser.add_subparsers(dest="step", required=True)
-    for name, text in (("check", "check the tag"), ("notes", "the release's text")):
-        steps.add_parser(name, help=text).add_argument("tag", help="the tag, vX.Y.Z")
+    checked = steps.add_parser("check", help="check the tag")
+    checked.add_argument("tag", help="the tag, vX.Y.Z")
+    checked.add_argument("--day", help="the day of the commit the tag is on, YYYY-MM-DD")
+    steps.add_parser("notes", help="the release's text").add_argument("tag", help="the tag, vX.Y.Z")
     steps.add_parser("sums", help="SHA256SUMS.txt").add_argument(
         "folders", nargs="+", type=Path, help="the folders of what is published"
     )
@@ -189,6 +206,11 @@ def main(argv: Sequence[str] | None = None, root: Path = ROOT) -> int:
         changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
         if step == "check":
             done = check(options.tag, source, changelog)
+            day: str | None = options.day
+            if day is not None and dated(changelog) != day:
+                raise ReleaseError(
+                    f"the changelog dates {done} {dated(changelog)}, not {day}, the day of the tag"
+                )
             path = RECORDS / f"{done}.md"
             if not (root / path).is_file():
                 raise ReleaseError(
@@ -196,6 +218,8 @@ def main(argv: Sequence[str] | None = None, root: Path = ROOT) -> int:
                 )
             seen = record(done, (root / path).read_text(encoding="utf-8"))
             print(f"{options.tag}: __version__ and the changelog's latest version are {done}")
+            if day is not None:
+                print(f"CHANGELOG.md: {done} is dated {day}, the day of the tag")
             print(f"{path.as_posix()}: the runs on {', '.join(seen)}")
         else:
             sys.stdout.write(notes(options.tag, changelog))
