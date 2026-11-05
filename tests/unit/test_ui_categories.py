@@ -28,7 +28,7 @@ def test_the_english_label_is_the_name_on_disk() -> None:
 
 
 def test_the_russian_labels() -> None:
-    # [0014.44]
+    # [0014.44] [0020.12]
     ru = Translator("ru")
     assert [ru.category(name) for name in NAMES] == [
         "Изображения",
@@ -37,10 +37,13 @@ def test_the_russian_labels() -> None:
         "Документы",
         "Архивы",
         "Установщики",
+        "Торренты",
+        "Шрифты",
+        "3D-модели",
     ]
 
 
 def test_a_name_without_a_label_is_shown_as_it_is() -> None:
     # [0014.44]
     for language in LANGUAGES:
-        assert Translator(language).category("Fonts") == "Fonts"
+        assert Translator(language).category("Spreadsheets") == "Spreadsheets"

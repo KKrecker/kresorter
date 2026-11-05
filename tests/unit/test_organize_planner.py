@@ -208,7 +208,7 @@ def test_a_saved_page_keeps_what_it_loads(zone: Path, scan: ScanContext) -> None
 @pytest.mark.parametrize(
     "pair",
     [
-        ("film.mkv", "film.srt"),  # a video and its subtitles
+        ("film.mkv", "film.nfo"),  # a video and its release's notes
         ("photo.jpg", "photo.xmp"),  # a photo and its sidecar
         ("song.mp3", "song.jpg"),  # a song and its cover: two categories
         ("holiday.2026.mp4", "holiday.jpg"),  # the stem is the name before its first dot
@@ -321,14 +321,29 @@ def test_a_file_gone_since_the_listing_is_not_planned(
 # --- folded names (item 20) ---------------------------------------------------------------------
 
 
-def test_subtitles_keep_their_film_whatever_the_case(zone: Path, scan: ScanContext) -> None:
-    # [0012.14] [0012.20] Movie.mkv and movie.srt are one film
-    result = plan(downloads(zone, "Movie.mkv", "movie.srt", "report.pdf"), scan)
+def test_notes_keep_their_film_whatever_the_case(zone: Path, scan: ScanContext) -> None:
+    # [0012.14] [0012.20] Movie.mkv and movie.nfo are one film
+    result = plan(downloads(zone, "Movie.mkv", "movie.nfo", "report.pdf"), scan)
     assert stayed(result) == {
         "Movie.mkv": StayReason.COMPANION,
-        "movie.srt": StayReason.UNKNOWN_KIND,
+        "movie.nfo": StayReason.UNKNOWN_KIND,
     }
     assert moved(result) == {"report.pdf": "Documents"}
+
+
+def test_a_film_and_its_subtitles_go_together_whatever_the_case(
+    zone: Path, scan: ScanContext
+) -> None:
+    # [0012.14] [0012.20] [0020.12] Subtitles are videos' now: Movie.mkv, movie.srt and
+    # movie.en.ass move as one film.
+    result = plan(downloads(zone, "Movie.mkv", "movie.srt", "movie.en.ass", "song.lrc"), scan)
+    assert moved(result) == {
+        "Movie.mkv": "Videos",
+        "movie.srt": "Videos",
+        "movie.en.ass": "Videos",
+        "song.lrc": "Audio",
+    }
+    assert stayed(result) == {}
 
 
 def test_companions_of_one_category_move_together_whatever_the_case(

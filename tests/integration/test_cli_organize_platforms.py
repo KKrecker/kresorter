@@ -312,7 +312,7 @@ def test_recover_settles_an_interrupted_batch_everywhere(
 
 
 @pytest.mark.parametrize(
-    "pair", [("Movie.mkv", "movie.srt"), (f"{NFC}.jpg", f"{NFD}.xmp")], ids=["case", "unicode"]
+    "pair", [("Movie.mkv", "movie.nfo"), (f"{NFC}.jpg", f"{NFD}.xmp")], ids=["case", "unicode"]
 )
 def test_a_pair_stays_while_the_rest_moves(
     pair: tuple[str, str], zone: Path, scan: ScanContext

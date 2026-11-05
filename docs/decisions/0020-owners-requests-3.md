@@ -120,17 +120,21 @@ hashing any cheaper. Kresorter keeps listing directories; the time goes from whe
 
 ## More sorted by kind (request 1, by kind)
 
-12. **More kinds.** The table of 0012 item 21 gains:
-    - Images: `avif`, `jxl`, `ico`, `cr3`, `raf`, `orf`, `rw2`, `psd`, `xcf`, `kra`;
-    - Videos: `3gp`, `flv`, `m2ts`, `mts`, `vob`, `ogv`, and the subtitles `srt`, `ass`,
-      `ssa`, `vtt`, so that a film and its subtitles go together;
-    - Audio: `aiff`, `aif`, `mid`, `midi`, `ape`, `amr`, `mka`, and the lyrics `lrc`;
-    - Documents: `djvu`, `fb2`, `mobi`, `azw3`, `xps`, `oxps`, `pages`, `numbers`;
-    - Archives: `cab`, `lz`, `lzma`, `zipx`, `tar.lz`;
-    - Installers: `msix`, `msixbundle`, `appx`, `appxbundle`, `apk`, `xapk`;
-    - and three kinds of their own, after the others: Torrents (`torrent`), Fonts (`ttf`,
-      `otf`, `woff`, `woff2`) and 3D models (`stl`, `3mf`, `step`, `stp`, `fbx`, `glb`,
-      `gltf`, `blend`).
+12. **More kinds.** The table of 0012 item 21 gains these extensions, and three kinds of
+    their own after the others, in the window `Торренты`, `Шрифты` and `3D-модели` in
+    Russian:
+
+    | Category | Extensions added |
+    |---|---|
+    | `Images` | `avif jxl ico cr3 raf orf rw2 psd xcf kra` |
+    | `Videos` | `3gp flv m2ts mts vob ogv`, and the subtitles `srt ass ssa vtt`, so that a film and its subtitles go together |
+    | `Audio` | `aiff aif mid midi ape amr mka`, and the lyrics `lrc` |
+    | `Documents` | `djvu fb2 mobi azw3 xps oxps pages numbers` |
+    | `Archives` | `cab lz lzma zipx tar.lz` |
+    | `Installers` | `msix msixbundle appx appxbundle apk xapk` |
+    | `Torrents` | `torrent` |
+    | `Fonts` | `ttf otf woff woff2` |
+    | `3D models` | `stl 3mf step stp fbx glb gltf blend` |
 
     Code, data and settings (`py`, `json`, `ini`, `bat`, ...) and virtual machines' disks stay
     out: they are often part of what is beside them.
