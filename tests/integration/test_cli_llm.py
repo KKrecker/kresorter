@@ -29,6 +29,7 @@ from kresorter.core.scanner import ScanContext
 from kresorter.environment import Environment
 from kresorter.llm.settings import Address
 from kresorter.llm.transport import LIMITS, Limits
+from support import lmstudio as lms
 from support.cli import autostart_context, scan_context
 from support.files import snapshot, write
 from support.journal import query
@@ -205,7 +206,8 @@ def texts_for(case: Case) -> list[str]:
 # --- llm status ----------------------------------------------------------------------------------
 
 SETTINGS = (
-    "Settings: KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
+    "Settings: KRESORTER_LLM_SERVER (ollama or lmstudio, default ollama),\n"
+    "  KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
     "  KRESORTER_OLLAMA_MODEL (default llama3.2)\n"
 )
 UNAVAILABLE_SETUP = (
@@ -244,7 +246,7 @@ def test_status_names_the_model_of_the_setting() -> None:
 
 
 def test_status_when_ollama_is_not_reached() -> None:
-    # [0013.15] Every step, numbered from 1.
+    # [0013.15] [0019.10] Every step, numbered from 1; the settings name the server's variable.
     address = free_address()
     code, out, err = kresorter(["llm", "status"], env=env_for(address))
     first, rest = out.split("\n", 1)
@@ -257,7 +259,8 @@ def test_status_when_ollama_is_not_reached() -> None:
         "  1. Install Ollama from https://ollama.com/download and start it\n"
         "  2. Download the model: ollama pull llama3.2\n"
         "  3. Check again: kresorter llm status\n"
-        "Settings: KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
+        "Settings: KRESORTER_LLM_SERVER (ollama or lmstudio, default ollama),\n"
+        "  KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
         "  KRESORTER_OLLAMA_MODEL (default llama3.2)\n"
     )
 
@@ -304,7 +307,8 @@ def test_status_when_the_model_is_missing() -> None:
         "To set them up (kresorter installs nothing itself):\n"
         "  1. Download the model: ollama pull llama3.2\n"
         "  2. Check again: kresorter llm status\n"
-        "Settings: KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
+        "Settings: KRESORTER_LLM_SERVER (ollama or lmstudio, default ollama),\n"
+        "  KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),\n"
         "  KRESORTER_OLLAMA_MODEL (default llama3.2)\n"
     )
 
@@ -747,3 +751,173 @@ def test_explain_leaves_the_disk_as_without(case: Case, tmp_path: Path) -> None:
     with ScriptedOllama(VERSION, TAGS, answer("Explained.")) as ollama:
         assert case.run("--explain", env=env_for(ollama.address))[1].endswith("Explained.\n")
     assert snapshot(tmp_path) == before
+
+
+# --- llm status and --explain with LM Studio (decision 0019) -------------------------------------
+
+LMS_SETTINGS = (
+    "Settings: KRESORTER_LLM_SERVER (ollama or lmstudio, default ollama),\n"
+    "  KRESORTER_LMSTUDIO_URL (a loopback address, default http://127.0.0.1:1234),\n"
+    "  KRESORTER_LMSTUDIO_MODEL (default the first model LM Studio lists)\n"
+)
+LMS_INSTALL = (
+    "Install LM Studio from https://lmstudio.ai, download a model and start its server"
+    " (Developer, Start Server)"
+)
+
+
+def lms_setup(*steps: str) -> str:
+    numbered = "".join(f"  {n}. {step}\n" for n, step in enumerate(steps, start=1))
+    return UNAVAILABLE_SETUP + numbered + LMS_SETTINGS
+
+
+def test_status_with_lm_studio_when_everything_is_in_place() -> None:
+    # [0019.10] no version to say; the model named, or else the first listed
+    with ScriptedOllama(lms.MODELS, lms.MODELS) as server:
+        named = kresorter(["llm", "status"], env=lms.env_for(server.address, lms.MODEL))
+        first = kresorter(["llm", "status"], env=lms.env_for(server.address))
+    expected = (
+        f"LM Studio: running at {server.address.url}\n"
+        f"Model: {lms.MODEL}: available\n"
+        "AI explanations: available with --explain on analyze, autostart list and organize move\n"
+    )
+    assert named == first == (0, expected, "")
+    assert server.paths() == [lms.LISTED, lms.LISTED]
+
+
+def test_status_with_lm_studio_when_the_model_is_not_listed() -> None:
+    # [0019.10] LM Studio runs: no step to install it
+    with ScriptedOllama(lms.MODELS) as server:
+        code, out, _ = kresorter(["llm", "status"], env=lms.env_for(server.address, "phi-4"))
+    assert code == 1
+    assert out == (
+        f"LM Studio: running at {server.address.url}\nModel: phi-4: not available\n"
+    ) + lms_setup("Download the model in LM Studio: phi-4", AGAIN)
+
+
+def test_status_with_lm_studio_when_no_model_is_listed() -> None:
+    # [0019.10] none named and none listed but embedding models: a model to download
+    with ScriptedOllama(lms.models(lms.EMBEDDING)) as server:
+        code, out, _ = kresorter(["llm", "status"], env=lms.env_for(server.address))
+    assert code == 1
+    assert out == (f"LM Studio: running at {server.address.url}\nModel: none listed\n") + lms_setup(
+        LMS_INSTALL, AGAIN
+    )
+
+
+@pytest.mark.parametrize(
+    ("model", "line", "steps"),
+    [
+        (None, "Model: not checked", [LMS_INSTALL, AGAIN]),
+        (
+            "phi-4",
+            "Model: phi-4: not checked",
+            [LMS_INSTALL, "Download the model in LM Studio: phi-4", AGAIN],
+        ),
+    ],
+)
+def test_status_when_lm_studio_is_not_reached(
+    model: str | None, line: str, steps: list[str]
+) -> None:
+    # [0019.10]
+    address = free_address()
+    code, out, err = kresorter(["llm", "status"], env=lms.env_for(address, model))
+    first, rest = out.split("\n", 1)
+    assert (code, err) == (1, "")
+    assert re.fullmatch(rf"LM Studio: not reachable at {re.escape(address.url)} \(.+\)", first)
+    assert rest == f"{line}\n" + lms_setup(*steps)
+
+
+def test_status_of_something_else_than_lm_studio() -> None:
+    # [0019.10] [0019.9]
+    with ScriptedOllama(VERSION) as server:
+        code, out, _ = kresorter(["llm", "status"], env=lms.env_for(server.address))
+    assert code == 1
+    assert out == (
+        f"LM Studio: {server.address.url} does not answer as LM Studio"
+        " (GET /v1/models: no list of models)\n"
+        "Model: not checked\n"
+    ) + lms_setup(LMS_INSTALL, AGAIN)
+
+
+@pytest.mark.parametrize(
+    ("env", "lines", "steps", "settings"),
+    [
+        (
+            {**lms.env_for(Address("127.0.0.1", 9)), "KRESORTER_LMSTUDIO_URL": "http://10.0.0.1"},
+            [
+                "LM Studio: refused setting KRESORTER_LMSTUDIO_URL='http://10.0.0.1'"
+                " (not a loopback address)",
+                "Model: not checked",
+            ],
+            [AGAIN],
+            LMS_SETTINGS,
+        ),
+        (
+            lms.env_for(Address("127.0.0.1", 9), "a b"),
+            [
+                "LM Studio: not checked",
+                "Model: refused setting KRESORTER_LMSTUDIO_MODEL='a b' (not a model name)",
+            ],
+            [AGAIN],
+            LMS_SETTINGS,
+        ),
+        (
+            {"KRESORTER_LLM_SERVER": "openai", "KRESORTER_OLLAMA_URL": "http://127.0.0.1:9"},
+            [
+                "Local AI: refused setting KRESORTER_LLM_SERVER='openai' (not ollama or lmstudio)",
+                "Model: not checked",
+            ],
+            [AGAIN],
+            SETTINGS,
+        ),
+    ],
+    ids=["address", "model", "server"],
+)
+def test_status_with_a_refused_setting_of_lm_studio_or_of_the_server(
+    monkeypatch: pytest.MonkeyPatch,
+    env: dict[str, str],
+    lines: list[str],
+    steps: list[str],
+    settings: str,
+) -> None:
+    # [0019.10] [0019.5] nothing is contacted; a refused server, Ollama's settings, the default's
+    connected = spy_on_connect(monkeypatch)
+    code, out, _ = kresorter(["llm", "status"], env=env)
+    assert (code, connected) == (1, [])
+    assert (
+        out
+        == "".join(f"{line}\n" for line in lines)
+        + UNAVAILABLE_SETUP
+        + "".join(f"  {n}. {step}\n" for n, step in enumerate(steps, start=1))
+        + settings
+    )
+
+
+def test_the_section_says_via_lm_studio(tmp_path: Path, zone: Path, scan: ScanContext) -> None:
+    # [0019.11] the header names the server that answered, and its model
+    organize = make_case("organize", tmp_path, zone, scan)
+    script = (lms.MODELS, lms.completed("A temporary file."), lms.completed("An unknown kind."))
+    with ScriptedOllama(*script) as server:
+        _, out, _ = organize.run("--explain", env=lms.env_for(server.address))
+    assert out.endswith(
+        "\n"
+        f"AI explanations ({lms.MODEL} via LM Studio; advisory, may be wrong; nothing above"
+        " depends on them):\n"
+        "  reason=junk, extension=.tmp\n"
+        "    A temporary file.\n"
+        "  reason=unknown_kind, extension=.qqq\n"
+        "    An unknown kind.\n"
+    )
+    assert server.paths() == [lms.LISTED, lms.CHAT, lms.CHAT]
+
+
+def test_the_help_names_both_servers(capsys: pytest.CaptureFixture[str]) -> None:
+    # [0019.10]
+    with pytest.raises(SystemExit):
+        cli.main(["--help"])
+    said = " ".join(capsys.readouterr().out.split())
+    assert "optional AI explanations from a local Ollama or LM Studio" in said
+    with pytest.raises(SystemExit):
+        cli.main(["analyze", "--help"])
+    assert "from a local Ollama or LM Studio" in " ".join(capsys.readouterr().out.split())
