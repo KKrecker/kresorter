@@ -16,6 +16,7 @@ import pytest
 
 from kresorter.core import hashing
 from kresorter.core.hashing import (
+    Digests,
     HashedFile,
     group_by_size,
     hash_duplicate_candidates,
@@ -281,3 +282,70 @@ def test_side_by_side_the_groups_their_order_and_the_skipped_paths_are_those_of_
         HashedFile(small1, blake(b"abc")),
         HashedFile(small2, blake(b"abc")),
     ]
+
+
+# --- the digests kept while the window is open [0020.18] ---------------------------------------
+
+
+def touched(path: Path, data: bytes, after: FileEntry) -> FileEntry:
+    """``path`` holding ``data``, modified a step after ``after`` was."""
+    path.write_bytes(data)
+    os.utime(path, ns=(after.mtime_ns, after.mtime_ns + MTIME_STEP_NS))
+    info = path.stat()
+    return FileEntry(path=path, size=info.st_size, mtime_ns=info.st_mtime_ns)
+
+
+def test_with_the_digests_kept_a_second_hashing_reads_no_unchanged_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0020.18] The prefixes and the full digests, each by its file's path, size and mtime_ns.
+    big = b"SAME-" + b"x" * 20
+    order = [make(tmp_path / "a", big), make(tmp_path / "b", big)]
+    order += [make(tmp_path / "s1", b"abc"), make(tmp_path / "s2", b"abc")]
+    kept = Digests()
+    first = list(hash_duplicate_candidates(order, partial_bytes=4, digests=kept))
+    calls = spy_hash_file(monkeypatch)
+    assert list(hash_duplicate_candidates(order, partial_bytes=4, digests=kept)) == first
+    assert calls == []
+
+
+def test_a_file_changed_since_it_was_hashed_is_read_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0020.18] Its size or mtime_ns no longer those kept: its new digests are kept instead.
+    big = b"SAME-" + b"x" * 20
+    a, b = make(tmp_path / "a", big), make(tmp_path / "b", big)
+    kept = Digests()
+    list(hash_duplicate_candidates([a, b], partial_bytes=4, digests=kept))
+    changed = touched(b.path, b"SAME-" + b"y" * 20, b)
+    calls = spy_hash_file(monkeypatch)
+    again = list(hash_duplicate_candidates([a, changed], partial_bytes=4, digests=kept))
+    assert again == [HashedFile(a, blake(big)), HashedFile(changed, blake(b"SAME-" + b"y" * 20))]
+    assert calls == [(b.path, 4), (b.path, None)]
+    calls.clear()
+    list(hash_duplicate_candidates([a, changed], partial_bytes=4, digests=kept))
+    assert calls == []
+
+
+def test_a_file_that_could_not_be_hashed_is_not_kept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0020.18] Changed while it was read: asked again, it is read again.
+    a, b = make(tmp_path / "a", b"same"), make(tmp_path / "b", b"same")
+    kept = Digests()
+    real = hashing.hash_file
+
+    def changing(path: Path, *, limit: int | None = None, chunk_size: int = 1 << 20) -> str:
+        digest = real(path, limit=limit, chunk_size=chunk_size)
+        if path == b.path:
+            os.utime(path, ns=(b.mtime_ns, b.mtime_ns + MTIME_STEP_NS))
+        return digest
+
+    monkeypatch.setattr(hashing, "hash_file", changing)
+    first = list(hash_duplicate_candidates([a, b], partial_bytes=8, digests=kept))
+    assert first == [Skipped(b.path, SkipReason.CHANGED, detail="modified during hashing")]
+    info = b.path.stat()
+    now = FileEntry(path=b.path, size=info.st_size, mtime_ns=info.st_mtime_ns)
+    calls = spy_hash_file(monkeypatch)
+    list(hash_duplicate_candidates([a, now], partial_bytes=8, digests=kept))
+    assert calls == [(b.path, 8)]

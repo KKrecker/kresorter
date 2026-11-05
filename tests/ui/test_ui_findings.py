@@ -4,6 +4,7 @@ selection; Review never preselected; quarantine from the findings (decision 0014
 
 import functools
 import os
+import re
 import time
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from pytestqt.qtbot import QtBot
 
 from fakes import UnreliableOpenFiles
 from kresorter.analysis.score import Level
+from kresorter.core.scanner import ScanTimes
 from kresorter.quarantine.service import QuarantineService
 from kresorter.ui import sessions
 from kresorter.ui.findings import (
@@ -674,3 +676,46 @@ def test_what_moved_leaves_its_group_in_one_go(
     assert page.tree.currentItem() is page.item(tree["kept"])
     assert page.detail.name.text() == "Thumbs.db"
     assert _groups(window)[0].isExpanded()
+
+
+# --- how long the scan took [0020.19] ----------------------------------------------------------
+
+S = r"\d+\.\d s"
+TOOK = rf"Scanned in {S}: listing {S}, open-file checks {S}, duplicates {S}\."
+RU_SECOND = "\N{CYRILLIC SMALL LETTER ES}"  # the unit, as the window writes it
+
+
+def test_the_page_says_how_long_the_scan_took_and_what_took_it(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
+) -> None:
+    # [0020.19] Under the findings, once there are some.
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    page = window.findings
+    assert page.took.isHidden()
+    scanned(qtbot, window)
+    found = window.overview.scanned
+    assert found is not None
+    assert not page.took.isHidden()
+    assert re.fullmatch(TOOK, page.took.text())
+    page.show_analysis(found.analysis, found.roots, found.at, times=ScanTimes(9.8, 2.1, 0.4, 7.3))
+    assert page.took.text() == (
+        "Scanned in 9.8 s: listing 2.1 s, open-file checks 0.4 s, duplicates 7.3 s."
+    )
+    page.show_analysis(found.analysis, found.roots, found.at)
+    assert page.took.isHidden()
+
+
+def test_in_russian_the_time_is_said_with_a_decimal_comma(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, tree: dict[str, Path]
+) -> None:
+    # [0020.19]
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
+    scanned(qtbot, window)
+    found = window.overview.scanned
+    assert found is not None
+    page = window.findings
+    page.show_analysis(found.analysis, found.roots, found.at, times=ScanTimes(9.8, 2.1, 0.4, 7.3))
+    assert page.took.text() == (
+        f"Сканирование заняло 9,8 {RU_SECOND}: список файлов 2,1 {RU_SECOND}, "
+        f"проверка открытых файлов 0,4 {RU_SECOND}, дубликаты 7,3 {RU_SECOND}."
+    )

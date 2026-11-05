@@ -16,6 +16,7 @@ from pytestqt.qtbot import QtBot
 from kresorter.analysis.report import AnalysisReport
 from kresorter.analysis.run import analyze_paths
 from kresorter.analysis.size_age import Thresholds
+from kresorter.core.hashing import Digests
 from kresorter.core.scanner import Progress, ScanContext, ScanReport
 from kresorter.ui import motion, overview
 from kresorter.ui.parts import Switch
@@ -73,13 +74,16 @@ def _slow_scan(monkeypatch: pytest.MonkeyPatch, outcome: str = "done") -> thread
         thresholds: Thresholds,
         *,
         junk_only: Sequence[Path],
+        digests: Digests,
         progress: Progress,
     ) -> tuple[ScanReport, AnalysisReport]:
         progress(1500)
         released.wait(10)
         if outcome == "failed":
             raise OSError("the disk went away")
-        return analyze_paths(paths, context, thresholds, junk_only=junk_only, progress=progress)
+        return analyze_paths(
+            paths, context, thresholds, junk_only=junk_only, digests=digests, progress=progress
+        )
 
     monkeypatch.setattr(overview, "analyze_paths", slow)
     return released

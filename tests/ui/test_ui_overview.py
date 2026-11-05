@@ -4,6 +4,7 @@ and 48)."""
 
 import dataclasses
 import json
+import os
 import threading
 import time
 from collections.abc import Sequence
@@ -19,6 +20,8 @@ from kresorter.analysis.report import AnalysisReport
 from kresorter.analysis.run import analyze_paths
 from kresorter.analysis.score import Level
 from kresorter.analysis.size_age import Thresholds
+from kresorter.core import hashing
+from kresorter.core.hashing import Digests
 from kresorter.core.open_files.windows import ShareModeChecker
 from kresorter.core.scanner import Progress, ScanContext, ScanReport
 from kresorter.environment import Environment
@@ -29,6 +32,7 @@ from kresorter.ui.shown import shown_path
 from kresorter.ui.tasks import Task
 from kresorter.ui.window import Window
 from support.files import write
+from support.host import MTIME_STEP_NS
 from support.kernel import FakeKernel
 from support.moves import three_files
 from support.window import (
@@ -480,11 +484,14 @@ def test_while_a_scan_runs_the_status_line_counts_the_files_read_at_most_ten_tim
         thresholds: Thresholds,
         *,
         junk_only: Sequence[Path],
+        digests: Digests,
         progress: Progress,
     ) -> tuple[ScanReport, AnalysisReport]:
         progress(1500)
         released.wait(10)
-        return analyze_paths(paths, context, thresholds, junk_only=junk_only, progress=progress)
+        return analyze_paths(
+            paths, context, thresholds, junk_only=junk_only, digests=digests, progress=progress
+        )
 
     monkeypatch.setattr(overview, "analyze_paths", slow)
     window = make_window(qtbot, environment(tmp_path, zone, data_dir), language="ru")
@@ -800,3 +807,36 @@ def test_the_programs_caches_alone_are_scanned_and_said_so_in_russian(
     assert found is not None
     subtitle = window.findings.head.subtitle.text()
     assert subtitle == f"Сканирование кешей программ, {_moment(found.at)}"
+
+
+# --- the digests kept while the window is open [0020.18] ---------------------------------------
+
+
+def test_a_later_scan_in_the_window_reads_no_unchanged_file_again(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # [0020.18] A file changed since is read again.
+    a, b = write(zone / "a.bin", b"same"), write(zone / "b.bin", b"same")
+    window = make_window(qtbot, environment(tmp_path, zone, data_dir))
+    window.overview.scan_button.click()
+    wait_idle(qtbot, window)
+    read: list[Path] = []
+    real = hashing.hash_file
+
+    def spy(path: Path, *, limit: int | None = None, chunk_size: int = 1 << 20) -> str:
+        read.append(path)
+        return real(path, limit=limit, chunk_size=chunk_size)
+
+    monkeypatch.setattr(hashing, "hash_file", spy)
+    window.overview.scan_button.click()
+    wait_idle(qtbot, window)
+    assert read == []
+    found = window.overview.scanned
+    assert found is not None
+    assert [group.paths for group in found.report.duplicates] == [(a, b)]
+    before = a.stat().st_mtime_ns
+    write(a, b"SAME")
+    os.utime(a, ns=(before, before + MTIME_STEP_NS))
+    window.overview.scan_button.click()
+    wait_idle(qtbot, window)
+    assert read == [a]
