@@ -269,10 +269,16 @@ CATALOG: dict[str, dict[str, str]] = {
     },
     "organize.by_kind": {"en": "By kind", "ru": "По типу"},
     "organize.grouped": {
-        "en": "Grouped by meaning by the local AI ({model}): the groups may be wrong. By kind goes"
-        " back to the plan by kind.",
-        "ru": "Сгруппировано по смыслу локальным ИИ ({model}): группы могут быть неверными."
+        "en": "The local AI ({model}) grouped {files} {into}: the groups may be wrong. By kind"
+        " goes back to the plan by kind.",
+        "ru": "Локальный ИИ ({model}) сгруппировал {files} {into}: группы могут быть неверными."
         " «По типу» возвращает план по типам.",
+    },
+    "organize.grouped_stopped": {
+        "en": "The local AI ({model}) grouped {files} {into}, then stopped: {reason}. The groups"
+        " may be wrong. By kind goes back to the plan by kind.",
+        "ru": "Локальный ИИ ({model}) сгруппировал {files} {into} и остановился: {reason}."
+        " Группы могут быть неверными. «По типу» возвращает план по типам.",
     },
     "organize.not_grouped": {
         "en": "Not grouped: {reason}. The plan by kind stays.",
@@ -770,5 +776,13 @@ PLURALS: dict[str, dict[str, tuple[str, ...]]] = {
     "folders.into": {
         "en": ("into {n} folder", "into {n} folders"),
         "ru": ("по {n} папке", "по {n} папкам", "по {n} папкам"),
+    },
+    "grouped.files": {
+        "en": ("{grouped} of {n} file", "{grouped} of {n} files"),
+        "ru": ("{grouped} из {n} файла", "{grouped} из {n} файлов", "{grouped} из {n} файлов"),
+    },
+    "grouped.into": {
+        "en": ("into {n} folder", "into {n} folders"),
+        "ru": ("в {n} папку", "в {n} папки", "в {n} папок"),
     },
 }

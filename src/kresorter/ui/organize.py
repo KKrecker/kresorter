@@ -20,9 +20,11 @@ made again, still holds.
 Once a plan is shown, Group by meaning (local AI) asks the local AI to group its files by what
 they are about (``llm.group``, decision 0018, items 24-31): nothing is sent before it is pressed,
 and it is offered only for two files or more to group. The groups make a new plan through the
-planner, shown as any with a note that the groups come from the local AI and may be wrong; By
-kind goes back to the plan by kind. Sort… makes the plan again with the same groups and asks the
-model nothing. A grouping that fails, or finds no group, says so and leaves the plan by kind.
+planner, shown as any with a note that says how many files the local AI grouped into how many
+folders and that the groups may be wrong (decision 0020, item 10); By kind goes back to the plan
+by kind. Sort… makes the plan again with the same groups and asks the model nothing. A grouping
+that fails, or finds no group, says so and leaves the plan by kind; one that stopped after some
+batches shows their groups and says why it stopped (item 8).
 """
 
 from __future__ import annotations
@@ -123,6 +125,21 @@ def _fits(tree: QTreeWidget) -> None:
     tree.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
     tree.setHeaderHidden(True)
     tree.setRootIsDecorated(False)
+
+
+def _grouped_note(translator: Translator, grouping: Grouping, by_kind: Plan) -> str:
+    """What the local AI grouped, of the files to group, into how many folders (decision 0020,
+    item 10); and, when a batch failed, why the grouping stopped (item 8)."""
+    total = len(names_to_group(by_kind))
+    files = translator.count("grouped.files", total, grouped=len(grouping.groups))
+    into = translator.count("grouped.into", len(set(grouping.groups.values())))
+    failed = grouping.unavailable
+    if failed is None:
+        return translator.text("organize.grouped", model=grouping.model, files=files, into=into)
+    reason = translator.reason(failed.reason, failed.detail)
+    return translator.text(
+        "organize.grouped_stopped", model=grouping.model, files=files, into=into, reason=reason
+    )
 
 
 class CategoryCard(QFrame):
@@ -423,7 +440,7 @@ class OrganizePage(QWidget):
 
         def done(grouping: Grouping) -> None:
             failed = grouping.unavailable
-            if failed is not None:
+            if failed is not None and not grouping.groups:
                 reason = window.translator.reason(failed.reason, failed.detail)
                 self.grouped.setText(text("organize.not_grouped", reason=reason))
                 return
@@ -441,7 +458,7 @@ class OrganizePage(QWidget):
         if isinstance(found, FolderRefused):
             return
         self._by_kind, self._groups = by_kind, grouping.groups
-        self.grouped.setText(self._window.translator.text("organize.grouped", model=grouping.model))
+        self.grouped.setText(_grouped_note(self._window.translator, grouping, by_kind))
         self._show_plan()
 
     def _kind_again(self) -> None:

@@ -239,8 +239,8 @@ def test_a_grouping_that_stopped_shows_the_groups_before_it_and_says_why(
     page = window.organize
     assert asked == [*CHECKS, GENERATE, GENERATE]
     assert _cards(window) == [
-        ("Trip to Rome", "2 files · 20 B", "Trip to Rome", "rome-1.jpg, rome-2.jpg"),
         BY_KIND[1],
+        ("Trip to Rome", "2 files · 20 B", "Trip to Rome", "rome-1.jpg, rome-2.jpg"),
     ]
     assert page.grouped.text() == (
         "The local AI (llama3.2) grouped 2 of 41 files into 1 folder, then stopped: The answer"

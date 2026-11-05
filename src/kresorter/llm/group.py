@@ -1,5 +1,5 @@
 """Grouping a plan's files by meaning (decision 0018, items 24-27, 30 and 31), in numbered
-batches a small context holds (decision 0020, items 1-7 and 9).
+batches a small context holds (decision 0020, items 1-9).
 
 Asked only for a plan with two files or more to group (a group needs two): the names of the
 files the plan moves or keeps for no kind, sorted and each once, at most ``MOST_NAMES``, each at
@@ -10,7 +10,8 @@ thinking and with the answer's JSON schema as ``"format"`` (``"json"`` before Ol
 LM Studio's ``POST /v1/chat/completions`` with the same schema (decision 0019, item 8); each
 under its own deadline and a body of at most ``Limits.group_bytes``: the batch's last names are
 left out until it fits, and a batch that no name fits ends the batches. Each batch is given its
-files by number and the folders kept so far. A batch that fails fails the grouping.
+files by number and the folders kept so far. A batch that fails ends the grouping: the groups of
+the batches before it are kept, with why it stopped.
 
 The answer is untrusted input, read as it comes (``read_groups``): anything but
 ``{"groups": ...}`` is a reason (``bad_response``) that quotes how it begins. In it a file is
@@ -130,8 +131,9 @@ Found = list[tuple[str, list[str]]]
 @dataclass(frozen=True)
 class Grouping:
     """What a grouping got: ``groups``, a file's name and its group's folder; ``sent``, the
-    names sent; ``unavailable``, why there is none. ``model`` is None when nothing was checked
-    or the setting was refused."""
+    names sent; ``unavailable``, why there is none, or why the grouping stopped after the
+    batches whose groups there are. ``model`` is None when nothing was checked or the setting
+    was refused."""
 
     model: str | None
     groups: Mapping[str, str]
@@ -242,7 +244,7 @@ def group(
             )
             found += read_groups(text, given)
         except ExplanationUnavailable as failed:
-            return Grouping(model, {}, tuple(sent), failed)
+            return Grouping(model, merged(found), tuple(sent), failed)
     return Grouping(model, merged(found), tuple(sent), None)
 
 
