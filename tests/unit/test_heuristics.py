@@ -168,6 +168,8 @@ def test_rules_without_rule_table_are_rejected() -> None:
 # --- packaged default rules --------------------------------------------------------------------
 
 LOCAL = r"C:\Users\a\AppData\Local"
+LOCALLOW = r"C:\Users\a\AppData\LocalLow"
+CHROME = LOCAL + r"\Google\Chrome\User Data"
 
 DEFAULT_EXAMPLES: list[tuple[Platform, str, str | None]] = [
     ("linux", "/home/a/proj/__pycache__/m.cpython-313.pyc", "python-bytecode"),
@@ -202,6 +204,35 @@ DEFAULT_EXAMPLES: list[tuple[Platform, str, str | None]] = [
     ("darwin", "/Users/a/Pictures/.DS_Store", "ds-store"),
     ("linux", "/media/usb/.DS_Store", "ds-store"),
     ("windows", LOCAL + r"\CrashDumps\app.exe.1234.dmp", "crash-dumps"),
+    # [0020.14] The graphics drivers' shader caches, the browsers', Windows' error reports.
+    ("windows", LOCAL + r"\NVIDIA\DXCache\1a2b.nvph", "gpu-shader-caches"),
+    ("windows", LOCAL + r"\NVIDIA\GLCache\x\y.bin", "gpu-shader-caches"),
+    ("windows", LOCALLOW + r"\NVIDIA\PerDriverVersion\DXCache\x.nvph", "gpu-shader-caches"),
+    ("windows", LOCALLOW + r"\NVIDIA\PerDriverVersion\GLCache\x\y.bin", "gpu-shader-caches"),
+    ("windows", LOCAL + r"\AMD\DxCache\x.parc", "gpu-shader-caches"),
+    ("windows", LOCAL + r"\AMD\DxcCache\x.parc", "gpu-shader-caches"),
+    ("windows", LOCAL + r"\AMD\GLCache\x.bin", "gpu-shader-caches"),
+    ("windows", LOCAL + r"\AMD\VkCache\x.parc", "gpu-shader-caches"),
+    ("windows", LOCALLOW + r"\Intel\ShaderCache\x.bin", "gpu-shader-caches"),
+    ("windows", LOCAL + r"\D3DSCache\x\y.idx", "gpu-shader-caches"),
+    ("windows", CHROME + r"\ShaderCache\data_0", "chromium-shader-caches"),
+    ("windows", CHROME + r"\GrShaderCache\data_1", "chromium-shader-caches"),
+    ("windows", CHROME + r"\GraphiteDawnCache\data_0", "chromium-shader-caches"),
+    ("windows", CHROME + r"\Default\DawnCache\data_0", "chromium-shader-caches"),
+    ("windows", CHROME + r"\Profile 1\DawnGraphiteCache\data_1", "chromium-shader-caches"),
+    ("windows", CHROME + r"\Default\DawnWebGPUCache\index", "chromium-shader-caches"),
+    (
+        "windows",
+        LOCAL + r"\Microsoft\Windows\WER\ReportArchive\AppCrash_x\Report.wer",
+        "windows-error-reports",
+    ),
+    (
+        "windows",
+        LOCAL + r"\Microsoft\Windows\WER\ReportQueue\AppHang_x\Report.wer",
+        "windows-error-reports",
+    ),
+    ("windows", LOCAL + r"\Microsoft\Windows\WER\Temp\x.xml", None),
+    ("windows", LOCAL + r"\NVIDIA Corporation\NvBackend\x.json", None),
     # Negatives: look like junk but are not (or are live).
     ("windows", r"C:\Users\a\Documents\cache\report.docx", None),
     ("linux", "/home/a/proj/tmp/data.csv", None),
@@ -227,6 +258,22 @@ def test_default_rules_examples(platform: Platform, path: str, expected: str | N
     match = JunkClassifier(default_rules(), platform=platform).classify(flavor(platform)(path))
 
     assert (match.rule_id if match else None) == expected
+
+
+@pytest.mark.parametrize(
+    ("rule", "category"),
+    [
+        ("gpu-shader-caches", JunkCategory.CACHE),
+        ("chromium-shader-caches", JunkCategory.BROWSER_CACHE),
+        ("windows-error-reports", JunkCategory.CRASH_DUMP),
+    ],
+)
+def test_the_shader_caches_and_error_reports_are_of_their_kind(
+    rule: str, category: JunkCategory
+) -> None:
+    # [0020.14] a driver's is rebuilt by it; a browser's is a browser's cache, for review
+    found = {r.id: r for r in default_rules()}[rule]
+    assert (found.category, found.platforms) == (category, frozenset({"windows"}))
 
 
 def test_every_default_rule_has_an_example() -> None:
