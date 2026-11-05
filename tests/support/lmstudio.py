@@ -22,12 +22,13 @@ def models(*ids: object) -> Answer:
 MODELS = models(EMBEDDING, MODEL)
 
 
-def completed(content: object, **fields: object) -> Answer:
-    """``/v1/chat/completions``, without streaming: ``content``, the first choice's message."""
+def completed(content: object, finish_reason: str = "stop", **fields: object) -> Answer:
+    """``/v1/chat/completions``, without streaming: ``content``, the first choice's message,
+    ended for ``finish_reason``."""
     choice = {
         "index": 0,
         "logprobs": None,
-        "finish_reason": "stop",
+        "finish_reason": finish_reason,
         "message": {"role": "assistant", "content": content},
     }
     answer = {

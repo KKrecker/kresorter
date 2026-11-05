@@ -409,16 +409,18 @@ def test_the_headers_sent() -> None:
 
 
 def test_the_generate_body() -> None:
-    # [0013.11] Exactly these fields, in this order; the subject as JSON, its facts in order.
+    # [0013.11] [0020.4] Exactly these fields, in this order; the subject as JSON, its facts
+    # in order; no thinking, which would spend the answer's 200 tokens.
     with ScriptedOllama(generated("Qwen's answer.")) as ollama:
         generate(ollama.address, "qwen2.5:7b", SUBJECT)
     sent = json.loads(ollama.received[0].body)
-    assert list(sent) == ["model", "system", "prompt", "stream", "options"]
+    assert list(sent) == ["model", "system", "prompt", "stream", "think", "options"]
     assert sent == {
         "model": "qwen2.5:7b",
         "system": instruction("en"),
         "prompt": sent["prompt"],
         "stream": False,
+        "think": False,
         "options": {"temperature": 0, "seed": 0, "num_predict": 200},
     }
     assert json.loads(sent["prompt"], object_pairs_hook=list) == list(SUBJECT.items())

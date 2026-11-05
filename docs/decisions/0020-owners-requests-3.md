@@ -61,15 +61,17 @@ hashing any cheaper. Kresorter keeps listing directories; the time goes from whe
 ## Grouping that is read (request 1)
 
 1. **Batches a small context holds.** The names of 0018 item 25 (the files the plan moves or
-   keeps as `unknown_kind`, sorted, each at most 100 characters) are sent in batches, each at
-   most 40 names and 2,000 bytes of names in UTF-8, at most 10 batches (400 names); each
-   batch's body is at most `group_bytes` (32 KiB) as before. A batch, its instruction and its
-   answer fit in 4096 tokens.
+   keeps as `unknown_kind`, sorted, each once and at most 100 characters; a name UTF-8 cannot
+   write, a lone surrogate of a byte the file system's encoding could not decode, is not sent)
+   are sent in batches, each at most 40 names and 2,000 bytes of names in UTF-8, at most 10
+   batches (400 names); each batch's body is at most `group_bytes` (32 KiB) as before, its
+   last names left out until it fits, and a batch that no name fits ends the batches. A batch,
+   its instruction and its answer fit in 4096 tokens.
 2. **Numbered.** A batch's prompt is `{"language": ..., "folders": [...], "files": {"1":
    "<name>", "2": "<name>", ...}}`, its files numbered from 1. The answer is
    `{"groups": [{"folder": "...", "files": [1, 4, 7]}]}`: a number names the file it was
-   given to; a file is taken when it is named once in the batch's answer, by its number or by
-   its exact name.
+   given to; a file is taken when it is named once in the batch's answer, by its number (an
+   integer, or its digits as the prompt writes them) or by its exact name.
 3. **The answer's shape asked of both servers.** Ollama gets the answer's JSON schema as
    `"format"` (structured outputs, Ollama 0.5.0 and later; an earlier version, or a version
    that is not `N.N.N`, gets `"json"`), LM Studio the same schema in `response_format`
@@ -86,7 +88,8 @@ hashing any cheaper. Kresorter keeps listing directories; the time goes from whe
    `"length"`), or LM Studio (`finish_reason` `"length"`), is `bad_response`: `the answer was
    cut at its length`, so the reason says what to change (a model's context, fewer files).
 7. **One grouping of the batches.** Each batch gets the folders kept so far as `"folders"`
-   and is asked to use one of them when its files belong there; folders that are equal folded
+   (the first 24, a folder kept when a file of the batches' answers is taken into it) and is
+   asked to use one of them when its files belong there; folders that are equal folded
    (0018 item 27) are one group. When every batch has answered, a group needs two files, and
    at most 24 groups are kept, in the order their folders came.
 8. **A batch that fails ends the grouping.** The groups of the batches before it are kept;
@@ -95,9 +98,10 @@ hashing any cheaper. Kresorter keeps listing directories; the time goes from whe
    of 0018 item 30 (120 s).
 9. **The instruction** (0018 item 25) asks for as many files as can be grouped: by project,
    trip, event or subject, or else by what they are (drivers, receipts, game mods); a group
-   of at least two files; a folder of `"folders"` when the files belong there; each file in
-   one group at most, the files that fit none left out; a folder's name a few plain words in
-   the language given, at most 40 characters.
+   of at least two files, or of one that belongs in a folder of `"folders"`; a folder of
+   `"folders"` when the files belong there; each file in one group at most, the files that
+   fit none left out; a folder's name a few plain words in the language given, at most 40
+   characters.
 10. **The note says what was grouped**: `The local AI grouped N of M files into K folders.`,
     under the plan made with the groups.
 
@@ -210,8 +214,9 @@ Each line is one commit or one test/fix pair (red, then green). The items in bra
 the pending list in that commit, and no earlier test cites them.
 
 1. This decision and its meta-test, every other item pending [24].
-2. Grouping in numbered batches, with the schema, without thinking, read as it comes [1-8].
-3. The instruction and the note [9, 10].
+2. Grouping in numbered batches, with the schema, without thinking, read as it comes, and its
+   instruction [1-7, 9]; until the next commit a batch that fails fails the whole grouping.
+3. A batch that fails keeps the groups before it; the note says what was grouped [8, 10].
 4. Qwen3 recommended [11].
 5. More kinds [12].
 6. The sessions blocked [13].

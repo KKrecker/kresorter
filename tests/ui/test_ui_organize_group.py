@@ -14,6 +14,7 @@ import pytest
 from pytestqt.qtbot import QtBot
 
 from kresorter.llm.client import GENERATE
+from kresorter.llm.group import GROUP_SCHEMA
 from kresorter.llm.settings import URL_VARIABLE
 from kresorter.ui.i18n import Language
 from kresorter.ui.window import Window
@@ -144,7 +145,8 @@ def test_a_plan_with_fewer_than_two_files_to_group_offers_no_grouping(
 def test_group_by_meaning_shows_the_groups_as_a_plan(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, folder: Path
 ) -> None:
-    # [0018.24] [0018.25] [0018.28] The names only, sorted; a plan like any other.
+    # [0018.24] [0018.25] [0018.28] [0020.2] [0020.3] The names only, sorted, numbered; the
+    # answer's schema asked; a plan like any other.
     with ScriptedOllama(VERSION, TAGS, GROUPED) as ollama:
         window, _ = _window(qtbot, tmp_path, zone, data_dir, ollama, folder)
         _group(qtbot, window)
@@ -153,10 +155,11 @@ def test_group_by_meaning_shows_the_groups_as_a_plan(
     page = window.organize
     assert asked == [*CHECKS, GENERATE]
     assert len(sent) == 1
-    assert sent[0]["format"] == "json"
+    assert sent[0]["format"] == GROUP_SCHEMA
     prompt = sent[0]["prompt"]
     assert isinstance(prompt, str)
-    assert json.loads(prompt) == {"language": "English", "files": list(NAMES)}
+    files = {str(number): name for number, name in enumerate(NAMES, 1)}
+    assert json.loads(prompt) == {"language": "English", "folders": [], "files": files}
     assert _cards(window) == BY_MEANING
     assert _stays(window) == [
         ("old.tmp", "Junk: for the cleanup: temp-files"),
