@@ -215,7 +215,8 @@ To set them up (kresorter installs nothing itself):
   1. Install Ollama from https://ollama.com/download and start it
   2. Download the model: ollama pull llama3.2
   3. Check again: kresorter llm status
-Settings: KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),
+Settings: KRESORTER_LLM_SERVER (ollama or lmstudio, default ollama),
+  KRESORTER_OLLAMA_URL (a loopback address, default http://127.0.0.1:11434),
   KRESORTER_OLLAMA_MODEL (default llama3.2)
 ```
 

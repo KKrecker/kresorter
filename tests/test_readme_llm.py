@@ -159,7 +159,7 @@ def test_the_steps_and_the_settings_are_those_llm_status_prints() -> None:
     assert shown[0][1:] == printed[1:]
     steps = [line for line in shown[0] if re.match(r"  \d\. ", line)]
     assert steps == [f"  1. {INSTALL}", f"  2. {PULL.format(DEFAULT_MODEL)}", f"  3. {AGAIN}"]
-    assert shown[0][-2:] == SETTINGS
+    assert shown[0][-len(SETTINGS) :] == SETTINGS
 
 
 def test_both_settings_are_explained() -> None:

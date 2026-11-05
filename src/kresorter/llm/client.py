@@ -68,9 +68,12 @@ def status(env: Mapping[str, str], *, limits: Limits = LIMITS) -> Status:
     if the previous one passed."""
     try:
         server = server_from(env)
-        address = address_from(env)
     except ExplanationUnavailable as refused:
         return Status(None, None, None, None, refused)
+    try:
+        address = address_from(env)
+    except ExplanationUnavailable as refused:
+        return Status(None, None, None, None, refused, server=server)
     try:
         model = model_from(env)
     except ExplanationUnavailable as refused:

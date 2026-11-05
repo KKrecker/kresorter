@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from kresorter.llm.client import generate, status
 from kresorter.llm.failure import ExplanationUnavailable
 from kresorter.llm.prompt import Language
+from kresorter.llm.settings import Server
 from kresorter.llm.subjects import Subject
 from kresorter.llm.transport import LIMITS, Limits
 
@@ -30,6 +31,7 @@ class Explanations:
     explained: tuple[Explained, ...]
     not_explained: int  # subjects beyond the budget
     unavailable: ExplanationUnavailable | None
+    server: Server = "ollama"  # the server that answered (decision 0019, item 11)
 
 
 def explain(
@@ -46,8 +48,9 @@ def explain(
         return Explanations(None, (), 0, None)
     left_out = max(0, len(subjects) - budget)
     checked = status(env, limits=limits)
+    server = checked.server
     if checked.failure is not None or checked.address is None or checked.model is None:
-        return Explanations(checked.model, (), left_out, checked.failure)
+        return Explanations(checked.model, (), left_out, checked.failure, server)
     explained: list[Explained] = []
     for subject in subjects[:budget]:
         try:
@@ -55,11 +58,11 @@ def explain(
                 checked.address,
                 checked.model,
                 subject.facts,
-                server=checked.server,
+                server=server,
                 language=language,
                 limits=limits,
             )
         except ExplanationUnavailable as failed:
-            return Explanations(checked.model, tuple(explained), left_out, failed)
+            return Explanations(checked.model, tuple(explained), left_out, failed, server)
         explained.append(Explained(subject, text))
-    return Explanations(checked.model, tuple(explained), left_out, None)
+    return Explanations(checked.model, tuple(explained), left_out, None, server)

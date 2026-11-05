@@ -15,6 +15,7 @@ from kresorter.llm.failure import SettingRefused
 
 Server = Literal["ollama", "lmstudio"]
 SERVERS: Final[tuple[Server, ...]] = ("ollama", "lmstudio")
+SERVER_NAMES: Final[dict[Server, str]] = {"ollama": "Ollama", "lmstudio": "LM Studio"}
 SERVER_VARIABLE = "KRESORTER_LLM_SERVER"
 URL_VARIABLE = "KRESORTER_OLLAMA_URL"
 MODEL_VARIABLE = "KRESORTER_OLLAMA_MODEL"
