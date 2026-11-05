@@ -14,11 +14,23 @@ from kresorter.llm.failure import ExplanationUnavailable, Unavailable
 from kresorter.llm.settings import Address, is_model_name
 from kresorter.llm.transport import Asked, Limits, json_of, request
 
-__all__ = ["CHAT", "MODELS", "REQUESTS", "chat_body", "chat_models", "chatted", "first", "models"]
+__all__ = [
+    "CHAT",
+    "MODELS",
+    "NO_THINK",
+    "REQUESTS",
+    "chat_body",
+    "chat_models",
+    "chatted",
+    "first",
+    "models",
+]
 
 MODELS: Asked = ("GET", "/v1/models")
 CHAT: Asked = ("POST", "/v1/chat/completions")
 REQUESTS = (MODELS, CHAT)
+# The chat has no "think": the switch Qwen3's models that think take (decision 0020, item 11).
+NO_THINK = "/no_think"
 
 
 def chat_body(
@@ -30,10 +42,13 @@ def chat_body(
     response_format: Mapping[str, object] | None = None,
 ) -> bytes:
     """The body of ``POST /v1/chat/completions``: these fields, in this order, nothing else;
-    ``response_format`` after ``stream`` when given."""
+    ``response_format`` after ``stream`` when given; ``system`` followed by ``NO_THINK``."""
     body: dict[str, object] = {
         "model": model,
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "messages": [
+            {"role": "system", "content": f"{system} {NO_THINK}"},
+            {"role": "user", "content": user},
+        ],
         "temperature": 0,
         "seed": 0,
         "max_tokens": max_tokens,
