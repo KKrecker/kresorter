@@ -371,7 +371,7 @@ src/kresorter/
 ├── autostart/    # step 4: readers, listing, XDG and HKCU Run changes, recover
 ├── organize/     # step 5: categories, planner, mover, journal, recovery, undo (decision 0012)
 ├── llm/          # step 6: settings, transport, client, prompt, clean, subjects, explain,
-                  #   failure (0013); machine, group (0018)
+                  #   failure (0013); machine, group (0018); lmstudio (0019)
 └── ui/           # step 7: launch, app, window, sidebar, tasks, i18n, texts, labels, theme,
                   #   icons (and icons/, Lucide's), parts, shown, settings, dialogs, sessions,
                   #   overview, findings, organize, autostart, quarantine, recovery, explain,

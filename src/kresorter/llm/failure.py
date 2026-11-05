@@ -10,6 +10,7 @@ class Unavailable(StrEnum):
     REDIRECT = "redirect"
     HTTP_STATUS = "http_status"
     NOT_OLLAMA = "not_ollama"
+    NOT_LMSTUDIO = "not_lmstudio"  # decision 0019, item 9
     MODEL_MISSING = "model_missing"
     TOO_LARGE = "too_large"
     BAD_RESPONSE = "bad_response"

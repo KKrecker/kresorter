@@ -1,4 +1,5 @@
-"""The one network point of kresorter: HTTP to Ollama on loopback (decision 0013, items 7, 10).
+"""The one network point of kresorter: HTTP to Ollama or LM Studio on loopback (decision 0013,
+items 7 and 10; decision 0019, item 9).
 
 ``http.client`` without ``urllib``: no proxy setting is read and no redirect is followed. The
 socket is made from the address itself, so no resolver is asked. One deadline covers
@@ -10,6 +11,7 @@ connecting, sending and every read: before each, the socket waits at most what r
 from __future__ import annotations
 
 import http.client
+import json
 import socket
 import time
 from collections.abc import Callable
@@ -25,6 +27,7 @@ if TYPE_CHECKING:
     from _typeshed import ReadableBuffer, WriteableBuffer
 
 Clock = Callable[[], float]
+Asked = tuple[Literal["GET", "POST"], str]  # a request's method and path
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,14 @@ LIMITS = Limits()
 class Answer:
     status: int
     body: bytes
+
+
+def json_of(data: bytes) -> object:
+    """The JSON value of a UTF-8 body, or ``None`` for anything else."""
+    try:
+        return json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        return None
 
 
 class _DeadlineSocket(socket.socket):
@@ -97,8 +108,10 @@ def request(
     seconds: float,
     limits: Limits = LIMITS,
     clock: Clock = time.monotonic,
+    foreign: Unavailable = Unavailable.NOT_OLLAMA,
 ) -> Answer:
-    """One request, one answer of at most ``limits.answer_bytes``, all within ``seconds``."""
+    """One request, one answer of at most ``limits.answer_bytes``, all within ``seconds``; an
+    answer that is not HTTP is ``foreign``, the server's own reason (decision 0019, item 9)."""
     if body is not None and len(body) > limits.request_bytes:
         raise ValueError(f"a request body of {len(body)} bytes is over {limits.request_bytes}")
     if not _loopback(address.host):
@@ -117,7 +130,7 @@ def request(
         with connection.getresponse() as response:  # its socket closed on every way out
             return _read(response, limits)
     except (OSError, http.client.HTTPException) as error:
-        raise _failure(error, deadline, clock) from error
+        raise _failure(error, deadline, clock, foreign) from error
     finally:
         connection.close()
 
@@ -147,9 +160,11 @@ def _read(response: http.client.HTTPResponse, limits: Limits) -> Answer:
     return Answer(response.status, body)
 
 
-def _failure(error: Exception, deadline: float, clock: Clock) -> ExplanationUnavailable:
+def _failure(
+    error: Exception, deadline: float, clock: Clock, foreign: Unavailable
+) -> ExplanationUnavailable:
     if isinstance(error, TimeoutError) or clock() >= deadline:
         return ExplanationUnavailable(Unavailable.TIMEOUT, "no whole answer before the deadline")
     if isinstance(error, http.client.HTTPException) and not isinstance(error, ConnectionError):
-        return ExplanationUnavailable(Unavailable.NOT_OLLAMA, f"not an HTTP answer ({error!r})")
+        return ExplanationUnavailable(foreign, f"not an HTTP answer ({error!r})")
     return ExplanationUnavailable(Unavailable.UNREACHABLE, str(error) or type(error).__name__)

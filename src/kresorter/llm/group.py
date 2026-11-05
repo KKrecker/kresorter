@@ -4,8 +4,10 @@ Asked only for a plan with two files or more to group (a group needs two): the n
 files the plan moves or keeps for no kind, sorted, at most ``MOST_NAMES``, each at most
 ``LONGEST_NAME`` characters (a longer one is not sent), and the language of the folder names;
 no path, folder, size, time or content. The checks of ``status`` first, then one
-``POST /api/generate`` with ``"format": "json"``, under its own deadline and a body of at most
-``Limits.group_bytes``: the last names are left out until it fits.
+``POST /api/generate`` with ``"format": "json"``, or with LM Studio one
+``POST /v1/chat/completions`` with the answer's JSON schema (decision 0019, item 8), under its
+own deadline and a body of at most ``Limits.group_bytes``: the last names are left out until it
+fits.
 
 The answer is untrusted input. Anything but ``{"groups": [...]}`` is a reason
 (``bad_response``); in it a file is taken only if it was sent and is named once in the whole
@@ -23,13 +25,16 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Final
 
-from kresorter.llm.client import generated, status
+from kresorter.llm import lmstudio
+from kresorter.llm.client import answered, status
 from kresorter.llm.failure import ExplanationUnavailable, Unavailable
 from kresorter.llm.prompt import LANGUAGES, Language
+from kresorter.llm.settings import Server
 from kresorter.llm.transport import LIMITS, Limits
 from kresorter.organize.planner import Plan, StayReason
 
 __all__ = [
+    "GROUP_FORMAT",
     "GROUP_INSTRUCTION",
     "GROUP_OPTIONS",
     "LANGUAGES",
@@ -67,6 +72,26 @@ GROUP_INSTRUCTION: Final = (
     "spaces."
 )
 GROUP_OPTIONS: Final = {"temperature": 0, "seed": 0, "num_predict": 4096}
+# LM Studio's: the answer's shape, as a JSON schema (decision 0019, item 8).
+_GROUP: Final = {
+    "type": "object",
+    "properties": {
+        "folder": {"type": "string"},
+        "files": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["folder", "files"],
+}
+GROUP_FORMAT: Final = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "groups",
+        "schema": {
+            "type": "object",
+            "properties": {"groups": {"type": "array", "items": _GROUP}},
+            "required": ["groups"],
+        },
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -88,13 +113,24 @@ def names_to_group(plan: Plan) -> tuple[str, ...]:
     return tuple(sorted(name for name in names if len(name) <= LONGEST_NAME)[:MOST_NAMES])
 
 
-def group_body(model: str, names: Sequence[str], language: Language) -> bytes:
-    """The body of ``POST /api/generate``: these fields, in this order, nothing else."""
-    prompt = {"language": LANGUAGES[language], "files": list(names)}
+def group_body(
+    model: str, names: Sequence[str], language: Language, *, server: Server = "ollama"
+) -> bytes:
+    """The body of Ollama's ``POST /api/generate``, or of LM Studio's
+    ``POST /v1/chat/completions``: these fields, in this order, nothing else."""
+    prompt = json.dumps({"language": LANGUAGES[language], "files": list(names)}, ensure_ascii=False)
+    if server == "lmstudio":
+        return lmstudio.chat_body(
+            model,
+            GROUP_INSTRUCTION,
+            prompt,
+            max_tokens=GROUP_OPTIONS["num_predict"],
+            response_format=GROUP_FORMAT,
+        )
     body = {
         "model": model,
         "system": GROUP_INSTRUCTION,
-        "prompt": json.dumps(prompt, ensure_ascii=False),
+        "prompt": prompt,
         "stream": False,
         "format": "json",
         "options": GROUP_OPTIONS,
@@ -113,14 +149,16 @@ def group(
     checked = status(env, limits=limits)
     if checked.failure is not None or checked.address is None or checked.model is None:
         return Grouping(checked.model, {}, (), checked.failure)
-    body = group_body(checked.model, names, language)
+    server = checked.server
+    body = group_body(checked.model, names, language, server=server)
     while len(body) > limits.group_bytes:
         names.pop()
-        body = group_body(checked.model, names, language)
+        body = group_body(checked.model, names, language, server=server)
     sent = tuple(names)
     bounded = replace(limits, request_bytes=limits.group_bytes)
+    seconds = limits.group_seconds
     try:
-        text = generated(checked.address, body, seconds=limits.group_seconds, limits=bounded)
+        text = answered(server, checked.address, body, seconds=seconds, limits=bounded)
         groups = groups_from(text, sent)
     except ExplanationUnavailable as failed:
         return Grouping(checked.model, {}, sent, failed)

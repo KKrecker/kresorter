@@ -67,7 +67,7 @@ def free_address() -> Address:
 
 
 def test_status_when_the_model_named_is_listed() -> None:
-    # [0019.7] [0019.9] one request; LM Studio says no version
+    # [0019.7] [0019.9] [0019.14] one request; LM Studio says no version
     with ScriptedOllama(MODELS) as server:
         found = status(env_for(server.address, MODEL))
     assert found == Status(server.address, MODEL, None, True, None, (MODEL,), "lmstudio")

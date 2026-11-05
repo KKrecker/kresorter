@@ -52,7 +52,12 @@ def explain(
     for subject in subjects[:budget]:
         try:
             text = generate(
-                checked.address, checked.model, subject.facts, language=language, limits=limits
+                checked.address,
+                checked.model,
+                subject.facts,
+                server=checked.server,
+                language=language,
+                limits=limits,
             )
         except ExplanationUnavailable as failed:
             return Explanations(checked.model, tuple(explained), left_out, failed)

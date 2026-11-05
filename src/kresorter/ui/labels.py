@@ -205,6 +205,7 @@ LABELS: dict[type[StrEnum], dict[str, dict[str, str]]] = {
         "redirect": _both("Ollama redirected the request", "Ollama перенаправила запрос"),
         "http_status": _both("Ollama returned an error", "Ollama вернула ошибку"),
         "not_ollama": _both("It is not Ollama", "Это не Ollama"),
+        "not_lmstudio": _both("It is not LM Studio", "Это не LM Studio"),
         "model_missing": _both("The model is not installed", "Модель не установлена"),
         "too_large": _both("The answer is too large", "Ответ слишком большой"),
         "bad_response": _both("The answer cannot be read", "Ответ не читается"),
