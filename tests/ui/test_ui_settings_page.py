@@ -369,14 +369,14 @@ def test_a_model_that_cannot_be_saved_is_not_used(
 def test_the_card_recommends_a_model_for_the_machine_and_how_to_get_it(
     qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path
 ) -> None:
-    # [0018.33] kresorter installs nothing.
+    # [0018.33] [0020.11] kresorter installs nothing.
     env = environment(tmp_path, zone, data_dir, machine=Machine(16 * GIB, 8))
     window = make_window(qtbot, env)
     size = window.translator.size(16 * GIB)
     assert window.settings.recommended.text() == (
-        f"Recommended for this computer ({size} of memory, 8 processors): qwen2.5:7b; Qwen 2.5"
-        " writes Russian as well as English. To get it: ollama pull qwen2.5:7b (kresorter"
-        " installs nothing itself)."
+        f"Recommended for this computer ({size} of memory, 8 processors): qwen3:4b-instruct;"
+        " Qwen3 writes Russian as well as English. To get it: ollama pull qwen3:4b-instruct"
+        " (kresorter installs nothing itself)."
     )
     assert window.settings.ai_card.isAncestorOf(window.settings.recommended)
 
@@ -387,18 +387,19 @@ def test_the_card_recommends_a_model_for_the_machine_and_how_to_get_it(
         (
             Machine(8 * GIB, 1),
             "en",
-            "Recommended for this computer (8.0 GiB of memory, 1 processor): qwen2.5:1.5b;",
+            "Recommended for this computer (8.0 GiB of memory, 1 processor): qwen3:1.7b;",
         ),
         (
             Machine(None, None),
             "ru",
             "Рекомендуется для этого компьютера (память неизвестна, число процессоров"
-            " неизвестно): qwen2.5:1.5b;",
+            " неизвестно): qwen3:1.7b;",
         ),
         (
             Machine(32 * GIB, 2),
             "ru",
-            "Рекомендуется для этого компьютера (32,0 ГиБ памяти, 2 процессора): qwen2.5:7b;",
+            "Рекомендуется для этого компьютера (32,0 ГиБ памяти, 2 процессора):"
+            " qwen3:4b-instruct;",
         ),
     ],
 )
@@ -424,8 +425,8 @@ def test_the_recommendation_in_russian(
     env = environment(tmp_path, zone, data_dir, machine=Machine(4 * GIB, 8))
     window = make_window(qtbot, env, language="ru")
     assert window.settings.recommended.text().endswith(
-        ": qwen2.5:1.5b; Qwen 2.5 пишет и по-русски, и по-английски. Чтобы получить её: ollama"
-        " pull qwen2.5:1.5b (kresorter сам ничего не устанавливает)."
+        ": qwen3:1.7b; Qwen3 пишет и по-русски, и по-английски. Чтобы получить её: ollama"
+        " pull qwen3:1.7b (kresorter сам ничего не устанавливает)."
     )
 
 

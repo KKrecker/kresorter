@@ -1,6 +1,7 @@
 """The machine's memory and processors, and the model recommended for them (decision 0018,
-item 33): ``qwen2.5``, for its languages, Russian among them, sized by the memory, one size
-smaller with fewer than four processors; unknown as the least."""
+item 33; decision 0020, item 11): Qwen3, for its languages, Russian among them, and its instruct
+models that do not think, sized by the memory, one size smaller with fewer than four
+processors; unknown as the least."""
 
 import ctypes
 import os
@@ -62,45 +63,46 @@ class FakeCtypes:
 @pytest.mark.parametrize(
     ("memory", "processors", "model"),
     [
-        (4 * GIB, 8, "qwen2.5:1.5b"),
-        (8 * GIB - 1, 8, "qwen2.5:1.5b"),
-        (8 * GIB, 8, "qwen2.5:3b"),
-        (16 * GIB - 1, 4, "qwen2.5:3b"),
-        (16 * GIB, 4, "qwen2.5:7b"),
-        (32 * GIB - 1, 16, "qwen2.5:7b"),
-        (32 * GIB, 16, "qwen2.5:14b"),
-        (256 * GIB, 64, "qwen2.5:14b"),
-        (64 * GIB, 3, "qwen2.5:7b"),
-        (16 * GIB, 2, "qwen2.5:3b"),
-        (8 * GIB, 1, "qwen2.5:1.5b"),
-        (4 * GIB, 1, "qwen2.5:1.5b"),
-        (None, 8, "qwen2.5:1.5b"),
-        (64 * GIB, None, "qwen2.5:7b"),
+        (4 * GIB, 8, "qwen3:1.7b"),
+        (8 * GIB - 1, 8, "qwen3:1.7b"),
+        (8 * GIB, 8, "qwen3:4b-instruct"),
+        (16 * GIB, 4, "qwen3:4b-instruct"),
+        (32 * GIB - 1, 16, "qwen3:4b-instruct"),
+        (32 * GIB, 16, "qwen3:30b-instruct"),
+        (256 * GIB, 64, "qwen3:30b-instruct"),
+        (64 * GIB, 3, "qwen3:4b-instruct"),
+        (16 * GIB, 2, "qwen3:1.7b"),
+        (8 * GIB, 1, "qwen3:1.7b"),
+        (4 * GIB, 1, "qwen3:1.7b"),
+        (None, 8, "qwen3:1.7b"),
+        (64 * GIB, None, "qwen3:4b-instruct"),
     ],
 )
 def test_the_model_recommended_for_the_memory_and_the_processors(
     memory: int | None, processors: int | None, model: str
 ) -> None:
-    # [0018.33] One size smaller with fewer than four processors, none smaller than the least;
-    # an unknown memory as under 8 GiB, unknown processors as fewer than four.
+    # [0018.33] [0020.11] Under 8 GiB, under 32 GiB, then more; one size smaller with fewer than
+    # four processors, none smaller than the least; an unknown memory as under 8 GiB, unknown
+    # processors as fewer than four.
     assert recommended(Machine(memory, processors)) == model
 
 
-def test_the_models_recommended_are_qwen2_5_s() -> None:
-    # [0018.33]
-    assert RECOMMENDED == ("qwen2.5:1.5b", "qwen2.5:3b", "qwen2.5:7b", "qwen2.5:14b")
+def test_the_models_recommended_are_qwen3_s() -> None:
+    # [0018.33] [0020.11] The larger two instruct models, which do not think; the 30B a mixture
+    # of experts with 3B active.
+    assert RECOMMENDED == ("qwen3:1.7b", "qwen3:4b-instruct", "qwen3:30b-instruct")
     assert GIB == 1 << 30
 
 
 @pytest.mark.parametrize(
     ("memory", "processors", "model"),
     [
-        (4 * GIB, 8, "qwen2.5-1.5b-instruct"),
-        (8 * GIB, 8, "qwen2.5-3b-instruct"),
-        (16 * GIB, 4, "qwen2.5-7b-instruct"),
-        (32 * GIB, 16, "qwen2.5-14b-instruct"),
-        (64 * GIB, 3, "qwen2.5-7b-instruct"),
-        (None, None, "qwen2.5-1.5b-instruct"),
+        (4 * GIB, 8, "qwen/qwen3-1.7b"),
+        (8 * GIB, 8, "qwen/qwen3-4b-2507"),
+        (16 * GIB, 4, "qwen/qwen3-4b-2507"),
+        (32 * GIB, 16, "qwen/qwen3-30b-a3b-2507"),
+        (64 * GIB, 3, "qwen/qwen3-4b-2507"),
+        (None, None, "qwen/qwen3-1.7b"),
     ],
 )
 def test_lm_studio_s_recommendation_is_the_same_model_as_lm_studio_names_it(
@@ -114,12 +116,11 @@ def test_lm_studio_s_recommendation_is_the_same_model_as_lm_studio_names_it(
 
 
 def test_the_models_recommended_for_lm_studio() -> None:
-    # [0019.13]
+    # [0019.13] [0020.11]
     assert LMSTUDIO_RECOMMENDED == (
-        "qwen2.5-1.5b-instruct",
-        "qwen2.5-3b-instruct",
-        "qwen2.5-7b-instruct",
-        "qwen2.5-14b-instruct",
+        "qwen/qwen3-1.7b",
+        "qwen/qwen3-4b-2507",
+        "qwen/qwen3-30b-a3b-2507",
     )
 
 

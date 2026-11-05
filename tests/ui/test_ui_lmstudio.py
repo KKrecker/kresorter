@@ -373,14 +373,14 @@ def test_a_change_of_server_shows_its_own_model_variable_and_recommendation(
     assert not page.model_note.isHidden()
     assert not page.model.isEnabled()
     assert page.recommended.text().endswith(
-        "To get it: ollama pull qwen2.5:7b (kresorter installs nothing itself)."
+        "To get it: ollama pull qwen3:4b-instruct (kresorter installs nothing itself)."
     )
     _choose(qtbot, window, 1)
 
     assert page.model_note.isHidden()
     assert page.model.isEnabled()
     assert page.recommended.text().endswith(
-        "To get it: find qwen2.5-7b-instruct in LM Studio's Discover tab and download it"
+        "To get it: find qwen/qwen3-4b-2507 in LM Studio's Discover tab and download it"
         " (kresorter installs nothing itself)."
     )
     assert _lines(page)[0].startswith(f"LM Studio: not reachable at {address.url} (")
@@ -492,8 +492,8 @@ def test_lm_studio_s_card_in_russian(
         " модель в списке LM Studio).",
     ]
     assert page.recommended.text().endswith(
-        ": qwen2.5-7b-instruct; Qwen 2.5 пишет и по-русски, и по-английски. Чтобы получить её:"
-        " найдите qwen2.5-7b-instruct на вкладке Discover в LM Studio и скачайте её (kresorter"
+        ": qwen/qwen3-4b-2507; Qwen3 пишет и по-русски, и по-английски. Чтобы получить её:"
+        " найдите qwen/qwen3-4b-2507 на вкладке Discover в LM Studio и скачайте её (kresorter"
         " сам ничего не устанавливает)."
     )
     assert window.sidebar.ai.text() == "Объяснения ИИ: LM Studio"
@@ -524,9 +524,9 @@ def test_a_model_lm_studio_has_not_and_the_server_s_note_in_russian(
 @pytest.mark.parametrize(
     ("memory", "processors", "model"),
     [
-        (4 * GIB, 8, "qwen2.5-1.5b-instruct"),
-        (16 * GIB, 8, "qwen2.5-7b-instruct"),
-        (32 * GIB, 16, "qwen2.5-14b-instruct"),
+        (4 * GIB, 8, "qwen/qwen3-1.7b"),
+        (16 * GIB, 8, "qwen/qwen3-4b-2507"),
+        (32 * GIB, 16, "qwen/qwen3-30b-a3b-2507"),
     ],
 )
 def test_the_recommendation_for_lm_studio_is_the_same_model_as_lm_studio_names_it(
@@ -538,14 +538,14 @@ def test_the_recommendation_for_lm_studio_is_the_same_model_as_lm_studio_names_i
     processors: int,
     model: str,
 ) -> None:
-    # [0019.13] Found in its Discover tab; kresorter installs nothing.
+    # [0019.13] [0020.11] Found in its Discover tab; kresorter installs nothing.
     settled(data_dir, server="lmstudio")
     machine = Machine(memory, processors)
     window = _window(qtbot, tmp_path, zone, data_dir, machine=machine)
     size = window.translator.size(memory)
     assert window.settings.recommended.text() == (
         f"Recommended for this computer ({size} of memory, {processors} processors): {model};"
-        " Qwen 2.5 writes Russian as well as English. To get it: find"
+        " Qwen3 writes Russian as well as English. To get it: find"
         f" {model} in LM Studio's Discover tab and download it (kresorter installs nothing"
         " itself)."
     )
