@@ -10,7 +10,7 @@ from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 
 import pytest
 
-from fakes import FakeOpenFiles
+from fakes import FakeOpenFiles, make_policy
 from kresorter.core.heuristics import JunkClassifier, Platform, default_rules
 from kresorter.core.models import FileEntry, Skipped, SkipReason
 from kresorter.core.policy import BlockReason, PathPolicy, Verdict
@@ -305,7 +305,8 @@ def test_the_walker_leaves_a_profile_s_sessions_out_and_lists_its_cache(tmp_path
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"x")
 
-    policy = PathPolicy.for_posix(home=PurePosixPath(home), platform="linux")
+    # on every host: the patterns hold for every system, the tmp path is the host's
+    policy = make_policy(tmp_path, sessions=session_patterns())
     events = list(walk([home], policy))
 
     assert sorted(e.path for e in events if isinstance(e, FileEntry)) == [
