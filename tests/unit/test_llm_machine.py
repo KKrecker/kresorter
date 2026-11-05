@@ -10,7 +10,15 @@ from dataclasses import dataclass, field
 import pytest
 
 from kresorter.core.heuristics import Platform
-from kresorter.llm.machine import GIB, RECOMMENDED, Machine, MemoryStatus, recommended, this_machine
+from kresorter.llm.machine import (
+    GIB,
+    LMSTUDIO_RECOMMENDED,
+    RECOMMENDED,
+    Machine,
+    MemoryStatus,
+    recommended,
+    this_machine,
+)
 
 live = pytest.mark.skipif(sys.platform != "win32", reason="live Windows memory")
 
@@ -82,6 +90,37 @@ def test_the_models_recommended_are_qwen2_5_s() -> None:
     # [0018.33]
     assert RECOMMENDED == ("qwen2.5:1.5b", "qwen2.5:3b", "qwen2.5:7b", "qwen2.5:14b")
     assert GIB == 1 << 30
+
+
+@pytest.mark.parametrize(
+    ("memory", "processors", "model"),
+    [
+        (4 * GIB, 8, "qwen2.5-1.5b-instruct"),
+        (8 * GIB, 8, "qwen2.5-3b-instruct"),
+        (16 * GIB, 4, "qwen2.5-7b-instruct"),
+        (32 * GIB, 16, "qwen2.5-14b-instruct"),
+        (64 * GIB, 3, "qwen2.5-7b-instruct"),
+        (None, None, "qwen2.5-1.5b-instruct"),
+    ],
+)
+def test_lm_studio_s_recommendation_is_the_same_model_as_lm_studio_names_it(
+    memory: int | None, processors: int | None, model: str
+) -> None:
+    # [0019.13] The size Ollama's would be, by LM Studio's name.
+    machine = Machine(memory, processors)
+    assert recommended(machine, "lmstudio") == model
+    assert recommended(machine, "ollama") == recommended(machine)
+    assert LMSTUDIO_RECOMMENDED.index(model) == RECOMMENDED.index(recommended(machine))
+
+
+def test_the_models_recommended_for_lm_studio() -> None:
+    # [0019.13]
+    assert LMSTUDIO_RECOMMENDED == (
+        "qwen2.5-1.5b-instruct",
+        "qwen2.5-3b-instruct",
+        "qwen2.5-7b-instruct",
+        "qwen2.5-14b-instruct",
+    )
 
 
 # --- the machine ---------------------------------------------------------------------------------

@@ -38,7 +38,7 @@ def test_the_card_names_the_model_in_use_before_any_check(
         wait_idle(qtbot, window)
         asked = ollama.paths()
 
-    assert _card(window) == ("Local AI", "Model: llama3.2", NOT_YET)
+    assert _card(window) == ("Local AI", "Ollama · Model: llama3.2", NOT_YET)
     assert asked == []
     card = window.overview.services["ai"]
     assert card.accessibleName() == "Local AI"
@@ -58,8 +58,12 @@ def test_after_a_check_the_card_says_what_it_found(
         _check(qtbot, window)
         asked = ollama.paths()
 
-    assert available == ("Local AI", "Model: llama3.2", "Available at the last check")
-    assert _card(window) == ("Local AI", "Model: llama3.2", "Unavailable at the last check")
+    assert available == ("Local AI", "Ollama · Model: llama3.2", "Available at the last check")
+    assert _card(window) == (
+        "Local AI",
+        "Ollama · Model: llama3.2",
+        "Unavailable at the last check",
+    )
     assert asked == [*CHECKS, *CHECKS]
 
 
@@ -72,14 +76,14 @@ def test_the_card_names_the_model_chosen_in_settings(
     with ScriptedOllama(VERSION, listed, VERSION, as_json({}, status=500)) as ollama:
         env = {URL_VARIABLE: ollama.address.url}
         window = make_window(qtbot, environment(tmp_path, zone, data_dir, llm_env=env))
-        assert _card(window)[1:] == ("Model: qwen2.5:3b", NOT_YET)
+        assert _card(window)[1:] == ("Ollama · Model: qwen2.5:3b", NOT_YET)
         _check(qtbot, window)
         window.settings.model.setCurrentIndex(1)
         chosen = _card(window)
         wait_idle(qtbot, window)
 
-    assert chosen[1:] == ("Model: llama3.2:latest", NOT_YET)
-    assert _card(window)[1:] == ("Model: llama3.2:latest", "Unavailable at the last check")
+    assert chosen[1:] == ("Ollama · Model: llama3.2:latest", NOT_YET)
+    assert _card(window)[1:] == ("Ollama · Model: llama3.2:latest", "Unavailable at the last check")
 
 
 def test_a_model_the_environment_names_wrongly_is_said_refused(
@@ -103,7 +107,7 @@ def test_the_card_in_russian(qtbot: QtBot, tmp_path: Path, zone: Path, data_dir:
 
     assert before == (
         "Локальный ИИ",
-        "Модель: llama3.2",
+        "Ollama · Модель: llama3.2",
         "Ещё не проверялась; проверка — в настройках",
     )
     assert _card(window)[2] == "Доступна по последней проверке"

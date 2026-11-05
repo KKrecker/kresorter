@@ -56,8 +56,9 @@ SETUP = [
 INSTALL = "Install Ollama from https://ollama.com/download and start it."
 AGAIN = "Check again."
 SETTINGS = (
-    "Settings, from the environment the window started in: KRESORTER_OLLAMA_URL (a loopback"
-    " address, default http://127.0.0.1:11434) and KRESORTER_OLLAMA_MODEL (default llama3.2)."
+    "Settings, from the environment the window started in: KRESORTER_LLM_SERVER (ollama or"
+    " lmstudio, default ollama), KRESORTER_OLLAMA_URL (a loopback address, default"
+    " http://127.0.0.1:11434) and KRESORTER_OLLAMA_MODEL (default llama3.2)."
 )
 AGENT = RegValue("Agent", ValueKind.REG_SZ, r"C:\agent.exe")
 SYNC = RegValue("Sync", ValueKind.REG_SZ, r"C:\sync.exe")
@@ -929,7 +930,7 @@ def test_a_card_each_the_page_scrolling_under_its_head(
         ["Language"],
         ["Appearance"],
         ["Autostart"],
-        ["Local AI (Ollama)"],
+        ["Local AI"],
         ["Data folder"],
     ]
     assert page.machine_card.isHidden() == (platform != "windows")

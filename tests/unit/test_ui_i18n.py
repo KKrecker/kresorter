@@ -235,3 +235,37 @@ def test_sizes_in_each_language(n: int, english: str, russian: str) -> None:
 def test_a_browser_s_cache_is_named_in_both_languages(language: Language, label: str) -> None:
     # [0018.21]
     assert Translator(language).label(Evidence.JUNK_BROWSER_CACHE) == label
+
+
+@pytest.mark.parametrize(
+    ("reason", "english", "russian"),
+    [
+        (Unavailable.UNREACHABLE, "The local AI is not running", "Локальный ИИ не запущен"),
+        (
+            Unavailable.TIMEOUT,
+            "The local AI did not answer in time",
+            "Локальный ИИ не ответил вовремя",
+        ),
+        (
+            Unavailable.REDIRECT,
+            "The local AI redirected the request",
+            "Локальный ИИ перенаправил запрос",
+        ),
+        (Unavailable.HTTP_STATUS, "The local AI returned an error", "Локальный ИИ вернул ошибку"),
+        (Unavailable.NOT_OLLAMA, "It is not Ollama", "Это не Ollama"),
+        (Unavailable.NOT_LMSTUDIO, "It is not LM Studio", "Это не LM Studio"),
+    ],
+)
+def test_the_reasons_that_named_ollama_name_the_local_ai(
+    reason: Unavailable, english: str, russian: str
+) -> None:
+    # [0019.11] Either server may be the one that did not answer.
+    assert (Translator("en").label(reason), Translator("ru").label(reason)) == (english, russian)
+
+
+@pytest.mark.parametrize("language", ["en", "ru"])
+def test_only_not_ollama_names_ollama(language: Language) -> None:
+    # [0019.11]
+    translator = Translator(language)
+    named = [reason for reason in Unavailable if "Ollama" in translator.label(reason)]
+    assert named == [Unavailable.NOT_OLLAMA]

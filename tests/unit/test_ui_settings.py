@@ -75,6 +75,7 @@ def test_the_settings_are_the_language_and_the_machine_scope() -> None:
         "skipped_zones",
         "theme",
         "model",
+        "server",
     ]
     assert Settings() == DEFAULTS == Settings(language="system", include_machine=False)
     assert LANGUAGE_SETTINGS == ("system", "en", "ru")
@@ -419,6 +420,52 @@ def test_a_model_that_is_no_model_name_is_a_wrong_value(
 ) -> None:
     # [0018.32] A name decision 0013's item 9 accepts, as KRESORTER_OLLAMA_MODEL.
     _write(data_dir, json.dumps({"language": "ru", "model": value}).encode())
+    assert load(context) == Loaded(DEFAULTS, Unused.WRONG_VALUE, detail)
+
+
+# --- the server [0019.12] ------------------------------------------------------------------------
+
+
+def test_lm_studio_chosen_is_remembered_before_its_model(
+    context: ScanContext, data_dir: Path
+) -> None:
+    # [0019.12] Saved as ``server``; the model chosen is that server's.
+    settings = Settings(model="qwen2.5-7b-instruct", server="lmstudio")
+    assert save(context, settings) is None
+    assert load(context) == Loaded(settings)
+    saved = json.loads((data_dir / SETTINGS_NAME).read_text(encoding="utf-8"))
+    assert list(saved.items())[-2:] == [("server", "lmstudio"), ("model", "qwen2.5-7b-instruct")]
+
+
+def test_a_server_left_out_is_ollama_and_ollama_is_not_written(
+    context: ScanContext, data_dir: Path
+) -> None:
+    # [0019.12]
+    assert DEFAULTS.server == "ollama"
+    assert save(context, Settings(language="ru")) is None
+    saved = json.loads((data_dir / SETTINGS_NAME).read_text(encoding="utf-8"))
+    assert "server" not in saved
+    _write(data_dir, json.dumps({"language": "ru", "server": "ollama"}).encode())
+    assert load(context) == Loaded(Settings(language="ru"))
+
+
+@pytest.mark.parametrize(
+    ("value", "detail"),
+    [
+        ("Ollama", 'server="Ollama"'),
+        ("LM Studio", 'server="LM Studio"'),
+        ("", 'server=""'),
+        (1, "server=1"),
+        (None, "server=null"),
+        (["lmstudio"], 'server=["lmstudio"]'),
+    ],
+)
+def test_any_other_server_is_a_wrong_value(
+    context: ScanContext, data_dir: Path, value: object, detail: str
+) -> None:
+    # [0019.12] [0014.36] Every default then, the model's too.
+    content = {"language": "ru", "server": value, "model": "qwen2.5:7b"}
+    _write(data_dir, json.dumps(content).encode())
     assert load(context) == Loaded(DEFAULTS, Unused.WRONG_VALUE, detail)
 
 
