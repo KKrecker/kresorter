@@ -21,7 +21,16 @@ from support.artifacts import (
 )
 
 DIST_INFO = "kresorter-0.1.0.dist-info/"
-SDIST = {"src", "tests", "docs", "README.md", "CHANGELOG.md", "LICENSE", "pyproject.toml"}
+SDIST = {
+    "src",
+    "tests",
+    "docs",
+    "README.md",
+    "README.ru.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "pyproject.toml",
+}
 
 
 def package_files() -> list[str]:
