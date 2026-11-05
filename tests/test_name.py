@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OLD = "safe" + "clean"  # made at run time: written whole, this file would name it
 RECORD = "docs/decisions/0015-packaging.md"
 FOLDERS = (".github", "docs", "src", "tests")
-FILES = (".gitignore", "CHANGELOG.md", "README.md", "pyproject.toml")
+FILES = (".gitignore", "CHANGELOG.md", "README.md", "README.ru.md", "pyproject.toml")
 
 
 def project_files() -> list[Path]:

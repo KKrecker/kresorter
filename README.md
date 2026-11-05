@@ -1,5 +1,7 @@
 # Kresorter
 
+**English** | [Русский](README.ru.md)
+
 Cross-platform desktop app for **safe** cleanup and triage of files on your PC.
 Open source, local-only, no telemetry.
 
