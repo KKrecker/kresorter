@@ -158,8 +158,8 @@ def test_group_by_meaning_shows_the_groups_as_a_plan(
     assert sent[0]["format"] == GROUP_SCHEMA
     prompt = sent[0]["prompt"]
     assert isinstance(prompt, str)
-    files = {str(number): name for number, name in enumerate(NAMES, 1)}
-    assert json.loads(prompt) == {"language": "English", "folders": [], "files": files}
+    numbered = {str(number): name for number, name in enumerate(NAMES, 1)}
+    assert json.loads(prompt) == {"language": "English", "folders": [], "files": numbered}
     assert _cards(window) == BY_MEANING
     assert _stays(window) == [
         ("old.tmp", "Junk: for the cleanup: temp-files"),

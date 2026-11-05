@@ -144,17 +144,27 @@ def generate(
 
 
 def answered(
-    server: Server, address: Address, body: bytes, *, seconds: float, limits: Limits
+    server: Server,
+    address: Address,
+    body: bytes,
+    *,
+    seconds: float,
+    limits: Limits,
+    whole: bool = False,
 ) -> str:
-    """The text of one finished answer to ``body``: Ollama's generate, LM Studio's chat."""
+    """The text of one finished answer to ``body``: Ollama's generate, LM Studio's chat; with
+    ``whole``, one the server ended for its length is a reason (decision 0020, item 6)."""
     if server == "lmstudio":
-        return lmstudio.chatted(address, body, seconds=seconds, limits=limits)
-    return generated(address, body, seconds=seconds, limits=limits)
+        return lmstudio.chatted(address, body, seconds=seconds, limits=limits, whole=whole)
+    return generated(address, body, seconds=seconds, limits=limits, whole=whole)
 
 
-def generated(address: Address, body: bytes, *, seconds: float, limits: Limits) -> str:
+def generated(
+    address: Address, body: bytes, *, seconds: float, limits: Limits, whole: bool = False
+) -> str:
     """The text of one finished answer to ``POST /api/generate`` with ``body``, as it came but
-    for the thinking it starts with; any other answer is a reason."""
+    for the thinking it starts with; any other answer is a reason, and with ``whole`` one ended
+    for its length (``done_reason``)."""
     method, path = GENERATE
     answer = request(address, method, path, body, seconds=seconds, limits=limits)
     if answer.status != 200:
@@ -170,6 +180,10 @@ def generated(address: Address, body: bytes, *, seconds: float, limits: Limits) 
     if not isinstance(response, str):
         raise ExplanationUnavailable(
             Unavailable.BAD_RESPONSE, f"{method} {path}: no text in the answer"
+        )
+    if whole and value.get("done_reason") == "length":
+        raise ExplanationUnavailable(
+            Unavailable.BAD_RESPONSE, f"{method} {path}: the answer was cut at its length"
         )
     return without_thinking(response)
 

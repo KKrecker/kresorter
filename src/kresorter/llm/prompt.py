@@ -40,12 +40,14 @@ def prompt(subject: Facts) -> str:
 
 
 def generate_body(model: str, subject: Facts, language: Language = "en") -> bytes:
-    """The body of Ollama's ``POST /api/generate``: these fields, in this order, nothing else."""
+    """The body of Ollama's ``POST /api/generate``: these fields, in this order, nothing else;
+    no thinking (decision 0020, item 4)."""
     body = {
         "model": model,
         "system": instruction(language),
         "prompt": prompt(subject),
         "stream": False,
+        "think": False,
         "options": OPTIONS,
     }
     return json.dumps(body, ensure_ascii=False).encode("utf-8")

@@ -81,9 +81,12 @@ def first(ids: Iterable[str]) -> str | None:
     return next((one for one in chat_models(ids) if is_model_name(one)), None)
 
 
-def chatted(address: Address, body: bytes, *, seconds: float, limits: Limits) -> str:
+def chatted(
+    address: Address, body: bytes, *, seconds: float, limits: Limits, whole: bool = False
+) -> str:
     """The text of the first choice of one finished chat completion with ``body``, as it came
-    but for the thinking it starts with; any other answer is a reason."""
+    but for the thinking it starts with; any other answer is a reason, and with ``whole`` one
+    ended for its length (``finish_reason``, decision 0020, item 6)."""
     method, path = CHAT
     answer = request(
         address,
@@ -106,6 +109,10 @@ def chatted(address: Address, body: bytes, *, seconds: float, limits: Limits) ->
     if not isinstance(content, str):
         raise ExplanationUnavailable(
             Unavailable.BAD_RESPONSE, f"{method} {path}: no text in the first choice"
+        )
+    if whole and isinstance(chosen, dict) and chosen.get("finish_reason") == "length":
+        raise ExplanationUnavailable(
+            Unavailable.BAD_RESPONSE, f"{method} {path}: the answer was cut at its length"
         )
     return without_thinking(content)
 
