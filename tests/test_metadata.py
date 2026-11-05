@@ -31,6 +31,28 @@ CLASSIFIERS = [
     "Topic :: Utilities",
     "Typing :: Typed",
 ]
+MIT = """MIT License
+
+Copyright (c) 2026 KKrecker
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
 QT = re.compile(r"pyside6|shiboken6|(lib)?qt\d", re.IGNORECASE)
 
 
@@ -49,6 +71,12 @@ def test_the_licence_is_mit_held_by_kkrecker() -> None:
     assert text.splitlines()[:3] == ["MIT License", "", "Copyright (c) 2026 KKrecker"]
     assert "Permission is hereby granted, free of charge, to any person obtaining a copy" in text
     assert 'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND' in text
+
+
+def test_the_licence_is_kept_word_for_word() -> None:
+    # [0019.19] The MIT licence, the owner's, and pyproject.toml's declaration as they were.
+    assert (ROOT / "LICENSE").read_text(encoding="utf-8") == MIT
+    assert (project()["license"], project()["license-files"]) == ("MIT", LICENCES)
 
 
 def test_pyproject_declares_it_as_pep_639_says() -> None:
@@ -79,6 +107,21 @@ def test_the_readme_names_both_licences() -> None:
     assert "ISC" in text
     assert "Lucide" in text
     assert "[`src/kresorter/ui/icons/LICENSE`](src/kresorter/ui/icons/LICENSE)" in text
+
+
+def test_the_readme_says_what_the_windows_build_carries_and_where_the_licence_is_shown() -> None:
+    # [0019.20] Qt and PySide6 under the LGPL-3.0, beside Python's; the installer and the
+    # Settings page show the licence.
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    text = " ".join(section(readme, "License"))
+    for said in (
+        "The Windows build (the installer and the portable zip) carries Python, under the PSF"
+        " licence, and Qt and PySide6, under the LGPL-3.0",
+        "`THIRD-PARTY-NOTICES.txt`",
+        "The installer shows `LICENSE` before it installs",
+        "the Settings page says the licence under the version",
+    ):
+        assert said in text
 
 
 # --- nothing of Qt [0015.6] ----------------------------------------------------------------------

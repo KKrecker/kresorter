@@ -695,6 +695,15 @@ def test_the_installer_installs_the_folder_the_spec_makes_with_its_icon() -> Non
     assert found.setup["SetupIconFile"] == "{#Icon}"
 
 
+def test_the_installer_shows_the_licence_before_it_installs() -> None:
+    # [0019.20] Inno Setup's licence page, with the repository's LICENSE
+    found = script()
+
+    assert found.setup["LicenseFile"] == "{#Root}LICENSE"
+    assert r'#define Root SourcePath + "..\..\"' in found.preprocessor
+    assert (ROOT / "LICENSE").read_text(encoding="utf-8").startswith("MIT License\n")
+
+
 def test_the_installer_makes_a_start_menu_shortcut_and_a_desktop_one_if_asked() -> None:
     # [0015.15] the desktop one is a task, unchecked; a silent install starts nothing
     found = script()

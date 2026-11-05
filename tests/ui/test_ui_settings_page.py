@@ -1007,13 +1007,33 @@ def test_the_data_folder_from_the_home_folder(
     assert page.data_dir.property("role") == "secondary"
 
 
-@pytest.mark.parametrize("language", ["en", "ru"])
-def test_the_version_under_the_data_folder(
-    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, language: Language
+@pytest.mark.parametrize(
+    ("language", "licence"),
+    [
+        (
+            "en",
+            "Kresorter is under the MIT licence. Its Windows build carries Qt and PySide6 under"
+            " the LGPL-3.0; THIRD-PARTY-NOTICES.txt in the program's folder names each part and"
+            " its licence.",
+        ),
+        (
+            "ru",
+            "Kresorter распространяется под лицензией MIT. Сборка для Windows содержит Qt и"
+            " PySide6 под лицензией LGPL-3.0; файл THIRD-PARTY-NOTICES.txt в папке программы"
+            " называет каждую часть и её лицензию.",
+        ),
+    ],
+)
+def test_the_version_and_the_licence_under_the_data_folder(
+    qtbot: QtBot, tmp_path: Path, zone: Path, data_dir: Path, language: Language, licence: str
 ) -> None:
-    # [0015.4] in both languages, the card's last line
+    # [0015.4] [0019.20] in both languages, the card's last lines, in secondary text
     window = _window(qtbot, tmp_path, zone, data_dir, language=language)
     page = window.settings
     shown = [label for label in page.data_card.findChildren(QLabel) if label.isVisibleTo(page)]
-    assert [label.text() for label in shown][-2:] == [page.data_dir.text(), "Kresorter 0.1.0"]
-    assert shown[-1].property("role") == "secondary"
+    assert [label.text() for label in shown][-3:] == [
+        page.data_dir.text(),
+        "Kresorter 0.1.0",
+        licence,
+    ]
+    assert [label.property("role") for label in shown[-2:]] == ["secondary", "secondary"]
