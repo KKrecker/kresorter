@@ -265,12 +265,13 @@ def test_a_tag_runs_the_release_job_and_nothing_else_does() -> None:
 
 
 def test_pypi_is_published_to_by_trusted_publishing_with_no_token() -> None:
-    # [0015.23] OpenID Connect in the environment pypi; the workflow names no secret
-    release = job("release")
+    # [0015.23] [0019.17] OpenID Connect in the environment pypi, in a job of its own; the
+    # workflow names no secret
+    pypi = job("pypi")
 
-    assert value(release, "environment") == "pypi"
-    assert value(block(release, "permissions"), "id-token") == "write"
-    published = stripped(step(release, "PyPI, by trusted publishing"))
+    assert value(pypi, "environment") == "pypi"
+    assert value(block(pypi, "permissions"), "id-token") == "write"
+    published = stripped(step(pypi, "PyPI, by trusted publishing"))
     assert "uses: pypa/gh-action-pypi-publish@release/v1" in published
     assert "packages-dir: dist/" in published
     text = "\n".join(workflow())
@@ -282,7 +283,44 @@ def test_the_tag_is_checked_before_anything_is_published() -> None:
     # [0015.23] the tag must be __version__ and the changelog's latest version
     done = commands(job("release"))
 
-    assert done[0] == 'python packaging/release.py check "$GITHUB_REF_NAME"'
+    assert done[0] == (
+        'python packaging/release.py check "$GITHUB_REF_NAME" --day "$(git log -1 --format=%cs)"'
+    )
+
+
+def _top(lines: list[str]) -> list[str]:
+    """The keys of a job's own lines, not its steps'."""
+    top = min(indent(line) for line in lines)
+    return [line.split(":", 1)[0].strip() for line in lines if indent(line) == top]
+
+
+def _steps(lines: list[str]) -> list[str]:
+    return [line.strip().removeprefix("- name: ") for line in lines if "- name: " in line]
+
+
+def test_the_github_release_first_then_pypi_only_when_the_owner_set_it_up() -> None:
+    # [0019.17] A PyPI not set up never holds the release back: its own job, after the GitHub
+    # release, run only when the repository's variable PUBLISH_TO_PYPI is true.
+    release, pypi = job("release"), job("pypi")
+
+    assert "environment" not in _top(release)
+    assert stripped(block(release, "permissions")) == ["contents: write"]
+    assert _steps(release)[-1] == "The GitHub release"
+    assert not any("pypi" in line.lower() for line in release)  # its comments left out
+    assert value(pypi, "if") == (
+        "startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_TO_PYPI == 'true'"
+    )
+    assert value(pypi, "needs") == "release"
+    assert value(pypi, "runs-on") == "ubuntu-latest"
+    assert stripped(block(pypi, "permissions")) == ["id-token: write"]
+    assert _steps(pypi) == ["The wheel and the sdist", "PyPI, by trusted publishing"]
+    downloaded = stripped(step(pypi, "The wheel and the sdist"))
+    assert [line for line in downloaded if line.startswith(("name:", "path:"))] == [
+        "name: python-dist",
+        "path: dist",
+    ]
+    assert not any("gh release" in line for line in pypi)
+    assert _top(block(workflow(), "jobs")) == ["check", "build", "windows", "release", "pypi"]
 
 
 def test_the_github_release_has_the_installer_the_zip_the_wheel_the_sdist_and_their_sums() -> None:

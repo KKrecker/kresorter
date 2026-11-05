@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 import release
+import winbuild
 
 import kresorter
 
@@ -127,6 +128,35 @@ def test_the_tag_of_the_version_and_the_changelog_s_latest_passes(
         "v1.2.3: __version__ and the changelog's latest version are 1.2.3\n"
         "docs/releases/1.2.3.md: the runs on Windows 10 22H2, Windows 11 24H2, Ubuntu 24.04 LTS\n",
         "",
+    )
+
+
+def test_the_changelog_dated_the_day_of_the_tag_passes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # [0019.18] the day the release job is given: that of the tagged commit
+    root = repository(tmp_path)
+
+    assert release.main(["check", "v1.2.3", "--day", "2026-01-31"], root) == 0
+
+    assert capsys.readouterr().out.splitlines()[:2] == [
+        "v1.2.3: __version__ and the changelog's latest version are 1.2.3",
+        "CHANGELOG.md: 1.2.3 is dated 2026-01-31, the day of the tag",
+    ]
+
+
+@pytest.mark.parametrize("day", ["2026-02-01", "2026-01-30", "31.01.2026"])
+def test_a_changelog_dated_another_day_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], day: str
+) -> None:
+    # [0019.18] before the record is looked at, and before anything is published
+    root = repository(tmp_path, record=None)
+
+    assert release.main(["check", "v1.2.3", "--day", day], root) == 1
+
+    assert capsys.readouterr() == (
+        "",
+        f"check: the changelog dates 1.2.3 2026-01-31, not {day}, the day of the tag\n",
     )
 
 
@@ -451,3 +481,29 @@ def test_the_command_knows_three_steps(capsys: pytest.CaptureFixture[str]) -> No
         release.main(["publish", "v1.2.3"])
     assert stopped.value.code == 2
     assert "invalid choice: 'publish'" in capsys.readouterr().err
+
+
+# --- the first release [0019.18] ----------------------------------------------------------------
+
+
+def test_the_first_release_is_0_1_0_wherever_its_version_is_written() -> None:
+    # [0019.18] __version__, which names the files and makes the version resources of
+    # Kresorter.exe and of the installer, and the changelog's latest heading
+    source = (ROOT / "src" / "kresorter" / "__init__.py").read_text(encoding="utf-8")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+
+    assert kresorter.__version__ == "0.1.0"
+    assert release.check("v0.1.0", source, changelog) == "0.1.0"
+    assert re.search(r"^## \[0\.1\.0\] - \d{4}-\d{2}-\d{2}$", changelog, re.MULTILINE)
+    assert [name.format(version="0.1.0") for name in release.WINDOWS] == [
+        "Kresorter-0.1.0-setup.exe",
+        "Kresorter-0.1.0-portable.zip",
+    ]
+    resource = winbuild.version_text()
+    for said in (
+        "filevers=(0, 1, 0, 0)",
+        "prodvers=(0, 1, 0, 0)",
+        "StringStruct('FileVersion', '0.1.0')",
+        "StringStruct('ProductVersion', '0.1.0')",
+    ):
+        assert said in resource
