@@ -4,7 +4,8 @@ The detail of a finding, an autostart entry and a file organize leaves in place 
 explanation card while that result is shown, with the button. Pressed, it asks for the one
 subject of that result (``llm.subjects``, 0013 item 17) through ``llm.explain``, off the window's
 thread, and shows the answer with a note that names the model and says it may be wrong, under
-the card's advisory badge, or why there is none (0013 item 23), in the window's words. Nothing
+the card's advisory badge, or why there is none (0013 item 23), in the window's words. The
+answer is asked in the window's language (decision 0019, item 1). Nothing
 is asked without the button and nothing is kept: another result clears the answer, and an answer
 that comes for a result no longer shown is dropped. An answer changes no level, selection, plan
 or action.
@@ -90,8 +91,10 @@ class ExplainPanel(QFrame):
         asked = self._result
         about = subjects([] if asked is None else [asked])
 
+        language, limits = window.translator.language, environment.llm_limits
+
         def work() -> Explanations:
-            return explain(about, env, limits=environment.llm_limits)
+            return explain(about, env, language=language, limits=limits)
 
         def done(explained: Explanations) -> None:
             if self._result is asked:

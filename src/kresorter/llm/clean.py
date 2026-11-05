@@ -2,7 +2,8 @@
 
 Escape sequences are removed whole first, so none is left half; then tabs become spaces and
 every character of the listed categories goes, whatever a terminal would do with it. An
-answer keeps its lines; a fact of a subject is one line.
+answer keeps its lines; a fact of a subject is one line. A reasoning model's thinking, a
+``<think>`` block at the start of an answer, is not the answer (decision 0019, item 2).
 """
 
 import re
@@ -19,6 +20,13 @@ _CSI = r"\x1b\[[0-?]*[ -/]*[@-~]"
 _OTHER = r"\x1b[ -/]*[0-~]"
 _ESCAPES = re.compile(f"{_STRING}|{_CSI}|{_OTHER}")
 _REMOVED = frozenset({"Cc", "Cf", "Co", "Cs", "Cn", "Zl", "Zp"})
+# Closed, or cut off by the limit of the answer, when all of it is thinking.
+_THINKING = re.compile(r"\A\s*<think>(?:.*?</think>|.*\Z)", re.DOTALL)
+
+
+def without_thinking(text: str) -> str:
+    """``text`` without the ``<think>`` block it starts with, if it starts with one."""
+    return _THINKING.sub("", text, count=1)
 
 
 def without_controls(text: str) -> str:

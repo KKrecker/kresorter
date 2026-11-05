@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from kresorter.llm.client import generate, status
 from kresorter.llm.failure import ExplanationUnavailable
+from kresorter.llm.prompt import Language
 from kresorter.llm.subjects import Subject
 from kresorter.llm.transport import LIMITS, Limits
 
@@ -35,10 +36,12 @@ def explain(
     subjects: Sequence[Subject],
     env: Mapping[str, str],
     *,
+    language: Language = "en",
     limits: Limits = LIMITS,
     budget: int = BUDGET,
 ) -> Explanations:
-    """Each subject in order, until the budget is spent or a request fails."""
+    """Each subject in order, until the budget is spent or a request fails; each answer asked
+    in ``language``, English as the console's (decision 0019, item 1)."""
     if not subjects:
         return Explanations(None, (), 0, None)
     left_out = max(0, len(subjects) - budget)
@@ -48,7 +51,9 @@ def explain(
     explained: list[Explained] = []
     for subject in subjects[:budget]:
         try:
-            text = generate(checked.address, checked.model, subject.facts, limits=limits)
+            text = generate(
+                checked.address, checked.model, subject.facts, language=language, limits=limits
+            )
         except ExplanationUnavailable as failed:
             return Explanations(checked.model, tuple(explained), left_out, failed)
         explained.append(Explained(subject, text))

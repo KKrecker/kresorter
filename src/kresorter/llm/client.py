@@ -10,9 +10,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from kresorter.llm.clean import cleaned_answer
+from kresorter.llm.clean import cleaned_answer, without_thinking
 from kresorter.llm.failure import ExplanationUnavailable, Unavailable
-from kresorter.llm.prompt import Facts, generate_body
+from kresorter.llm.prompt import Facts, Language, generate_body
 from kresorter.llm.settings import Address, address_from, installed, model_from
 from kresorter.llm.transport import LIMITS, Limits, request
 
@@ -64,9 +64,17 @@ def status(env: Mapping[str, str], *, limits: Limits = LIMITS) -> Status:
     return Status(address, model, version, True, None, tuple(names))
 
 
-def generate(address: Address, model: str, subject: Facts, *, limits: Limits = LIMITS) -> str:
-    """One explanation of one subject, cleaned (item 20); any other answer is a reason."""
-    body = generate_body(model, subject)
+def generate(
+    address: Address,
+    model: str,
+    subject: Facts,
+    *,
+    language: Language = "en",
+    limits: Limits = LIMITS,
+) -> str:
+    """One explanation of one subject, in ``language``, cleaned (item 20); any other answer is
+    a reason."""
+    body = generate_body(model, subject, language)
     text = cleaned_answer(generated(address, body, seconds=limits.generate_seconds, limits=limits))
     if not text:
         raise ExplanationUnavailable(Unavailable.EMPTY, "nothing left once cleaned")
@@ -74,8 +82,8 @@ def generate(address: Address, model: str, subject: Facts, *, limits: Limits = L
 
 
 def generated(address: Address, body: bytes, *, seconds: float, limits: Limits) -> str:
-    """The text of one finished answer to ``POST /api/generate`` with ``body``, as it came;
-    any other answer is a reason."""
+    """The text of one finished answer to ``POST /api/generate`` with ``body``, as it came but
+    for the thinking it starts with; any other answer is a reason."""
     method, path = GENERATE
     answer = request(address, method, path, body, seconds=seconds, limits=limits)
     if answer.status != 200:
@@ -92,7 +100,7 @@ def generated(address: Address, body: bytes, *, seconds: float, limits: Limits) 
         raise ExplanationUnavailable(
             Unavailable.BAD_RESPONSE, f"{method} {path}: no text in the answer"
         )
-    return response
+    return without_thinking(response)
 
 
 def _not_ollama(asked: Asked, why: str) -> ExplanationUnavailable:

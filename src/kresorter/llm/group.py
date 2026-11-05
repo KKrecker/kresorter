@@ -21,10 +21,11 @@ import unicodedata
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Final, Literal
+from typing import Final
 
 from kresorter.llm.client import generated, status
 from kresorter.llm.failure import ExplanationUnavailable, Unavailable
+from kresorter.llm.prompt import LANGUAGES, Language
 from kresorter.llm.transport import LIMITS, Limits
 from kresorter.organize.planner import Plan, StayReason
 
@@ -44,8 +45,6 @@ __all__ = [
     "names_to_group",
 ]
 
-Language = Literal["en", "ru"]
-LANGUAGES: Final[dict[str, str]] = {"en": "English", "ru": "Russian"}
 MOST_NAMES = 100
 LONGEST_NAME = 100
 MOST_GROUPS = 12
