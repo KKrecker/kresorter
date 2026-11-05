@@ -679,7 +679,8 @@ def test_a_check_that_fails_sends_no_generate() -> None:
 
 
 def test_with_lm_studio_grouping_lists_the_models_then_sends_one_chat() -> None:
-    # [0019.8] [0020.3] its own instruction and prompt, 1024 tokens, the answer's schema
+    # [0019.8] [0020.3] [0020.11] its own instruction and prompt, not to think, 1024 tokens,
+    # the answer's schema
     with ScriptedOllama(lms.MODELS, lms.completed(GROUPED)) as server:
         found = group(PLAN, lms.env_for(server.address), "ru")
     assert found == Grouping(
@@ -701,7 +702,7 @@ def test_with_lm_studio_grouping_lists_the_models_then_sends_one_chat() -> None:
     assert sent == {
         "model": lms.MODEL,
         "messages": [
-            {"role": "system", "content": GROUP_INSTRUCTION},
+            {"role": "system", "content": f"{GROUP_INSTRUCTION} /no_think"},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0,

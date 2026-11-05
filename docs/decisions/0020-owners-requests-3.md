@@ -114,7 +114,9 @@ hashing any cheaper. Kresorter keeps listing directories; the time goes from whe
     under 32 GiB `qwen3:4b-instruct`, otherwise `qwen3:30b-instruct` (a mixture of experts
     with 3B active parameters: on a processor about as fast as a 3B model), one size smaller
     with fewer than four processors; in LM Studio `qwen/qwen3-1.7b`, `qwen/qwen3-4b-2507` and
-    `qwen/qwen3-30b-a3b-2507`.
+    `qwen/qwen3-30b-a3b-2507`. LM Studio's chat has no `think`: the system message of each of
+    its bodies ends with ` /no_think`, the switch Qwen3's models that think (`qwen/qwen3-1.7b`
+    among them) take to answer at once; another model reads it as a word of its instruction.
 
 ## More sorted by kind (request 1, by kind)
 

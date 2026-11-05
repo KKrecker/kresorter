@@ -215,7 +215,7 @@ def test_with_lm_studio_the_models_are_listed_once_then_each_subject_is_a_chat()
         ".x0",
         ".x1",
     ]
-    assert bodies[0]["messages"][0]["content"].endswith("Write the answer in Russian.")
+    assert bodies[0]["messages"][0]["content"].endswith("Write the answer in Russian. /no_think")
 
 
 def test_with_lm_studio_a_failed_check_asks_nothing_more() -> None:

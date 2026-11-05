@@ -276,7 +276,8 @@ def test_the_headers_sent() -> None:
 
 @pytest.mark.parametrize("language", ["en", "ru"])
 def test_an_explanations_body(language: Language) -> None:
-    # [0019.8] exactly these fields, in this order; the subject as JSON, its facts in order
+    # [0019.8] [0020.11] exactly these fields, in this order; the subject as JSON, its facts in
+    # order; the instruction ending with Qwen3's switch not to think
     with ScriptedOllama(completed("A PDF document.")) as server:
         ask(server.address, language=language)
     [chat] = server.received
@@ -286,7 +287,7 @@ def test_an_explanations_body(language: Language) -> None:
     assert sent == {
         "model": MODEL,
         "messages": [
-            {"role": "system", "content": instruction(language)},
+            {"role": "system", "content": f"{instruction(language)} /no_think"},
             {"role": "user", "content": json.dumps(SUBJECT, ensure_ascii=False)},
         ],
         "temperature": 0,
@@ -298,9 +299,15 @@ def test_an_explanations_body(language: Language) -> None:
 
 
 def test_a_chat_body() -> None:
-    # [0019.8] a response format, when asked, after stream
+    # [0019.8] [0020.11] a response format, when asked, after stream; the system message ends
+    # with /no_think, which Qwen3's models that think take as the switch to answer at once
     sent = json.loads(lmstudio.chat_body("m", "Be brief.", "Hi ж", max_tokens=9))
     assert list(sent) == ["model", "messages", "temperature", "seed", "max_tokens", "stream"]
+    assert sent["messages"] == [
+        {"role": "system", "content": "Be brief. /no_think"},
+        {"role": "user", "content": "Hi ж"},
+    ]
+    assert lmstudio.NO_THINK == "/no_think"
     assert sent["max_tokens"] == 9
     shaped = lmstudio.chat_body("m", "s", "u", max_tokens=1, response_format={"type": "text"})
     assert list(json.loads(shaped))[-2:] == ["stream", "response_format"]
