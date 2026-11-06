@@ -26,6 +26,13 @@ class ExplanationUnavailable(Exception):
         self.detail = detail
 
 
+class AnswerCut(ExplanationUnavailable):
+    """The server explicitly reported that generation reached a length limit."""
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(Unavailable.BAD_RESPONSE, detail)
+
+
 class SettingRefused(ExplanationUnavailable):
     """A setting that is not used, always ``config``: its name, its value and why."""
 

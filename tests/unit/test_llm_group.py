@@ -752,3 +752,57 @@ def test_with_lm_studio_an_answer_cut_at_its_length_says_so() -> None:
         Unavailable.BAD_RESPONSE,
         "POST /v1/chat/completions: the answer was cut at its length",
     )
+
+
+@pytest.mark.parametrize("server_kind", ["ollama", "lmstudio"])
+def test_cut_batch_is_retried_in_smaller_batches_without_losing_names(server_kind: str) -> None:
+    names = [f"n{n:02}.pdf" for n in range(8)]
+    checks: tuple[Answer, ...]
+    if server_kind == "ollama":
+        checks = (VERSION, TAGS)
+        cut = as_json({"response": "{", "done": True, "done_reason": "length"})
+        first = generated(_answer(("Taxes", [1, 2, 3, 4])))
+        second = generated(_answer(("Taxes", [1, 2, 3, 4])))
+    else:
+        checks = (lms.MODELS,)
+        cut = lms.completed(None, finish_reason="length")
+        first = lms.completed(_answer(("Taxes", [1, 2, 3, 4])))
+        second = lms.completed(_answer(("Taxes", [1, 2, 3, 4])))
+    with ScriptedOllama(*checks, cut, first, second) as server:
+        env = _env(server) if server_kind == "ollama" else lms.env_for(server.address)
+        found = group(_plan(names, [], []), env, "en")
+    assert found.unavailable is None
+    assert found.sent == tuple(names)
+    assert found.groups == dict.fromkeys(names, "Taxes")
+    bodies = [json.loads(request.body) for request in server.received[len(checks) :]]
+    prompts = [
+        json.loads(body["prompt"] if server_kind == "ollama" else body["messages"][1]["content"])
+        for body in bodies
+    ]
+    assert [list(prompt["files"].values()) for prompt in prompts] == [names, names[:4], names[4:]]
+    assert prompts[2]["folders"] == ["Taxes"]
+
+
+def test_persistently_cut_minimal_batch_stops_and_keeps_prior_groups() -> None:
+    names = [f"n{n:02}.pdf" for n in range(8)]
+    cut = as_json({"response": "{", "done": True, "done_reason": "length"})
+    with ScriptedOllama(
+        VERSION, TAGS, cut, generated(_answer(("Taxes", [1, 2]))), cut, cut
+    ) as server:
+        found = group(_plan(names, [], []), _env(server), "en")
+    assert found.groups == {names[0]: "Taxes", names[1]: "Taxes"}
+    assert found.sent == tuple(names)
+    assert _why(found)[0] is Unavailable.BAD_RESPONSE
+    assert len(server.received) == 6
+
+
+def test_retry_splits_are_bounded_across_the_whole_grouping() -> None:
+    names = [f"n{n:02}.pdf" for n in range(40)]
+    cut = as_json({"response": "{", "done": True, "done_reason": "length"})
+    answer = generated(_answer(("Taxes", [1, 2])))
+    with ScriptedOllama(VERSION, TAGS, cut, cut, cut, cut, answer, answer, cut) as server:
+        found = group(_plan(names, [], []), _env(server), "en")
+    assert _why(found)[0] is Unavailable.BAD_RESPONSE
+    assert found.sent == tuple(names)
+    assert found.groups == dict.fromkeys([*names[:2], *names[2:4]], "Taxes")
+    assert len(server.received) == 9

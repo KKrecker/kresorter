@@ -10,7 +10,7 @@ import json
 from collections.abc import Iterable, Mapping
 
 from kresorter.llm.clean import without_thinking
-from kresorter.llm.failure import ExplanationUnavailable, Unavailable
+from kresorter.llm.failure import AnswerCut, ExplanationUnavailable, Unavailable
 from kresorter.llm.settings import Address, is_model_name
 from kresorter.llm.transport import Asked, Limits, json_of, request
 
@@ -121,13 +121,11 @@ def chatted(
     chosen = choices[0] if isinstance(choices, list) and choices else None
     message = chosen.get("message") if isinstance(chosen, dict) else None
     content = message.get("content") if isinstance(message, dict) else None
+    if whole and isinstance(chosen, dict) and chosen.get("finish_reason") == "length":
+        raise AnswerCut(f"{method} {path}: the answer was cut at its length")
     if not isinstance(content, str):
         raise ExplanationUnavailable(
             Unavailable.BAD_RESPONSE, f"{method} {path}: no text in the first choice"
-        )
-    if whole and isinstance(chosen, dict) and chosen.get("finish_reason") == "length":
-        raise ExplanationUnavailable(
-            Unavailable.BAD_RESPONSE, f"{method} {path}: the answer was cut at its length"
         )
     return without_thinking(content)
 

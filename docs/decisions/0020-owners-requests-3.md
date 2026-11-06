@@ -1,5 +1,9 @@
 # 0020. The owner's requests after trying 0.1.0: a grouping that is read, more sorted, more cleaned without losing a sign-in, a faster scan
 
+Update: on an explicit length cutoff, grouping retries the batch in halves, at most four splits
+overall (eight additional requests). An incomplete response is never accepted. If retries fail,
+completed groups remain; a small batch or exhausted retry budget still reports the cutoff.
+
 - Status: accepted
 - Date: 2026-11-05
 - Builds on: 0002, 0010, 0012, 0013, 0016, 0018, 0019

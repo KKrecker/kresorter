@@ -322,8 +322,9 @@ batch, its instruction and its answer. The answer's shape is asked of both serve
 schema in Ollama's `format` (from Ollama 0.5.0; `"json"` before it) and in LM Studio's
 `response_format`. Every body sent to Ollama says `"think": false`; LM Studio's chat has no such
 switch, so the system message of each body sent to it ends with `/no_think`, which Qwen3's
-models that think take to answer at once. An answer the server cut at its length is refused
-with `the answer was cut at its length`: a larger context for the model, or fewer files, helps.
+models that think take to answer at once. A grouping answer cut at its length is never used:
+the batch is retried in smaller halves, with at most four splits in total. If it still fails,
+`the answer was cut at its length` is shown; a larger context or an instruct model may help.
 
 ### Exit codes
 
@@ -387,12 +388,13 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
   and the window what the command sorted. Once a plan is shown, Group by meaning (local AI)
   asks the local model to group the files by what their names say (a trip, taxes, drivers): it
   sends the names only, of the files the plan moves or keeps for no kind, sorted, at most 400 of
-  at most 100 characters each, in batches of at most 40 (at most 10 requests), each name
+  at most 100 characters each, in batches of at most 40 (at most 10 initial requests), each name
   numbered, with no path, folder, size, time or content; the model answers with the numbers.
   Each batch is given the folders of the batches before it, to use when its files belong
   there; the groups, at most 24 of two files or more into folders whose names are names, make a
   new plan through the same planner, checked as any. The page says how many files the local AI
-  grouped, into how many folders, and that the groups may be wrong; when a batch fails, the
+  grouped, into how many folders, and that the groups may be wrong; a length-cut batch is
+  retried in smaller halves, at most four splits overall (up to eight extra requests). When a batch fails, the
   groups before it stay, and the page says so: The local AI (its model) grouped N of M files
   into K folders, then stopped, and why. By kind goes back. Sort then moves the plan shown
   without asking the model again, as one batch that can be undone. Manual sorting opens

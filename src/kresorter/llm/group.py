@@ -10,8 +10,9 @@ thinking and with the answer's JSON schema as ``"format"`` (``"json"`` before Ol
 LM Studio's ``POST /v1/chat/completions`` with the same schema (decision 0019, item 8); each
 under its own deadline and a body of at most ``Limits.group_bytes``: the batch's last names are
 left out until it fits, and a batch that no name fits ends the batches. Each batch is given its
-files by number and the folders kept so far. A batch that fails ends the grouping: the groups of
-the batches before it are kept, with why it stopped.
+files by number and the folders kept so far. On an explicit length cutoff, a batch of at least
+four names is retried in halves, with at most four splits in a grouping. A failed retry or another
+error ends the grouping: the groups of completed batches are kept, with why it stopped.
 
 The answer is untrusted input, read as it comes (``read_groups``): anything but
 ``{"groups": ...}`` is a reason (``bad_response``) that quotes how it begins. In it a file is
@@ -27,7 +28,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
-from collections import Counter
+from collections import Counter, deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Final
@@ -35,7 +36,7 @@ from typing import Final
 from kresorter.llm import lmstudio
 from kresorter.llm.clean import cut, one_line
 from kresorter.llm.client import answered, status
-from kresorter.llm.failure import ExplanationUnavailable, Unavailable
+from kresorter.llm.failure import AnswerCut, ExplanationUnavailable, Unavailable
 from kresorter.llm.prompt import LANGUAGES, Language
 from kresorter.llm.settings import Server
 from kresorter.llm.transport import LIMITS, Limits
@@ -74,6 +75,7 @@ LONGEST_NAME = 100
 BATCH_NAMES = 40
 BATCH_BYTES = 2000
 MOST_BATCHES = 10
+MAX_SPLITS = 4  # bound additional requests when a model repeatedly hits its length limit
 MOST_GROUPS = 24
 EXCERPT = 60
 SCHEMA_SINCE = (0, 5, 0)
@@ -218,7 +220,11 @@ def group(
     bounded = replace(limits, request_bytes=limits.group_bytes)
     found: Found = []
     sent: list[str] = []
-    for batch in batches(names):
+    sent_set: set[str] = set()
+    pending = deque(batches(names))
+    splits = 0
+    while pending:
+        batch = pending.popleft()
         folders = folders_of(found)
         given = list(batch)
         body = group_body(model, given, language, folders=folders, server=server, schema=schema)
@@ -227,7 +233,8 @@ def group(
             body = group_body(model, given, language, folders=folders, server=server, schema=schema)
         if not given:
             break
-        sent += given
+        sent.extend(name for name in given if name not in sent_set)
+        sent_set.update(given)
         try:
             text = answered(
                 server,
@@ -238,6 +245,13 @@ def group(
                 whole=True,
             )
             found += read_groups(text, given)
+        except AnswerCut as failed:
+            if len(given) < 4 or splits >= MAX_SPLITS:
+                return Grouping(model, merged(found), tuple(sent), failed)
+            splits += 1
+            middle = len(given) // 2
+            pending.appendleft(tuple(given[middle:]))
+            pending.appendleft(tuple(given[:middle]))
         except ExplanationUnavailable as failed:
             return Grouping(model, merged(found), tuple(sent), failed)
     return Grouping(model, merged(found), tuple(sent), None)

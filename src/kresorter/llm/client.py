@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from kresorter.llm import lmstudio
 from kresorter.llm.clean import cleaned_answer, without_thinking
-from kresorter.llm.failure import ExplanationUnavailable, Unavailable
+from kresorter.llm.failure import AnswerCut, ExplanationUnavailable, Unavailable
 from kresorter.llm.prompt import Facts, Language, chat_body, generate_body
 from kresorter.llm.settings import (
     Address,
@@ -176,14 +176,12 @@ def generated(
         raise ExplanationUnavailable(
             Unavailable.BAD_RESPONSE, f"{method} {path}: not a finished answer"
         )
+    if whole and value.get("done_reason") == "length":
+        raise AnswerCut(f"{method} {path}: the answer was cut at its length")
     response = value.get("response")
     if not isinstance(response, str):
         raise ExplanationUnavailable(
             Unavailable.BAD_RESPONSE, f"{method} {path}: no text in the answer"
-        )
-    if whole and value.get("done_reason") == "length":
-        raise ExplanationUnavailable(
-            Unavailable.BAD_RESPONSE, f"{method} {path}: the answer was cut at its length"
         )
     return without_thinking(response)
 
