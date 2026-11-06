@@ -53,7 +53,7 @@ def commands() -> list[str]:
 def test_unreleased_comes_first_above_the_release_of_version() -> None:
     # [0015.18]
     found = [title for level, title, _ in headings(changelog()) if level == 2]
-    assert found[0] == "[Unreleased]"
+    assert found[0] == "[Unreleased]", "[Pre-release]"
     assert found[1] == release_heading()
     assert re.fullmatch(r"\[\d+\.\d+\.\d+\] - \d{4}-\d{2}-\d{2}", release_heading())
 
