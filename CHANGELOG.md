@@ -5,9 +5,9 @@ What each release of Kresorter brings to its users. The format is
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). How it was built, step by step, is
 in git's history and in the [roadmap](docs/roadmap.md).
 
-## [Unreleased]
+## [Pre-release]
 
-## [0.1.0] - 2026-11-05
+## [0.1.0] - 2026-11-06
 
 The first release, an alpha: the console commands and the window, on Windows and Linux.
 
