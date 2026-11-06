@@ -39,7 +39,7 @@ from kresorter.llm.failure import ExplanationUnavailable, Unavailable
 from kresorter.llm.prompt import LANGUAGES, Language
 from kresorter.llm.settings import Server
 from kresorter.llm.transport import LIMITS, Limits
-from kresorter.organize.planner import Plan, StayReason
+from kresorter.organize.planner import LONGEST_FOLDER, Plan, StayReason, is_folder_name
 
 __all__ = [
     "BATCH_BYTES",
@@ -75,13 +75,8 @@ BATCH_NAMES = 40
 BATCH_BYTES = 2000
 MOST_BATCHES = 10
 MOST_GROUPS = 24
-LONGEST_FOLDER = 40
 EXCERPT = 60
 SCHEMA_SINCE = (0, 5, 0)
-_SIGNS = frozenset(" -_.,()&'")
-_DEVICES = frozenset(
-    {"con", "prn", "aux", "nul", *(f"{port}{n}" for port in ("com", "lpt") for n in range(1, 10))}
-)
 _NOT_GROUPS = 'the answer is not {"groups": [...]}'
 _RELEASE = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:[-+]|\Z)", re.ASCII)
 _FENCED = re.compile(r"```[A-Za-z]*\s*(.*?)```", re.DOTALL)
@@ -281,17 +276,6 @@ def merged(found: Iterable[tuple[str, Sequence[str]]]) -> dict[str, str]:
     return {name: folder for folder, names in kept[:MOST_GROUPS] for name in names}
 
 
-def is_folder_name(name: str) -> bool:
-    """1 to ``LONGEST_FOLDER`` letters, digits, spaces and ``-_.,()&'``, starting with a letter
-    or a digit, ending with neither a space nor a dot, and no Windows device name, with or
-    without an extension."""
-    if not 1 <= len(name) <= LONGEST_FOLDER or name[-1] in " .":
-        return False
-    if not all(_allowed(character) for character in name) or name[0] in _SIGNS:
-        return False
-    return _fold(name.split(".")[0]) not in _DEVICES
-
-
 def _writable(name: str) -> bool:
     """Whether UTF-8 can write ``name``: not with a lone surrogate."""
     try:
@@ -344,10 +328,6 @@ def _by_folder(found: Iterable[tuple[str, Sequence[str]]]) -> dict[str, tuple[st
     for folder, names in found:
         folders.setdefault(_fold(folder), (folder, []))[1].extend(names)
     return folders
-
-
-def _allowed(character: str) -> bool:
-    return character.isalpha() or character.isdecimal() or character in _SIGNS
 
 
 def _fold(name: str) -> str:

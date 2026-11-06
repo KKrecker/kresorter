@@ -34,9 +34,9 @@ from kresorter.core.scanner import ScanContext
 from kresorter.organize.categories import default_table
 from kresorter.organize.folders import entries
 from kresorter.organize.mover import is_directory
-from kresorter.organize.names import first_match, fold
+from kresorter.organize.names import LONGEST_FOLDER, first_match, fold, is_folder_name
 
-__all__ = ["Move", "Plan", "Stay", "StayReason", "plan"]
+__all__ = ["LONGEST_FOLDER", "Move", "Plan", "Stay", "StayReason", "is_folder_name", "plan"]
 
 METADATA = ("desktop.ini", "thumbs.db")  # with every name that starts with "."
 IN_PROGRESS = ("*.part", "*.crdownload", "*.download", "*.partial", "~$*")

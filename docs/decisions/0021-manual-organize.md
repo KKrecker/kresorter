@@ -12,7 +12,9 @@ confirms them. Moving a folder can break paths used by projects or programs; war
 before confirmation. No overwrite; journal and undo with clear reporting of anything not restored.
 This requires new safety, recovery and undo work for directories: the existing file preflight,
 identity and undo rules do not support them. The manual interface and directory moves are not yet
-implemented.
+implemented. A read-only manual file planner is available as groundwork: it proposes only
+assigned files, validates group names, keeps protected entries and unassigned companions in
+place, and never executes a move. It is not yet connected to the interface.
 
 ## Shortcuts
 

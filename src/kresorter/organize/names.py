@@ -22,3 +22,23 @@ def first_match(name: str, patterns: Iterable[str]) -> str | None:
     """The first of ``patterns`` (``fnmatch``, as written) that ``name`` matches, both folded."""
     folded = fold(name)
     return next((pattern for pattern in patterns if fnmatchcase(folded, fold(pattern))), None)
+
+
+LONGEST_FOLDER = 40
+_SIGNS = frozenset(" -_.,()&'")
+_DEVICES = frozenset(
+    {"con", "prn", "aux", "nul", *(f"{port}{n}" for port in ("com", "lpt") for n in range(1, 10))}
+)
+
+
+def is_folder_name(name: str) -> bool:
+    """A portable single folder name accepted for proposed groups."""
+    if not 1 <= len(name) <= LONGEST_FOLDER or name[-1] in " .":
+        return False
+    if not all(_allowed(character) for character in name) or name[0] in _SIGNS:
+        return False
+    return fold(name.split(".")[0]) not in _DEVICES
+
+
+def _allowed(character: str) -> bool:
+    return character.isalpha() or character.isdecimal() or character in _SIGNS
