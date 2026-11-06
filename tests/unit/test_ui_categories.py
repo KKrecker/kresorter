@@ -40,6 +40,7 @@ def test_the_russian_labels() -> None:
         "Торренты",
         "Шрифты",
         "3D-модели",
+        "Ярлыки",
     ]
 
 

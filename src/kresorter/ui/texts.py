@@ -330,6 +330,12 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "Разложить {files} ({size}) по папкам категорий внутри {folder}? Их можно"
         " вернуть кнопкой «Вернуть файлы…».",
     },
+    "organize.shortcut_warning": {
+        "en": "Some shortcuts may stop working after moving, especially when they use"
+        " relative paths.",
+        "ru": "После перемещения некоторые ярлыки могут перестать работать, особенно если"
+        " они используют относительные пути.",
+    },
     "organize.done": {
         "en": "Moved {files}, {size} in {folder} (batch {batch}).",
         "ru": "Перемещено: {files}, {size}, папка {folder} (пакет {batch}).",

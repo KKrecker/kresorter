@@ -933,3 +933,32 @@ def test_one_category_or_two_keep_the_cards_as_wide_as_three_to_a_row(
     assert grid.count() == 3
     [card, *_] = page.cards
     assert card.width() * 3 < page.controls.width()
+
+
+def test_sorting_shortcuts_warns_before_confirmation(
+    qtbot: QtBot, window: Window, folder: Path, dialogs: FakeDialogs
+) -> None:
+    write(folder / "App.lnk", b"shortcut")
+    write(folder / "Site.url", b"url")
+    dialogs.answer = False
+    _planned(qtbot, window)
+    window.organize.move_button.click()
+    [asked] = dialogs.asked
+    assert "Some shortcuts may stop working after moving" in asked.text
+    assert "relative paths" in asked.text
+    assert "App.lnk → Shortcuts/" in asked.details
+    assert "Site.url → Shortcuts/" in asked.details
+    assert (folder / "App.lnk").is_file()
+
+
+def test_shortcuts_can_be_sorted_and_undone(qtbot: QtBot, window: Window, folder: Path) -> None:
+    write(folder / "App.lnk", b"shortcut")
+    write(folder / "Site.url", b"url")
+    _planned(qtbot, window)
+    window.organize.move_button.click()
+    wait_idle(qtbot, window)
+    assert (folder / "Shortcuts" / "App.lnk").read_bytes() == b"shortcut"
+    assert (folder / "Shortcuts" / "Site.url").read_bytes() == b"url"
+    _undo(qtbot, window, 1)
+    assert (folder / "App.lnk").read_bytes() == b"shortcut"
+    assert (folder / "Site.url").read_bytes() == b"url"

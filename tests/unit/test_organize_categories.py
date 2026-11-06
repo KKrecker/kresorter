@@ -14,16 +14,23 @@ import pytest
 from kresorter.organize.categories import (
     Category,
     CategoryTable,
+    Kind,
     default_categories,
     default_table,
     load_categories,
 )
 
 DECISIONS = Path(__file__).resolve().parents[2] / "docs" / "decisions"
-TABLES = (DECISIONS / "0012-organize.md", DECISIONS / "0020-owners-requests-3.md")
+TABLES = (
+    DECISIONS / "0012-organize.md",
+    DECISIONS / "0020-owners-requests-3.md",
+    DECISIONS / "0021-manual-organize.md",
+)
 ROW = re.compile(r"^ *\| `([A-Z0-9][A-Za-z0-9 ]*)` \| (.+) \|$", re.MULTILINE)
 
 EXAMPLES: list[tuple[str, str]] = [
+    ("Telegram.lnk", "Shortcuts"),
+    ("Godot.url", "Shortcuts"),
     ("holiday.jpg", "Images"),
     ("scan.jpeg", "Images"),
     ("screenshot.png", "Images"),
@@ -183,6 +190,7 @@ def test_the_categories_are_english_and_in_table_order() -> None:
         "Torrents",
         "Fonts",
         "3D models",
+        "Shortcuts",
     ]
     assert default_table().names == tuple(category.name for category in default_categories())
 
@@ -307,3 +315,8 @@ def test_an_invalid_table_is_rejected(text: str, message: str) -> None:
     # [0012.21] one extension, one category
     with pytest.raises(ValueError, match=message):
         load_categories(text)
+
+
+def test_shortcuts_are_a_distinct_category() -> None:
+    assert default_table().match("Telegram.lnk") == Kind("Shortcuts", "lnk")
+    assert default_table().match("Godot.URL") == Kind("Shortcuts", "url")

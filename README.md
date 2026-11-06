@@ -200,8 +200,10 @@ kresorter organize undo 4 --yes            # move it back
 
 Only the regular files directly in the folder move, each to `<folder>/<Category>/<its name>`
 (`Images`, `Videos`, `Audio`, `Documents`, `Archives`, `Installers`, `Torrents`, `Fonts`,
-`3D models`), a film's subtitles (`srt`, `ass`, `vtt`) with it in `Videos`; subdirectories are
-never entered or moved. Nothing is renamed, overwritten or deleted: a file whose destination is
+`3D models`, `Shortcuts`), a film's subtitles (`srt`, `ass`, `vtt`) with it in `Videos`; subdirectories are
+never entered or moved. Windows shortcut (`.lnk`) and internet shortcut (`.url`) files are
+proposed for `Shortcuts`; moving a shortcut can affect it if it uses relative paths.
+Nothing is renamed, overwritten or deleted: a file whose destination is
 taken stays, and undo leaves the category directories. A folder whose files break when moved is
 refused as a whole (the home directory or above it, a game library, a project, a cache or temp
 directory), and every file that stays is listed with its reason: links, the folder's own

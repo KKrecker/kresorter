@@ -531,11 +531,14 @@ class OrganizePage(QWidget):
         translator = self._window.translator
         found = self._plan
         action = translator.text("organize.move")
+        message = translator.text(
+            "organize.confirm", folder=found.folder, **self._amount(found.moves)
+        )
+        if any(move.source.suffix.casefold() in {".lnk", ".url"} for move in found.moves):
+            message += "\n\n" + translator.text("organize.shortcut_warning")
         asked = Confirmation(
             title=action,
-            text=translator.text(
-                "organize.confirm", folder=found.folder, **self._amount(found.moves)
-            ),
+            text=message,
             details=tuple(self._line(move) for move in found.moves),
             action=action,
         )
