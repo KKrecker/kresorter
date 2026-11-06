@@ -308,6 +308,14 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
                 "font-weight": "600",
             },
         ),
+        (
+            'QPushButton[role="primary"]:disabled',
+            {
+                "background-color": p.surface2,
+                "border": f"1px solid {p.border}",
+                "color": p.secondary,
+            },
+        ),
         ('QPushButton[role="chip"]', {"padding": "0px 12px"}),
         (
             'QPushButton[role="chip"]:checked',
@@ -379,6 +387,29 @@ def _rules(p: Palette) -> list[tuple[str, dict[str, str]]]:
         (
             'QListWidget[role="nav"], QListWidget[role="nav"]:focus',
             {"background-color": p.surface, "border": "none"},
+        ),
+        (
+            'QListWidget[role="manual-tiles"]',
+            {
+                "background-color": p.surface,
+                "border": f"1px solid {p.border}",
+                "border-radius": "8px",
+                "padding": "6px",
+            },
+        ),
+        (
+            'QListWidget[role="manual-tiles"]::item',
+            {
+                "background-color": p.canvas,
+                "border": f"1px solid {p.border}",
+                "border-radius": "8px",
+                "padding": "6px",
+                "margin": "3px",
+            },
+        ),
+        (
+            'QListWidget[role="manual-tiles"]::item:selected',
+            {"background-color": p.selection, "border": f"1px solid {p.accent}", "color": p.text},
         ),
         ("QComboBox::drop-down", {"border": "none", "width": "24px"}),
         ('QFrame#sidebar QLabel[role="secondary"]', {"font-size": "13px"}),

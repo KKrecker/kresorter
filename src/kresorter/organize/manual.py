@@ -1,8 +1,7 @@
 """Read-only plans for manually assigned files.
 
-This is groundwork, not an execution API: directory moves and the manual UI are not yet
-implemented. The existing organizer's checks still apply. Unassigned companions stay beside
-assigned files, so assigning one does not implicitly move the other.
+Directory moves are not supported. The existing organizer's checks still apply. Unassigned
+companions stay beside assigned files, so assigning one does not implicitly move the other.
 """
 
 from __future__ import annotations

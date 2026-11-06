@@ -395,7 +395,9 @@ The sidebar opens six pages, with the open-file check and the local AI's model u
   grouped, into how many folders, and that the groups may be wrong; when a batch fails, the
   groups before it stay, and the page says so: The local AI (its model) grouped N of M files
   into K folders, then stopped, and why. By kind goes back. Sort then moves the plan shown
-  without asking the model again, as one batch that can be undone.
+  without asking the model again, as one batch that can be undone. Manual sorting opens
+  file tiles: create groups, select or drag files into them, optionally ask local AI for
+  editable suggestions, then preview and confirm. It does not move directories yet.
 - **Autostart**: the entries by source, each with its location, its scope and a switch that is
   on while it starts, and a search over names and locations; the switch of an entry that can
   change disables or enables it, and an entry that cannot has a lock.

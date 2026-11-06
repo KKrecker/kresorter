@@ -316,6 +316,49 @@ CATALOG: dict[str, dict[str, str]] = {
         "ru": "Ничего не переименовывается, не перезаписывается и не удаляется; пакет можно"
         " вернуть.",
     },
+    "manual.title": {"en": "Manual sorting", "ru": "Ручная сортировка"},
+    "manual.files": {"en": "Files", "ru": "Файлы"},
+    "manual.groups": {"en": "Groups", "ru": "Группы"},
+    "manual.group_placeholder": {"en": "New group name", "ru": "Название новой группы"},
+    "manual.add_group": {"en": "Add group", "ru": "Создать группу"},
+    "manual.assign": {"en": "Add selected to group", "ru": "Добавить выбранные в группу"},
+    "manual.clear": {"en": "Remove assignment", "ru": "Убрать из группы"},
+    "manual.preview": {"en": "Preview", "ru": "Предпросмотр"},
+    "manual.hint": {
+        "en": "Drag selected files onto a group, or use the button. Nothing moves before"
+        " confirmation.",
+        "ru": "Перетащите выбранные файлы на группу или воспользуйтесь кнопкой."
+        " До подтверждения плана ничего не переместится.",
+    },
+    "manual.invalid_group": {
+        "en": "Use a valid folder name, up to 40 characters.",
+        "ru": "Введите допустимое имя папки длиной до 40 символов.",
+    },
+    "manual.ai": {"en": "Suggest groups (local AI)", "ru": "Предложить группы (локальный ИИ)"},
+    "manual.ai_done": {
+        "en": "AI suggestions are editable and may be wrong; existing assignments were kept.",
+        "ru": "Предложения ИИ можно изменить, они могут ошибаться; ваши назначения сохранены.",
+    },
+    "manual.ai_partial": {
+        "en": "AI stopped early: {reason}. Earlier suggestions were kept and may be wrong.",
+        "ru": "ИИ остановился раньше: {reason}. Прежние предложения сохранены и могут ошибаться.",
+    },
+    "manual.ai_error": {"en": "AI request failed.", "ru": "Запрос к ИИ завершился ошибкой."},
+    "manual.ai_empty": {"en": "AI found no groups.", "ru": "ИИ не предложил групп."},
+    "manual.ai_failed": {"en": "AI unavailable: {reason}", "ru": "ИИ недоступен: {reason}"},
+    "manual.search": {"en": "Search files", "ru": "Поиск файлов"},
+    "manual.privacy": {
+        "en": "AI is optional; only file names are sent to the local model.",
+        "ru": "ИИ необязателен: локальной модели передаются только имена файлов.",
+    },
+    "manual.limitation": {
+        "en": "Folders cannot be moved in this mode yet.",
+        "ru": "Перемещение папок в этом режиме пока недоступно.",
+    },
+    "manual.stale": {
+        "en": "The folder changed; choose it again before making a manual plan.",
+        "ru": "Папка изменилась; выберите её заново для ручного плана.",
+    },
     "organize.sort": {"en": "Sort…", "ru": "Разложить…"},
     "organize.nothing": {
         "en": "Nothing to move in {folder}.",

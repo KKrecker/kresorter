@@ -58,6 +58,7 @@ from kresorter.storage.pending import Domain
 from kresorter.storage.session import SessionFailed
 from kresorter.ui.dialogs import Confirmation
 from kresorter.ui.explain import ExplainPanel
+from kresorter.ui.manual import ManualDialog
 from kresorter.ui.parts import (
     QUIET,
     SECONDARY,
@@ -86,7 +87,9 @@ from kresorter.ui.sessions import (
     in_organize,
     no_act,
     plan_folder,
+    plan_manual_folder,
     sort_folder,
+    sort_manual_folder,
     undo_batch,
     undo_plan,
 )
@@ -182,6 +185,8 @@ class OrganizePage(QWidget):
         self._plan = _NO_PLAN
         self._by_kind = _NO_PLAN  # while the plan shown is grouped by meaning
         self._groups: Mapping[str, str] | None = None  # the plan shown's groups by meaning
+        self._manual: Mapping[str, str] | None = None
+        self.manual_dialog: ManualDialog | None = None
         self._rows: dict[int, QTreeWidgetItem] = {}
         self.cards: list[CategoryCard] = []
         self.planned_at: float | None = None
@@ -207,6 +212,8 @@ class OrganizePage(QWidget):
         self.choose_button.clicked.connect(self._choose)
         self.group_button = button(look, text("organize.group"), icon="sparkles")
         self.group_button.clicked.connect(self._group)
+        self.manual_button = button(look, text("manual.title"))
+        self.manual_button.clicked.connect(self._manual_open)
         self.kind_button = button(look, text("organize.by_kind"))
         self.kind_button.clicked.connect(self._kind_again)
         self.grouped = Note(self.controls, role="secondary")
@@ -270,10 +277,13 @@ class OrganizePage(QWidget):
         chosen = hbox(spacing=8)
         chosen.addWidget(self.folder, 3)
         chosen.addWidget(self.choose_button)
-        chosen.addWidget(self.group_button)
-        chosen.addWidget(self.kind_button)
         chosen.addStretch(1)
         chosen.addWidget(self.state)
+        modes = hbox(spacing=8)
+        modes.addWidget(self.group_button)
+        modes.addWidget(self.manual_button)
+        modes.addWidget(self.kind_button)
+        modes.addStretch(1)
         stays_head = hbox(spacing=12)
         stays_head.addWidget(self.stays_title)
         stays_head.addWidget(self.stays_note)
@@ -296,6 +306,7 @@ class OrganizePage(QWidget):
         lower.addWidget(self.recent, 0, Qt.AlignmentFlag.AlignTop)
         inside = vbox(self.controls, margins=(32, 16, 32, 16), spacing=16)
         inside.addLayout(chosen)
+        inside.addLayout(modes)
         inside.addWidget(self.grouped)
         inside.addWidget(self.summary)
         inside.addLayout(self.categories)
@@ -322,6 +333,7 @@ class OrganizePage(QWidget):
         layout.addWidget(self.bar)
         window.add_starter(self.choose_button)
         window.add_starter(self.group_button, lambda: len(names_to_group(self._plan)) >= 2)
+        window.add_starter(self.manual_button, lambda: self.planned_at is not None)
         window.add_starter(self.kind_button)
         window.add_starter(self.move_button, lambda: bool(self._plan.moves))
         window.add_starter(self.undo_button, lambda: bool(self.batches.selectedItems()))
@@ -413,7 +425,7 @@ class OrganizePage(QWidget):
         text = self._window.translator.text
         self.result.clear()
         self.grouped.clear()
-        self._plan, self._groups = _NO_PLAN, None
+        self._plan, self._groups, self._manual = _NO_PLAN, None, None
         self.planned_at = None
         self.folder.setText(shown_path(found.folder, Path.home()))
         self.choose_button.setText(text("organize.change"))
@@ -425,6 +437,36 @@ class OrganizePage(QWidget):
         self._plan = found
         self.planned_at = time.time()
         self._window.overview.show_plan(found)
+        self._show_plan()
+
+    def _manual_open(self) -> None:
+        base = self._by_kind if self._groups is not None or self._manual is not None else self._plan
+        initial = self._manual or self._groups or {}
+        editor = ManualDialog(self._window, base, initial)
+        self.manual_dialog = editor
+
+        def accepted() -> None:
+            assignments = dict(editor.assignments)
+            self._session(
+                "task.plan",
+                plan_manual_folder(base.folder, assignments),
+                lambda found: self._manual_planned(found, base, assignments),
+            )
+
+        editor.accepted.connect(accepted)
+        editor.setModal(True)
+        editor.show()
+
+    def _manual_planned(
+        self, found: Plan | FolderRefused | None, base: Plan, assignments: Mapping[str, str]
+    ) -> None:
+        if found is None:
+            self.result.setText(self._window.translator.text("manual.stale"))
+            return
+        self._planned(found)
+        if isinstance(found, FolderRefused):
+            return
+        self._by_kind, self._manual = base, assignments
         self._show_plan()
 
     def _group(self) -> None:
@@ -464,7 +506,7 @@ class OrganizePage(QWidget):
     def _kind_again(self) -> None:
         """Back to the plan by kind."""
         self.grouped.clear()
-        self._plan, self._groups = self._by_kind, None
+        self._plan, self._groups, self._manual = self._by_kind, None, None
         self._window.overview.show_plan(self._plan)
         self._show_plan()
 
@@ -508,8 +550,11 @@ class OrganizePage(QWidget):
         into = count("folders.into", len(groups))
         self.will.setText(text("organize.will", files=count("file", len(found.moves)), into=into))
         self.bar.setHidden(not moves)
-        self.group_button.setHidden(planned is None or self._groups is not None)
-        self.kind_button.setHidden(self._groups is None)
+        self.group_button.setHidden(
+            planned is None or self._groups is not None or self._manual is not None
+        )
+        self.manual_button.setHidden(planned is None)
+        self.kind_button.setHidden(self._groups is None and self._manual is None)
         window.update_starters()
 
     def _current(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
@@ -544,12 +589,16 @@ class OrganizePage(QWidget):
         )
         if not self._window.dialogs.confirm(asked):
             return
-        act = sort_folder(found.folder, found.moves, self._groups)
+        act = (
+            sort_manual_folder(found.folder, found.moves, self._manual)
+            if self._manual is not None
+            else sort_folder(found.folder, found.moves, self._groups)
+        )
         self._session("task.organize", act, self._sorted)
 
     def _sorted(self, carried: Carried | FolderRefused) -> None:
         text = self._window.translator.text
-        self._plan, self._groups = _NO_PLAN, None
+        self._plan, self._groups, self._manual = _NO_PLAN, None, None
         self.grouped.clear()
         self.planned_at = None
         self._window.overview.show_plan(None)

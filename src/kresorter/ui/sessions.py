@@ -35,6 +35,7 @@ from kresorter.core.scanner import ScanContext
 from kresorter.organize import recovery as organize_recovery
 from kresorter.organize.folders import FolderRefused
 from kresorter.organize.journal import Summary, summaries
+from kresorter.organize.manual import plan_manual
 from kresorter.organize.mover import BatchResult, Planned, carry_out, check
 from kresorter.organize.planner import Move, Plan, plan
 from kresorter.organize.platforms import renamer
@@ -67,9 +68,11 @@ __all__ = [
     "in_quarantine",
     "no_act",
     "plan_folder",
+    "plan_manual_folder",
     "problem",
     "recover_all",
     "sort_folder",
+    "sort_manual_folder",
     "undo_batch",
     "undo_plan",
     "unfinished_work",
@@ -192,6 +195,48 @@ def sort_folder(
         still, changed = _still(confirmed, found.moves)
         cleared, refused = check(still, folder, context)
         return _carry(conn, folder, cleared, refused, changed, context.platform)
+
+    return act
+
+
+def plan_manual_folder(
+    folder: Path, assignments: Mapping[str, str]
+) -> Act[Plan | FolderRefused | None]:
+    """Preview a manual plan; None means the staged selection is no longer valid."""
+    selected = dict(assignments)
+
+    def act(context: ScanContext, conn: Journal) -> Plan | FolderRefused | None:
+        try:
+            return plan_manual(folder, context, selected)
+        except FolderRefused as refused:
+            return refused
+        except ValueError:
+            return None
+
+    return act
+
+
+def sort_manual_folder(
+    folder: Path, confirmed: Sequence[Move], assignments: Mapping[str, str]
+) -> Act[Carried | FolderRefused]:
+    """Replan confirmed manual file moves inside the journal session, then recheck them.
+
+    Missing assignments invalidate the plan as a whole: no move is carried out. The user can
+    reopen the editor against the current folder instead of applying a stale selection.
+    """
+    selected = dict(assignments)
+    original = tuple(confirmed)
+
+    def act(context: ScanContext, conn: Journal) -> Carried | FolderRefused:
+        try:
+            found = plan_manual(folder, context, selected)
+        except FolderRefused as folder_refused:
+            return folder_refused
+        except ValueError:
+            return Carried(folder, None, (), (), tuple(move.source for move in original))
+        still, changed = _still(original, found.moves)
+        cleared, refused = check(still, found.folder, context)
+        return _carry(conn, found.folder, cleared, refused, changed, context.platform)
 
     return act
 

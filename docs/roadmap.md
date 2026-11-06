@@ -451,7 +451,7 @@ src/kresorter/
                   #   icons (and icons/, Lucide's), parts, shown, settings, dialogs, sessions,
                   #   overview, findings, organize, autostart, quarantine, recovery, explain,
                   #   settings_page (0014); step 8: errors, selftest (0015); motion (0018);
-                  #   brand (0019)
+                  #   brand (0019); manual (0021)
 ```
 
 Directories are created only when their step starts.

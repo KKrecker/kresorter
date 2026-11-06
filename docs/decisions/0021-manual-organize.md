@@ -11,10 +11,14 @@ groups, which the user can edit or disregard. No proposed moves happen until the
 confirms them. Moving a folder can break paths used by projects or programs; warn prominently
 before confirmation. No overwrite; journal and undo with clear reporting of anything not restored.
 This requires new safety, recovery and undo work for directories: the existing file preflight,
-identity and undo rules do not support them. The manual interface and directory moves are not yet
-implemented. A read-only manual file planner is available as groundwork: it proposes only
-assigned files, validates group names, keeps protected entries and unassigned companions in
-place, and never executes a move. It is not yet connected to the interface.
+identity and undo rules do not support them. Directory moves are not yet implemented.
+
+The manual file interface provides selectable and searchable tiles, named groups, drag-and-drop
+and a keyboard-accessible assignment button. Optional local AI proposes editable assignments
+without replacing the user's own. Preview is read-only, then confirmation precedes a journaled
+batch with existing preflight and undo; changed or missing entries are not moved. Protected
+entries stay protected, and unassigned companions stay beside a file. This first version is for
+files only; directory moving and its warning remain pending.
 
 ## Shortcuts
 
